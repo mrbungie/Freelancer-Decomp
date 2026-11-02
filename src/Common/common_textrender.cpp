@@ -773,6 +773,12 @@ void DeviceTRC::get_text_fit(const wchar_t* Text, int MaxWidth, int& FitCount,
         ++FitCount;
         TotalWidth = NewTotal;
     }
+    if (getenv("FL_TRACE_FONT"))
+    {
+        static int Shown = 0;
+        if (Shown++ < 12)
+            fprintf(stderr, "[trc] get_text_fit max=%d len=%d fit=%d font=%p style=%d\n", MaxWidth, Len, FitCount, (const void*)Font, (int)(CurrentAttrs.Packed & 0xFF));
+    }
 }
 
 void DeviceTRC::execute_text(const wchar_t* Text, bool bHighlight, int Len)

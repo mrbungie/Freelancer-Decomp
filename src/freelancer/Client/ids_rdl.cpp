@@ -6,7 +6,9 @@
 
 // FUN_0057da40 / FUN_0057db50 -- IDS resource and plain UTF-16 text into a RenderDisplayList.
 
+#include <map>
 #include <string>
+#include <vector>
 #include "ids_rdl.h"
 #include "ids_strings.h"
 
@@ -123,6 +125,8 @@ namespace
                  bool bUseTextPtr)
     {
         const int Len = static_cast<int>(End - Start);
+        if (getenv("FL_TRACE_FONT"))
+            fprintf(stderr, "[ids] EmitRun len=%d first=%c ptr=%d\n", Len, Len > 0 ? (char)Start[0] : '?', (int)bUseTextPtr);
         if (Len <= 0)
             return;
 
@@ -161,8 +165,12 @@ void AppendTextMaybeXmlRdl(const wchar_t* Text, unsigned int Count, RenderDispla
 {
     // FUN_0057e2c0: XMLReader::read_buffer(Rdl, Text, Count*2) with no test of either argument
     // (0057e2d5..0057e2e3); AL == 0 falls into FUN_0057db50 with the same arguments (0057e2f5).
+    // PORT: callers hold host wchar_t text; the reader takes UTF-16 bytes.
+    std::vector<unsigned short> Units(Count);
+    for (unsigned int Index = 0; Index < Count; ++Index)
+        Units[Index] = static_cast<unsigned short>(Text[Index]);
     XMLReader Reader;
-    if (Reader.read_buffer(Rdl, reinterpret_cast<const char*>(Text), Count * 2u))
+    if (Reader.read_buffer(Rdl, reinterpret_cast<const char*>(Units.data()), Count * 2u))
         return;
     AppendTextAsRdl(Text, Count, Rdl, bUseTextPtr);
 }
@@ -323,12 +331,17 @@ bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl)
     XMLReader Reader;
     if (!Reader.read_buffer(Rdl, reinterpret_cast<const char*>(Text), Count * 2u))
     {
-        // PORT: the resource holds 16-bit units; the RDL text nodes use the host wchar_t.
-        std::wstring Wide;
-        Wide.reserve(Count);
-        const unsigned short* const Units = reinterpret_cast<const unsigned short*>(Text);
-        for (unsigned int Index = 0; Index < Count; ++Index)
-            Wide.push_back(static_cast<wchar_t>(Units[Index]));
+        // PORT: the resource holds 16-bit units; the RDL text nodes use the host wchar_t and point into the buffer
+        // (TextPtrNode), so the widened copy must outlive the list: keep one per resource.
+        static std::map<std::pair<HMODULE, unsigned int>, std::wstring> Widened;
+        std::wstring& Wide = Widened[std::make_pair(Module, LowId)];
+        if (Wide.empty())
+        {
+            const unsigned short* const Units = reinterpret_cast<const unsigned short*>(Text);
+            Wide.reserve(Count);
+            for (unsigned int Index = 0; Index < Count; ++Index)
+                Wide.push_back(static_cast<wchar_t>(Units[Index]));
+        }
         AppendTextAsRdl(Wide.c_str(), Count, Rdl, true);
     }
     return true;

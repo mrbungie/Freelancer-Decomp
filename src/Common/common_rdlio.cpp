@@ -1301,6 +1301,9 @@ namespace
         size_t I = 0;
         size_t const N = Doc.size();
         if (I < N && Doc[I] == 0xFEFF) ++I;
+        // Like a real XML reader: exactly one balanced root element, no character data outside it.
+        int Depth = 0;
+        bool SawRoot = false;
         Sink.startDocument();
         while (I < N)
         {
@@ -1309,7 +1312,14 @@ namespace
                 size_t End = Doc.find(L'<', I);
                 if (End == std::wstring::npos) End = N;
                 std::wstring Text = SaxDecode(Doc.substr(I, End - I));
-                if (!Text.empty()) Sink.characters(Text.c_str(), (int)Text.size());
+                if (Depth == 0)
+                {
+                    for (wchar_t Ch : Text)
+                        if (!iswspace((wint_t)Ch))
+                            return E_FAIL;   // "content is not allowed outside the root element"
+                }
+                else if (!Text.empty())
+                    Sink.characters(Text.c_str(), (int)Text.size());
                 I = End;
                 continue;
             }
@@ -1345,6 +1355,7 @@ namespace
                 if (End == std::wstring::npos) return E_FAIL;
                 std::wstring Name = Doc.substr(I + 2, End - I - 2);
                 while (!Name.empty() && iswspace((wint_t)Name.back())) Name.pop_back();
+                if (--Depth < 0) return E_FAIL;
                 Sink.endElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size());
                 I = End + 1;
             }
@@ -1386,11 +1397,17 @@ namespace
                     Attrs.Names.push_back(AName);
                     Attrs.Values.push_back(AValue);
                 }
+                if (Depth == 0 && SawRoot) return E_FAIL;   // a second root element
+                SawRoot = true;
                 Sink.startElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size(), &Attrs);
                 if (SelfClose)
                     Sink.endElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size());
+                else
+                    ++Depth;
             }
         }
+        if (!SawRoot || Depth != 0)
+            return E_FAIL;
         Sink.endDocument();
         return S_OK;
     }
