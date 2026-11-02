@@ -1100,7 +1100,7 @@ FTradeLaneRingRuntime* TradeLaneRingFindOrCreate(FClientGameobj* RingGameobj,
     Ring->bActive = 1;
     Watchable const* WatchTarget = nullptr;
     if (RingGameobj != nullptr)
-        WatchTarget = reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char*>(RingGameobj) + 8);
+        WatchTarget = WatchableOf(RingGameobj);
     Ring->RingWatcher.set(WatchTarget);
     Ring->SideKey = Side;
 

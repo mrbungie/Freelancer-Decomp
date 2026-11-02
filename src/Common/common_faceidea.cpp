@@ -135,8 +135,7 @@ void FaceIdea::SetWatchObject(void const* Object2)
     // 062d7518-062d7533: tag 1, then watch Object2 + 8 -- the IObjRW -> Watchable
     // adjustment, identical to MoveIdea::SetWatchObject's.
     TargetKind = 1;
-    Watcher.set(reinterpret_cast<Watchable const*>(
-        static_cast<unsigned char const*>(Object2) + 8));
+    Watcher.set(WatchableOf(Object2));
 }
 
 // FUN_062d7560 (item 1607), Common.dll.txt 219311-219320, 10 instructions.

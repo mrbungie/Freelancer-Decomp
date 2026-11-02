@@ -248,7 +248,7 @@ void AppendSystemManagerTimerListEntry(SystemManagerTimerTable* Self, void* Sour
     if (Candidate != nullptr)
     {
         Watchable* const Target =
-            reinterpret_cast<Watchable*>(reinterpret_cast<unsigned char*>(Candidate) + 8);
+            WatchableOf(Candidate);
         if (Target != nullptr)
             Scratch.set(Target);
     }

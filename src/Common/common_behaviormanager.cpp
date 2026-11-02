@@ -1225,7 +1225,7 @@ void IBehaviorManager::QueueNotification(IObjRW* Target, unsigned Extra, float D
         NotificationNode* Node = InsertNotificationNodeBefore(NotificationQueueHead);
         Node->Mode = 0;
         Node->WatcherA.set((Target != nullptr)
-            ? reinterpret_cast<Watchable const*>(reinterpret_cast<char const*>(Target) + 8)
+            ? WatchableOf(Target)
             : nullptr);
         Node->WatcherB.set(nullptr);
         Node->Field1C = Extra;
@@ -1276,7 +1276,7 @@ void IBehaviorManager::InsertNotification(IObjRW* Target, unsigned Extra, float 
             && (WatchableOwnerAddr(SelfWatched) != nullptr);
         Node->WatcherA.set(SelfValid ? SelfWatched : nullptr);
         Node->WatcherB.set((Target != nullptr)
-            ? reinterpret_cast<Watchable const*>(reinterpret_cast<char const*>(Target) + 8)
+            ? WatchableOf(Target)
             : nullptr);
         Node->Field1C = Extra;      // 062d484f local_14
         Node->Timer = Duration;     // 062d4853 local_10

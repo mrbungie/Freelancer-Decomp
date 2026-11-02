@@ -4,6 +4,7 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
+#include "common_iface.h"
 #include "client_gameobj.h"
 #include "fl/handles.h"
 
@@ -5109,8 +5110,7 @@ int FClientGuidedGameobj::set_target(IObjRW* Target, unsigned short SubTarget, i
     if (static_cast<Archetype::Munition const*>(Guided->Archetype)->Seeker != 0)
     {
         Watchable const* const NewWatched =
-            (Target != nullptr) ? reinterpret_cast<Watchable const*>(
-                                      reinterpret_cast<unsigned char const*>(Target) + 8)
+            (Target != nullptr) ? WatchableOf(Target)
                                 : nullptr;
         Guided->TargetWatch.set(NewWatched);
     }
@@ -5310,7 +5310,7 @@ void GameobjWatchListAdd(IObjRW* Obj)
     if (Obj != nullptr)
     {
         Watchable const* const Target =
-            reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char const*>(Obj) + 8);
+            WatchableOf(Obj);
         G_GameobjWatchList.back().set(Target);
     }
 }

@@ -805,6 +805,12 @@ inline IObjRW* ObjRwFromWatchable(void* WatchableSubObject)
     return static_cast<IObjRW*>(static_cast<Watchable*>(WatchableSubObject));
 }
 
+// Object -> its Watchable base (retail: `object + 8`). Null stays null.
+inline Watchable* WatchableOf(void const* ObjRw)
+{
+    return ObjRw == nullptr ? nullptr : static_cast<Watchable*>(static_cast<IObjRW*>(const_cast<void*>(ObjRw)));
+}
+
 // Address of the whole object a Watchable sub-object belongs to (retail: `watchable - 8`).
 template <class P>
 inline char const* WatchableOwnerAddr(P const* W)

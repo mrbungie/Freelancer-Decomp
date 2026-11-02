@@ -358,7 +358,7 @@ void DodgeMissileIdea::SetWatchObject(void const* Object)
 {
     Watchable const* const Target =
         (Object != nullptr)
-            ? reinterpret_cast<Watchable const*>(static_cast<unsigned char const*>(Object) + 8)
+            ? WatchableOf(Object)
             : nullptr;
     MissileWatcher.set(Target);
 }

@@ -137,7 +137,7 @@ int FormationBehavior::Slot5(float Value)
     {
         IObjRW* const Default = Rec->GetFormationLeader();          // 062cc064 FUN_062ecab0
         LeadWatcher.set(Default != nullptr
-            ? reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char*>(Default) + 8)
+            ? WatchableOf(Default)
             : nullptr);
     }
     if (ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target())) != nullptr)
@@ -342,7 +342,7 @@ void FormationBehavior::Slot27()
     {
         IObjRW* const Directed = NavHelper->GunConvergenceStateBytes.GetFormationLeader(); // FUN_062ecab0
         LeadWatcher.set(Directed != nullptr
-            ? reinterpret_cast<Watchable const*>(reinterpret_cast<unsigned char*>(Directed) + 8)
+            ? WatchableOf(Directed)
             : nullptr);
     }
 

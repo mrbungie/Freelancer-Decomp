@@ -8,6 +8,7 @@
 // FUN_004f7bd0 kill, FUN_004f7db0 freeze-to-world, FUN_004f7ef0 world transform).
 // Agent: cursor:equip-fx-factory.
 
+#include "common_iface.h"
 #include "effect_base.h"
 #include "fl/handles.h"
 
@@ -194,7 +195,7 @@ void FEffectBase::Attach(void* WatchableOwner, int EngineIndex, FTransform const
     Watchable const* WatchablePtr = nullptr;
     if (WatchableOwner != nullptr)
         WatchablePtr =
-            reinterpret_cast<Watchable const*>(static_cast<unsigned char*>(WatchableOwner) + 8);
+            WatchableOf(WatchableOwner);
     if (WatchablePtr != This->Watcher.target())
         This->Watcher.set(WatchablePtr);
     This->EngineIndex = EngineIndex;
