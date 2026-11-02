@@ -28,7 +28,7 @@ public:
     explicit IVP_U_Vector(int Size)
         : memsize((unsigned short)Size)
         , n_elems(0)
-        , elems(Size != 0 ? (T**)malloc((size_t)Size * 4u) : nullptr)
+        , elems(Size != 0 ? (T**)malloc((size_t)Size * sizeof(T*)) : nullptr)
     {
     }
 
@@ -168,7 +168,7 @@ protected:
     // the n_elems pointers; free the old block unless it is the inline buffer or null.
     void Realloc()
     {
-        unsigned int NewByteCount = ((unsigned int)memsize * 8) + 8; // 063441a9
+        unsigned int NewByteCount = ((unsigned int)memsize * 2 + 2) * sizeof(T*); // 063441a9 (memsize*8+8 with 4-byte pointers)
         T** NewBuffer = (T**)malloc(NewByteCount);                  // 063441b1 FUN_06343f70
 
         unsigned short NewMemsize = (unsigned short)((memsize << 1) + 1); // 063441bb-063441ca

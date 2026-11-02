@@ -244,7 +244,7 @@ IVP_OV_Element::IVP_OV_Element(IVP_Real_Object* Owner)
     // takes the free path in practice.
     collision_fvector.memsize = 0x10;
     collision_fvector.n_elems = 0;
-    collision_fvector.elems = static_cast<IVP_Collision**>(std::malloc(0x40));
+    collision_fvector.elems = static_cast<IVP_Collision**>(std::malloc(16 * sizeof(IVP_Collision*)));   // 0x40 bytes in retail
 
     node = nullptr;         // :0635c044
     CenterX = 0.0f;         // :0635c04d
@@ -1540,7 +1540,7 @@ void IVP_Mindist_Manager::RebuildOvElement(IVP_Real_Object* Object)
 
     Object->ov_element = nullptr; // :0634f1b0
 
-    void* Raw = ::operator new(0x30);                    // :0634f1ae-:0634f1ba
+    void* Raw = ::operator new(sizeof(IVP_OV_Element));                    // :0634f1ae-:0634f1ba
     Object->ov_element = (Raw != nullptr)                 // :0634f1c6/:0634f1d0
                        ? new (Raw) IVP_OV_Element(Object) // :0634f1d5
                        : nullptr;                         // LAB_0634f1dc

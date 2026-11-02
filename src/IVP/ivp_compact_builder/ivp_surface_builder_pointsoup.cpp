@@ -722,7 +722,7 @@ namespace
 
 // FUN_0636ca00 (.text:0636ca00-0636ca21).
 FLedgeConvexHullBuilder::FLedgeConvexHullBuilder()
-    : Ledges(static_cast<IVP_Compact_Ledge**>(malloc(0x200)), 0x80) // FUN_06343f70 = malloc
+    : Ledges(static_cast<IVP_Compact_Ledge**>(malloc(0x80 * sizeof(IVP_Compact_Ledge*))), 0x80) // FUN_06343f70 = malloc
 {
 }
 

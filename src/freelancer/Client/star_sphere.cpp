@@ -8,6 +8,7 @@
 // Listing: FUN_00510d10 / 00510ef0 / 00510f10 / LAB_00511020 / FUN_0050c950 / 0050d420 /
 //          FUN_0050d300 / FUN_004215b0 / 00422690 / FUN_00554e90.
 
+#include "fl/handles.h"
 #include "star_sphere.h"
 
 #include "DALib.h"
@@ -47,6 +48,16 @@
 #include <cstdint>
 #include <cstring>
 #include <new>
+
+// Retail records keep 4-byte pointer slots at fixed offsets; here the slot holds a handle (fl/handles.h).
+template<class T> static T* RawGetPtr(unsigned char* Base, unsigned Off)
+{
+    uint32_t H; std::memcpy(&H, Base + Off, 4); return static_cast<T*>(fl::HandleToPtr(H));
+}
+static void RawSetPtr(unsigned char* Base, unsigned Off, const void* P)
+{
+    uint32_t H = fl::PtrToHandle(P); std::memcpy(Base + Off, &H, 4);
+}
 
 constexpr int kPipelineStateViewspace = 7;
 constexpr float kPi = 3.14159274f; // 0x40490fdb
@@ -1088,8 +1099,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // colour (+8, +0xc, +0x10, fade * +0x14); centre sun + axis * +0 (the y product through
         // a float first); half size base * +4; the quad (u,v) (0,0) (1,0) (1,1) (0,1) at
         // (x-h,y-h) (x+h,y-h) (x+h,y+h) (x-h,y+h), z 0.
-        float** It = *reinterpret_cast<float***>(Base + 0x04);
-        while (It != *reinterpret_cast<float***>(Base + 0x08))
+        float** It = RawGetPtr<float*>(Base, 0x04);
+        while (It != RawGetPtr<float*>(Base, 0x08))
         {
             float const* const Elem = *It;
             Win3DColor4f(Elem[2], Elem[3], Elem[4],
@@ -1956,10 +1967,10 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         double SpinesMax = 0.0;
         for (unsigned Index = 0;; ++Index)
         {
-            unsigned char* const Begin = *reinterpret_cast<unsigned char**>(SpinesRaw + 0x04);
+            unsigned char* const Begin = RawGetPtr<unsigned char>(SpinesRaw, 0x04);
             if (Begin == nullptr)
                 break;
-            unsigned char* const End = *reinterpret_cast<unsigned char**>(SpinesRaw + 0x08);
+            unsigned char* const End = RawGetPtr<unsigned char>(SpinesRaw, 0x08);
             int const Count = static_cast<int>((End - Begin) / 0x2c);
             if (Index >= static_cast<unsigned>(Count))
                 break;
@@ -2426,8 +2437,8 @@ static void LensFlareFree(FStarFxChild40* Flare)
     if (Flare == nullptr)
         return;
     unsigned char* const Base = Flare->Raw;
-    float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-    float** End = *reinterpret_cast<float***>(Base + 0x08);
+    float** Begin = RawGetPtr<float*>(Base, 0x04);
+    float** End = RawGetPtr<float*>(Base, 0x08);
     if (Begin != nullptr)
     {
         for (float** It = Begin; It != End; ++It)
@@ -2437,10 +2448,10 @@ static void LensFlareFree(FStarFxChild40* Flare)
         }
         operator delete(Begin);
     }
-    *reinterpret_cast<void**>(Base + 0x04) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x08) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x0c) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x34) = nullptr;
+    RawSetPtr(Base, 0x04, nullptr);
+    RawSetPtr(Base, 0x08, nullptr);
+    RawSetPtr(Base, 0x0c, nullptr);
+    RawSetPtr(Base, 0x34, nullptr);
 }
 
 static void SpinesFree(FStarFxChild40* Spines)
@@ -2449,25 +2460,25 @@ static void SpinesFree(FStarFxChild40* Spines)
     if (Spines == nullptr)
         return;
     unsigned char* const Base = Spines->Raw;
-    *reinterpret_cast<void**>(Base + 0x08) = *reinterpret_cast<void**>(Base + 0x04);
-    *reinterpret_cast<void**>(Base + 0x34) = nullptr;
+    RawSetPtr(Base, 0x08, RawGetPtr<void>(Base, 0x04));
+    RawSetPtr(Base, 0x34, nullptr);
     *reinterpret_cast<unsigned*>(Base + 0x10) = 0;
     Base[0x14] = 0;
-    void* const Begin = *reinterpret_cast<void**>(Base + 0x04);
+    void* const Begin = RawGetPtr<void>(Base, 0x04);
     if (Begin != nullptr)
         operator delete(Begin);
-    *reinterpret_cast<void**>(Base + 0x04) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x08) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x0c) = nullptr;
+    RawSetPtr(Base, 0x04, nullptr);
+    RawSetPtr(Base, 0x08, nullptr);
+    RawSetPtr(Base, 0x0c, nullptr);
 }
 
 static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
 {
     // FUN_00537260 — push float[6]* into [+4,+8) pointer vector.
     unsigned char* const Base = Flare->Raw;
-    float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-    float** End = *reinterpret_cast<float***>(Base + 0x08);
-    float** Cap = *reinterpret_cast<float***>(Base + 0x0c);
+    float** Begin = RawGetPtr<float*>(Base, 0x04);
+    float** End = RawGetPtr<float*>(Base, 0x08);
+    float** Cap = RawGetPtr<float*>(Base, 0x0c);
     if (End == Cap)
     {
         int const OldCount = (Begin != nullptr) ? static_cast<int>(End - Begin) : 0;
@@ -2482,8 +2493,8 @@ static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
         Begin = NewBegin;
         End = Begin + OldCount;
         Cap = Begin + NewCap;
-        *reinterpret_cast<float***>(Base + 0x04) = Begin;
-        *reinterpret_cast<float***>(Base + 0x0c) = Cap;
+        RawSetPtr(Base, 0x04, Begin);
+        RawSetPtr(Base, 0x0c, Cap);
     }
     float* Elem = static_cast<float*>(operator new(sizeof(float) * 6));
     if (Elem == nullptr)
@@ -2492,16 +2503,16 @@ static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
         Elem[I] = Values[I];
     *End = Elem;
     ++End;
-    *reinterpret_cast<float***>(Base + 0x08) = End;
+    RawSetPtr(Base, 0x08, End);
 }
 
 static void SpinesPushElem(FStarFxChild40* Spines, float const Elem[11])
 {
     // FUN_005126f0 — append one 0x2c record.
     unsigned char* const Base = Spines->Raw;
-    unsigned char* Begin = *reinterpret_cast<unsigned char**>(Base + 0x04);
-    unsigned char* End = *reinterpret_cast<unsigned char**>(Base + 0x08);
-    unsigned char* Cap = *reinterpret_cast<unsigned char**>(Base + 0x0c);
+    unsigned char* Begin = RawGetPtr<unsigned char>(Base, 0x04);
+    unsigned char* End = RawGetPtr<unsigned char>(Base, 0x08);
+    unsigned char* Cap = RawGetPtr<unsigned char>(Base, 0x0c);
     int const Stride = 0x2c;
     if (End == Cap)
     {
@@ -2519,12 +2530,12 @@ static void SpinesPushElem(FStarFxChild40* Spines, float const Elem[11])
         Begin = NewBegin;
         End = Begin + OldCount * Stride;
         Cap = Begin + NewCap * Stride;
-        *reinterpret_cast<unsigned char**>(Base + 0x04) = Begin;
-        *reinterpret_cast<unsigned char**>(Base + 0x0c) = Cap;
+        RawSetPtr(Base, 0x04, Begin);
+        RawSetPtr(Base, 0x0c, Cap);
     }
     memcpy(End, Elem, Stride);
     End += Stride;
-    *reinterpret_cast<unsigned char**>(Base + 0x08) = End;
+    RawSetPtr(Base, 0x08, End);
 }
 
 // -------------------------------------------------------------------- FUN_0050f3a0
@@ -2600,8 +2611,8 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
     // FUN_00512b00 / 00512a40 / 00512b70 — sort bead pointer vector by pointer address
     // (MSVC insertion/introsort on uint*). Count ≤16 → insertion; else introsort-equivalent.
     {
-        float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-        float** End = *reinterpret_cast<float***>(Base + 0x08);
+        float** Begin = RawGetPtr<float*>(Base, 0x04);
+        float** End = RawGetPtr<float*>(Base, 0x08);
         if (Begin != nullptr && End != nullptr && End > Begin)
         {
             int const Count = static_cast<int>(End - Begin);
@@ -2693,8 +2704,8 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
     }
     Reader.close();
 
-    unsigned char* Begin = *reinterpret_cast<unsigned char**>(Base + 0x04);
-    unsigned char* End = *reinterpret_cast<unsigned char**>(Base + 0x08);
+    unsigned char* Begin = RawGetPtr<unsigned char>(Base, 0x04);
+    unsigned char* End = RawGetPtr<unsigned char>(Base, 0x08);
     int Count = 0;
     if (Begin != nullptr)
         Count = static_cast<int>(End - Begin) / 0x2c;

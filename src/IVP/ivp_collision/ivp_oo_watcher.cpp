@@ -98,7 +98,7 @@ void IVP_Synapse_OO::hull_manager_is_going_to_be_deleted_event(IVP_Hull_Manager*
 IVP_OO_Watcher::IVP_OO_Watcher(IVP_Collision_Delegator* Delegator, IVP_Real_Object* Object0, IVP_Real_Object* Object1)
     : IVP_Collision(Delegator)                                                     // :06369bf9-:06369c0f
     , IVP_Collision_Delegator()                                                    // :06369c1b
-    , mindists(static_cast<IVP_Collision**>(std::malloc(0x20)), 8)                 // :06369c3f-:06369c58
+    , mindists(static_cast<IVP_Collision**>(std::malloc(8 * sizeof(IVP_Collision*))), 8)                 // :06369c3f-:06369c58
 {
     synapses[0].init_synapse_oo(this, Object0); // :06369c70-:06369c77
     synapses[1].init_synapse_oo(this, Object1); // :06369c7c-:06369c85
