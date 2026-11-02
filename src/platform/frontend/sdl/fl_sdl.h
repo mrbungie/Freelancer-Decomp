@@ -59,6 +59,7 @@ void        fl_sdl_set_window_rect(FlSdlWindow, int x, int y, int w, int h, bool
 void        fl_sdl_show_cursor(bool show);
 bool        fl_sdl_warp_cursor(FlSdlWindow, int x, int y);   // window-relative on SDL1
 bool        fl_sdl_get_cursor(FlSdlWindow, int* x, int* y);
+bool        fl_sdl_get_cursor_in_window(FlSdlWindow, int* x, int* y);   // OS pointer in client coordinates
 bool        fl_sdl_key_down(int flKey);                      // FlKey (below), translated per SDL version
 const char* fl_sdl_error();
 void        fl_sdl_pump_events();                            // pump the OS queue (needed for fresh mouse/key state)

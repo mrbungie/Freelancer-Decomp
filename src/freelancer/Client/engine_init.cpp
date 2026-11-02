@@ -756,7 +756,11 @@ bool InitializeEngine(const FClientCommandLine* CommandLine)
     Mode.interval = 1;
     Mode.buffer_count = 2;
     Mode.border = 1;
+#if defined(FREELANCER_PORTABLE)
+    Mode.fullscreen = 0;   // PORT: the window host stays windowed; the software cursor must follow the OS pointer (see SetActive)
+#else
     Mode.fullscreen = 1;
+#endif
     static_assert(offsetof(DisplaySettings, height) == offsetof(DisplaySettings, width) + 4 &&
                       offsetof(DisplaySettings, color_bpp) == offsetof(DisplaySettings, width) + 8 &&
                       offsetof(DisplaySettings, depth_bpp) == offsetof(DisplaySettings, width) + 12,

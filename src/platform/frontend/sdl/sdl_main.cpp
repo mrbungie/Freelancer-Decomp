@@ -108,7 +108,7 @@ namespace
         unsigned DoubleClickTimeMs() override { return 500; }
         bool IsCursorVisible() override { return cursorCounter_ >= 0; }
         void SetCursorVisible(bool v) override { cursorCounter_ = v ? 0 : -1; fl_sdl_show_cursor(v); }
-        bool GetCursorInWindow(void*, int* x, int* y) override { return fl_sdl_get_cursor(nullptr, x, y); }   // TODO: subtract window origin
+        bool GetCursorInWindow(void* w, int* x, int* y) override { return fl_sdl_get_cursor_in_window(static_cast<FlSdlWindow>(w), x, y); }
         bool SetCursorInWindow(void*, int x, int y) override { return fl_sdl_warp_cursor(nullptr, x, y); }
         int GetKeyState(int vk) override
         {

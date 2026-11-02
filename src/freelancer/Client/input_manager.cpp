@@ -322,6 +322,8 @@ namespace
 
             // A windowed session picks the cursor up where the OS pointer is.
             int PointX = 0, PointY = 0;
+            if (getenv("FL_TRACE_INPUT"))
+                fprintf(stderr, "[in] SetActive(1) display=%dx%d fullscreen=%d cursor=%d,%d\n", (int)g_display.width, (int)g_display.height, (int)g_display.fullscreen, (int)G_CursorX, (int)G_CursorY);
             if (g_display.width != 0 && g_display.height != 0 && g_display.fullscreen == 0 &&
                 fl::GetWindowHost()->GetCursorInWindow(g_client.window, &PointX, &PointY))
             {
@@ -922,6 +924,8 @@ namespace
 void ClientInputOnMouseMove()
 {
     // FUN_0041e890: gated on DAT_0061685c; the device ensure and FUN_004201a0(1) inlined.
+    if (getenv("FL_TRACE_INPUT"))
+        fprintf(stderr, "[in] OnMouseMove inputActive=%d\n", (int)G_bInputActive);
     if (!G_bInputActive)
         return;
     EnsureDevice();

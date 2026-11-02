@@ -6,6 +6,8 @@
 // ============================================================================ SDL 2
 bool fl_sdl_init()
 {
+    // Scripted runs (FL_CONTROL) must not steal focus from the user: run as a background app.
+    if (getenv("FL_CONTROL")) { SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1"); }
     return SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMECONTROLLER) == 0;
 }
 void fl_sdl_quit() { SDL_Quit(); }
@@ -41,11 +43,63 @@ void fl_sdl_desktop_size(int* w, int* h)
     SDL_DisplayMode m;
     if (SDL_GetDesktopDisplayMode(0, &m) == 0) { *w = m.w; *h = m.h; } else { *w = 1920; *h = 1080; }
 }
+
+static bool g_relMouse = false;   // pointer captured (DirectInput exclusive): only deltas matter, no WM_MOUSEMOVE reaches the game
+
+// ---- debug control channel: FL_CONTROL=<fifo path> lets a script drive the pointer (see tools/port/flctl.sh) ----
+#include <atomic>
+#include <thread>
+#include <string>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+static std::atomic<bool> g_ctlActive{false};
+static std::atomic<int> g_ctlX{0}, g_ctlY{0}, g_ctlDx{0}, g_ctlDy{0};
+static std::atomic<unsigned> g_ctlButtons{0}, g_ctlLatch{0};
+static void CtlMove(int x, int y)
+{
+    g_ctlDx += x - g_ctlX.load(); g_ctlDy += y - g_ctlY.load();
+    g_ctlX = x; g_ctlY = y; g_ctlActive = true;
+    SDL_Event e; SDL_zero(e); e.type = SDL_MOUSEMOTION; SDL_PushEvent(&e);
+}
+static void ControlThread(std::string path)
+{
+    mkfifo(path.c_str(), 0600);
+    for (;;)
+    {
+        FILE* f = fopen(path.c_str(), "r");   // blocks until a writer opens the fifo
+        if (!f) return;
+        char line[256];
+        while (fgets(line, sizeof line, f))
+        {
+            char cmd[32] = {}; int a = 0, b = 0;
+            int n = sscanf(line, "%31s %d %d", cmd, &a, &b);
+            if (n >= 3 && !strcmp(cmd, "move")) CtlMove(a, b);
+            else if (n >= 3 && !strcmp(cmd, "click"))
+            {
+                CtlMove(a, b); usleep(150000);
+                g_ctlButtons = 1; g_ctlLatch = 1; usleep(120000); g_ctlButtons = 0;
+                fprintf(stderr, "[ctl] click %d %d\n", a, b);
+            }
+            else if (n >= 1 && !strcmp(cmd, "quit")) { SDL_Event e; SDL_zero(e); e.type = SDL_QUIT; SDL_PushEvent(&e); }
+        }
+        fclose(f);
+    }
+}
+static bool g_ctlEnabled = false;
+static void ControlInit()
+{
+    static bool once = false; if (once) return; once = true;
+    if (const char* p = getenv("FL_CONTROL")) g_ctlEnabled = true, std::thread(ControlThread, std::string(p)).detach();
+}
 static int g_wheelAccum = 0;
 static unsigned g_latchedDown = 0;   // buttons pressed since the last poll (a click shorter than a frame must not be lost)
 static unsigned ButtonBit(int b) { switch (b) { case SDL_BUTTON_LEFT: return 1; case SDL_BUTTON_RIGHT: return 2; case SDL_BUTTON_MIDDLE: return 4; case SDL_BUTTON_X1: return 8; case SDL_BUTTON_X2: return 16; } return 0; }
 void fl_sdl_poll_events(FlSdlEvents* sink)
 {
+    ControlInit();
+    static bool ctlFocused = false;
+    if (g_ctlEnabled && !ctlFocused) { ctlFocused = true; sink->Focus(true); }   // scripted runs behave as focused
     SDL_Event ev;
     while (SDL_PollEvent(&ev))
     {
@@ -57,7 +111,7 @@ void fl_sdl_poll_events(FlSdlEvents* sink)
             else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) sink->Focus(true);
             else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST) sink->Focus(false);
             break;
-        case SDL_MOUSEMOTION: sink->MouseMove(); break;
+        case SDL_MOUSEMOTION: if (!g_relMouse) sink->MouseMove(); break;   // exclusive DirectInput suppresses WM_MOUSEMOVE
         case SDL_MOUSEWHEEL: g_wheelAccum += ev.wheel.y; break;
         case SDL_MOUSEBUTTONDOWN: g_latchedDown |= ButtonBit(ev.button.button); break;
         default: break;
@@ -76,14 +130,31 @@ void fl_sdl_set_window_rect(FlSdlWindow w, int x, int y, int cw, int ch, bool to
 void fl_sdl_show_cursor(bool show) { SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE); }
 bool fl_sdl_warp_cursor(FlSdlWindow, int x, int y) { SDL_WarpMouseGlobal(x, y); return true; }
 bool fl_sdl_get_cursor(FlSdlWindow, int* x, int* y) { SDL_GetGlobalMouseState(x, y); return true; }
+// OS pointer in the window's client coordinates (window points, which is the game's surface resolution).
+bool fl_sdl_get_cursor_in_window(FlSdlWindow w, int* x, int* y)
+{
+    if (g_ctlEnabled) { *x = g_ctlX; *y = g_ctlY; return true; }
+    SDL_Window* win = static_cast<SDL_Window*>(w);
+    if (!win) win = SDL_GetKeyboardFocus();
+    if (!win) win = SDL_GetMouseFocus();
+    if (!win) return false;
+    int gx = 0, gy = 0, wx = 0, wy = 0;
+    SDL_GetGlobalMouseState(&gx, &gy);
+    SDL_GetWindowPosition(win, &wx, &wy);
+    *x = gx - wx; *y = gy - wy;
+    return true;
+}
 
 void fl_sdl_set_relative_mouse(FlSdlWindow w, bool enable)
 {
+    g_relMouse = enable;
+    if (getenv("FL_TRACE_INPUT")) fprintf(stderr, "[in] relative mouse = %d\n", (int)enable);
     SDL_SetRelativeMouseMode(enable ? SDL_TRUE : SDL_FALSE);
     if (w) SDL_SetWindowGrab(static_cast<SDL_Window*>(w), enable ? SDL_TRUE : SDL_FALSE);
 }
 bool fl_sdl_window_has_focus(FlSdlWindow w)
 {
+    if (g_ctlEnabled) return true;
     return w ? (SDL_GetWindowFlags(static_cast<SDL_Window*>(w)) & SDL_WINDOW_INPUT_FOCUS) != 0 : true;
 }
 unsigned fl_sdl_ticks() { return SDL_GetTicks(); }
@@ -101,12 +172,14 @@ bool fl_sdl_mouse_state(int* dx, int* dy, int* wheel, unsigned* buttons)
 {
     fl_sdl_pump_events();
     SDL_GetRelativeMouseState(dx, dy);
+    if (!g_relMouse) { *dx = 0; *dy = 0; g_ctlDx = 0; g_ctlDy = 0; }
     *wheel = g_wheelAccum;
     g_wheelAccum = 0;
     Uint32 b = SDL_GetMouseState(nullptr, nullptr);
     *buttons = ((b & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1u : 0u) | ((b & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 2u : 0u) |
                ((b & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 4u : 0u) | ((b & SDL_BUTTON(SDL_BUTTON_X1)) ? 8u : 0u) |
                ((b & SDL_BUTTON(SDL_BUTTON_X2)) ? 16u : 0u);
+    if (g_ctlActive) { *dx += g_ctlDx.exchange(0); *dy += g_ctlDy.exchange(0); *buttons |= g_ctlButtons.load() | g_ctlLatch.exchange(0); }
     *buttons |= g_latchedDown;   // reported down for this poll even if already released; up shows on the next one
     g_latchedDown = 0;
     return true;
@@ -199,6 +272,7 @@ void fl_sdl_set_window_rect(FlSdlWindow, int, int, int w, int h, bool) { SDL_Set
 void fl_sdl_show_cursor(bool show) { SDL_ShowCursor(show ? SDL_ENABLE : SDL_DISABLE); }
 bool fl_sdl_warp_cursor(FlSdlWindow, int x, int y) { SDL_WarpMouse((Uint16)x, (Uint16)y); return true; }
 bool fl_sdl_get_cursor(FlSdlWindow, int* x, int* y) { SDL_GetMouseState(x, y); return true; }
+bool fl_sdl_get_cursor_in_window(FlSdlWindow, int* x, int* y) { SDL_GetMouseState(x, y); return true; }   // SDL1: already window-relative
 
 void fl_sdl_set_relative_mouse(FlSdlWindow, bool) {}   // TODO(SDL1): SDL_WM_GrabInput
 bool fl_sdl_window_has_focus(FlSdlWindow) { return (SDL_GetAppState() & SDL_APPINPUTFOCUS) != 0; }
