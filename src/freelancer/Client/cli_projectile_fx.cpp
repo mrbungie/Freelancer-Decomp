@@ -221,9 +221,9 @@ void CliEffectListInsert(void* ListOwnerPlus28, void const* Payload16)
     // its Prev at 0x004fcea8 unconditionally -- the owner's constructor allocates the head
     // (FGameobjEffectListStorage).
     unsigned char* ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    int& CountRef = static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Count;
 
-    FEffectListNode* Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
+    FEffectListNode* Head = static_cast<FEffectListNode*>(static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Head);
     FEffectListNode* OldPrev = Head->Prev;
     FEffectListNode* Node =
         static_cast<FEffectListNode*>(::operator new(sizeof(FEffectListNode)));
@@ -313,7 +313,7 @@ unsigned char CliEffectListRemove(void* ListOwnerPlus28, void* Payload16)
     // No test of the list, its head (0x004fcef0 MOV ECX,[ECX+4]; 0x004fcef8 MOV ESI,[ECX]) or
     // the companion (0x004fcf03 reads +8 once the list is non-empty). The node is not unlinked.
     unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
+    FEffectListNode* const Head = static_cast<FEffectListNode*>(static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Head);
 
     void** const Want = static_cast<void**>(Payload16);
     for (FEffectListNode* Cursor = Head->Next; Cursor != Head; Cursor = Cursor->Next)
@@ -354,8 +354,8 @@ void CliEffectListClear(void* ListOwnerPlus28, void* ArchFilter)
     // FUN_004fd0d0 — listing 004fd0d0..004fd226. ECX = the list (+0 allocator byte, +4 head,
     // +8 count). No null tests: the head is always there (the owner's ctor allocates it).
     unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const Head = *reinterpret_cast<FEffectListNode**>(ListBase + 4);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    FEffectListNode* const Head = static_cast<FEffectListNode*>(static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Head);
+    int& CountRef = static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Count;
 
     // Pass 1 (004fd0f0..004fd1db). With a filter, a node whose slot 0 is null or does not hold
     // the filter in its first dword is skipped (004fd0f4..004fd101). Every other node gets the
@@ -397,7 +397,7 @@ namespace
     FEffectListNode* EffectListInsertBefore(void* ListBase, FEffectListNode* Where,
                                             void const* Payload16)
     {
-        int& CountRef = *reinterpret_cast<int*>(static_cast<unsigned char*>(ListBase) + 8);
+        int& CountRef = static_cast<FGameobjEffectListStorage*>(ListBase)->Count;
         FEffectListNode* const Node =
             static_cast<FEffectListNode*>(::operator new(sizeof(FEffectListNode)));
         Node->Next = Where;
@@ -430,8 +430,9 @@ void CliEffectListDetachPart(void* ListOwnerPlus28, int32_t PartIndex, FClientGa
     // one of its descendants leaves this list: with NewOwner, one that is still alive moves to
     // the end of NewOwner's list; everything else is stopped and released.
     unsigned char* const ListBase = static_cast<unsigned char*>(ListOwnerPlus28);
-    FEffectListNode* const* const HeadSlot = reinterpret_cast<FEffectListNode**>(ListBase + 4);
-    int& CountRef = *reinterpret_cast<int*>(ListBase + 8);
+    FEffectListNode* const HeadNode = static_cast<FEffectListNode*>(static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Head);
+    FEffectListNode* const* const HeadSlot = &HeadNode;
+    int& CountRef = static_cast<FGameobjEffectListStorage*>(static_cast<void*>(ListBase))->Count;
 
     FEffectListNode* Next = (*HeadSlot)->Next;
     while (Next != *HeadSlot)
