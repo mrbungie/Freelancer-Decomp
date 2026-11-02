@@ -807,6 +807,13 @@ int DACOM_API FRenderManager::RenderInstance(void* CameraArg, void* Inst, float 
         bDraw = Rank >= 3;
     }
 
+    if (getenv("FL_TRACE_UI"))
+    {
+        static int n = 0;
+        if (Flags == 0 && n++ < 40)
+            fprintf(stderr, "[fl] render: inst=%p flags=%x radius=%g viewCenter=(%g %g %g) rank=%d draw=%d znear=%g zfar=%g\n", Inst, (unsigned)Flags, Radius * Scale,
+                    ViewCenter.X, ViewCenter.Y, ViewCenter.Z, Rank, (int)bDraw, Camera->GetZNear(), Camera->GetZFar());
+    }
     if (bDraw)
     {
         void* Arch = G_Engine->GetInstanceArchetype(Inst);
