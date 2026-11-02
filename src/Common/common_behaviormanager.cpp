@@ -165,6 +165,7 @@ IBehaviorManager::IBehaviorManager(IObjRW* Owner)
     for (int Index = 0; Index < 21; ++Index)
     {
         BehaviorDispatchTable[Index] = CREATE_BEHAVIOR(Index);
+        if (getenv("FL_TRACE_FX")) fprintf(stderr,"[bm] idx=%d beh=%p\n",Index,(void*)BehaviorDispatchTable[Index]);
         (void)BehaviorDispatchTable[Index]->SetContext(Owner, this, Sys);
     }
 
