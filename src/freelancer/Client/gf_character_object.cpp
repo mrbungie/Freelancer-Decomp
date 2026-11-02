@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_character_object.h"
+#include "fl/handles.h"
 #ifdef FREELANCER_WALK_MODE
 #include "base_walk.h"
 #endif
@@ -60,7 +61,7 @@ namespace
     // empty atexit (DAT_00443e80 is a bare RET); zero initialization here is that.
     FCharacterLodSet G_SharedCharacterLod;
 
-    void* const kNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    void* const kNoInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
     // FUN_00443b60 (thiscall on Set, RET 4) -- build Set's deformable from the four bodyparts
     // (0 body, 1 head, 2 left hand, 3 right hand) and read back its LOD switch table.
@@ -68,8 +69,8 @@ namespace
     {
         // 0x00443b6e..0x00443b9d: "low_character_lod" sets Flags bit 1 (Deformable2 skips LOD 0)
         // and raises the LOD limit of the non-first parts from 2 to 3.
-        unsigned long PartFlags = 0;
-        unsigned long ChildLodLimit = 2;
+        uint32_t PartFlags = 0;
+        uint32_t ChildLodLimit = 2;
         if (RtcSlider::is_enabled("low_character_lod"))
         {
             PartFlags = 2;
@@ -531,7 +532,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         void* const Instance = MiscUtilLoadEngineInstance(Found->Mesh.c_str(), DALib::Data,
                                                           nullptr, nullptr, &Paths,
                                                           &MaterialEntries, nullptr);
-        AccessoryInstances[Index] = reinterpret_cast<long>(Instance);
+        AccessoryInstances[Index] = static_cast<int32_t>(fl::PtrToHandle(Instance));
         AccessoryHardpoints[Index].analyze_instance(AccessoryInstances[Index]);
         if (AccessoryInstances[Index] != -1)
         {
@@ -628,7 +629,7 @@ void* FCharacterObject::GetEngineInstance()
     // LAB_00444970: IDeformable slot 18 into an int that starts at -1.
     int Bone = -1;
     DALib::Deform->GetFirstBone(Lod.Instance, &Bone);
-    return reinterpret_cast<void*>(static_cast<intptr_t>(Bone));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Bone)));
 }
 
 void FCharacterObject::SetFloat1C(float Value)
@@ -676,8 +677,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     if (ActiveMotions != 0 || ActiveAims != 0 || bPoseDirty != 0)
     {
         float const Time = static_cast<float>(DeltaSeconds);
-        DALib::Anim->MixerWalk(static_cast<unsigned long>(
-                                   reinterpret_cast<uintptr_t>(GetEngineInstance())),
+        DALib::Anim->MixerWalk(static_cast<uint32_t>(fl::PtrToHandle(GetEngineInstance())),
                                Time);
         void* TimeArg = nullptr;
         memcpy(&TimeArg, &Time, sizeof(Time));
@@ -701,7 +701,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     FToolTipHoverInfo Info;
     ToolTipHoverInit(&Info);
     ToolTipHoverSetCaption(&Info, DisplayName);
-    Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this));
+    Info.Ids = static_cast<int>(fl::PtrToHandle(this));
 
     // 0x00444c09..0x00444cb2: the corner on the Win3D camera's near plane (DAT_0067dc60 /
     // 0067dc64 centre, 0067dc70 / 0067dc74 scale, 0067dc9c znear), turned by its orientation
@@ -838,9 +838,9 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
 
     // 0x0044522c..0x0044523d: the shadow (FUN_0044b370 with the instance, the height and 1).
     float const Height = GetFloat1C();
-    unsigned long HeightBits = 0;
+    uint32_t HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
-    RoomControlDrawShadow(Owner, static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Instance)),
+    RoomControlDrawShadow(Owner, static_cast<uint32_t>(fl::PtrToHandle(Instance)),
                           HeightBits, 1);
     // 0x00445242..0x00445246: FUN_0044ae80.
     RoomControlLightObject(Owner, this);
@@ -984,7 +984,7 @@ void FCharacterObject::UpdateHotspotEnabled()
     Hotspot->bEnabled = 1;
 }
 
-void FCharacterObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
+void FCharacterObject::Slot10(uint32_t /*Cookie*/, int const* /*Point*/)
 {
     // FUN_00445a90 (RET 8). Not while a window holds the mouse.
     if (Win3DAnyCaptured())
@@ -1036,7 +1036,7 @@ void FCharacterObject::Slot10(unsigned long /*Cookie*/, int const* /*Point*/)
     MouseSetCursor(Cursor, false);
 }
 
-void FCharacterObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
+void FCharacterObject::Slot11(uint32_t /*Cookie*/, int const* /*Point*/)
 {
     // FUN_00445be0 (RET 8): unless a window holds the mouse, the arrow, no name, the tooltip
     // hidden (FUN_004be390).
@@ -1047,7 +1047,7 @@ void FCharacterObject::Slot11(unsigned long /*Cookie*/, int const* /*Point*/)
     NnToolTipHideGlobal();
 }
 
-void FCharacterObject::Slot12(unsigned long Cookie, int const* Point)
+void FCharacterObject::Slot12(uint32_t Cookie, int const* Point)
 {
 #ifdef FREELANCER_WALK_MODE
     BaseWalkBeforeInteraction();
@@ -1128,7 +1128,7 @@ void FCharacterObject::ResetScriptState(unsigned char bRelease)
     malloc_strfree(&OwnScriptName);
 }
 
-long FCharacterObject::FindPart(char const* PartName)
+int32_t FCharacterObject::FindPart(char const* PartName)
 {
     // FUN_00445620. The scan (0x00445631..0x0044566d) returns a used entry whose name matches
     // (DACOM stricmp) and whose part is not -1; on the way it remembers the first unused entry
@@ -1149,8 +1149,8 @@ long FCharacterObject::FindPart(char const* PartName)
     if (Unused < 0)
         Unused = 0;
 
-    long const Part = CompoundInstanceFindFirstName(
-        static_cast<long>(reinterpret_cast<intptr_t>(GetEngineInstance())), PartName);
+    int32_t const Part = CompoundInstanceFindFirstName(
+        static_cast<int32_t>(fl::PtrToHandle(GetEngineInstance())), PartName);
     if (Part != -1)
     {
         FPartCacheEntry& Entry = Parts[Unused];

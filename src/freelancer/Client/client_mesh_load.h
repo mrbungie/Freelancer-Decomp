@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstddef>
+#include "fl/handles.h"
 #include "client_cliobj.h"
 
 struct IEngine;
@@ -60,7 +61,7 @@ struct FMeshHolder
 {
     FMeshHolder() = default;
     virtual ~FMeshHolder(); // FUN_00420d10; scalar deleting wrapper LAB_00420d20
-    void* EngineInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1)); // +0x04
+    void* EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))); // +0x04
     Archetype::FCliMaterialEntry* MaterialEntry = nullptr;    // +0x08
     Archetype::FCliMaterialEntry* AuxMaterialEntry = nullptr; // +0x0c
 };
@@ -83,7 +84,7 @@ struct FClientMeshHolder : FMeshHolder
     FClientMeshHolder(FClientMeshHolder const&) = delete;
     FClientMeshHolder& operator=(FClientMeshHolder const&) = delete;
 
-    long AnimOrArchIndex = -1;                            // +0x10
+    int32_t AnimOrArchIndex = -1;                            // +0x10
     float UserFloats[5] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f}; // +0x14..+0x24 (FUN_00492250)
 };
 
@@ -147,7 +148,7 @@ void ClientMeshHolderSetMatrix(FMeshHolder* Holder, void* Transform);
 
 // FUN_00421120 (thiscall on the holder, RET 8) - IRenderer2 slot 7
 // (Camera, Holder+0x04, 1.0f, Flags, 0, 0).
-void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags);
+void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, uint32_t Flags);
 
 // FUN_00420fd0 (thiscall on the holder, RET 4) - DALib::Engine vt+0x8c
 // SetInstancePosition(Holder+0x04, Position).

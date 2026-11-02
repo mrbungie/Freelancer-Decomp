@@ -15,19 +15,19 @@
 
 struct FBatchRecord
 {
-    unsigned long InternalFlags; // +0x00
+    uint32_t InternalFlags; // +0x00
     FMaterialSubmitContext Context; // +0x04, borrowed views into this queued record
     float MatrixDataA[12];       // +0x28
     float MatrixDataB[12];       // +0x58
     float Combined[12];          // +0x88
-    unsigned long PrimType;                // +0xB8
-    unsigned long Start;         // +0xBC
-    unsigned long Count;         // +0xC0
-    unsigned long Zero;          // +0xC4
-    unsigned long Field;         // +0xC8
+    uint32_t PrimType;                // +0xB8
+    uint32_t Start;         // +0xBC
+    uint32_t Count;         // +0xC0
+    uint32_t Zero;          // +0xC4
+    uint32_t Field;         // +0xC8
     FVbListing VertexBufferListing; // +0xCC, formerly OptionalAData
     FIbScratch IndexBufferScratch;  // +0xD8, formerly OptionalBData
-    unsigned long Flags;         // +0xE0
+    uint32_t Flags;         // +0xE0
     void* Field78;               // +0xE4
     void* Field7C;               // +0xE8
     void* Unused;                // +0xEC (Arg8; sort depth when flags&0x20)
@@ -56,10 +56,10 @@ struct FBatchQueuedRecord
 
 struct FBatchBin
 {
-    long Pad0;
-    unsigned long SortKind; // +4
+    int32_t Pad0;
+    uint32_t SortKind; // +4
     std::map<IMaterial*, std::list<FBatchQueuedRecord>> Queue;
-    unsigned long RecordCount;
+    uint32_t RecordCount;
 
     FBatchBin();
 };
@@ -74,8 +74,8 @@ public:
     explicit FMaterialBatcherController(FMaterialBatcher* InOwner);
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     FMaterialBatcher* Owner;
 };
@@ -87,21 +87,21 @@ public:
     ~FMaterialBatcher();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API ClearRules() override;
-    GENRESULT DACOM_API AddRule(unsigned long Kind, const char* Pattern) override;
-    GENRESULT DACOM_API RemoveRule(unsigned long Kind, const char* Pattern) override;
-    GENRESULT DACOM_API SelectBin(unsigned long Index) override;
-    GENRESULT DACOM_API SetBinSortKind(unsigned long Index, void* Value) override;
-    GENRESULT DACOM_API SetBinOrder(unsigned long Index, long Key) override;
-    GENRESULT DACOM_API FlushBin(unsigned long Index, unsigned char Clear) override;
+    GENRESULT DACOM_API AddRule(uint32_t Kind, const char* Pattern) override;
+    GENRESULT DACOM_API RemoveRule(uint32_t Kind, const char* Pattern) override;
+    GENRESULT DACOM_API SelectBin(uint32_t Index) override;
+    GENRESULT DACOM_API SetBinSortKind(uint32_t Index, void* Value) override;
+    GENRESULT DACOM_API SetBinOrder(uint32_t Index, int32_t Key) override;
+    GENRESULT DACOM_API FlushBin(uint32_t Index, unsigned char Clear) override;
     GENRESULT DACOM_API FlushAll(unsigned char Clear) override;
-    GENRESULT DACOM_API Submit(IMaterial* Material, void* Context, unsigned long PrimType,
-                               unsigned long Start, unsigned long Count,
-                               unsigned long Zero, unsigned long Field,
-                               void* Unused, unsigned long Flags) override;
+    GENRESULT DACOM_API Submit(IMaterial* Material, void* Context, uint32_t PrimType,
+                               uint32_t Start, uint32_t Count,
+                               uint32_t Zero, uint32_t Field,
+                               void* Unused, uint32_t Flags) override;
     GENRESULT DACOM_API ClearBins() override;
     GENRESULT DACOM_API NoOp(void* Arg) override;
     GENRESULT DACOM_API SetEvents(void* NewValue) override;
@@ -113,32 +113,32 @@ public:
 
     FMaterialLibrary Library; // +4  QI 1.11_IMaterialLibrary
     std::vector<FBatchRule> RuleList; // retail this+0x58/+0x5C, slots 3/4/5
-    unsigned long RefCount;
+    uint32_t RefCount;
     IDAComponent* Outer;
     IRenderPipeline* Pipeline;
     IRPVertexBuffer* RpVertexBuffer;
     IRPIndexBuffer* RpIndexBuffer;
     unsigned char* ScratchBuffer; // Owned byte arena for copied streams.
-    unsigned long BufferSize;      // retail owner +0x84 capacity
-    unsigned long Bin1SortOrder;
+    uint32_t BufferSize;      // retail owner +0x84 capacity
+    uint32_t Bin1SortOrder;
     std::unique_ptr<FBatchBin> Bins[2];
-    unsigned long BinOrder[2];     // retail this+0x60/+0x64
+    uint32_t BinOrder[2];     // retail this+0x60/+0x64
     FBatchBin* SelectedBin;        // retail this+0x70, slots 6/7
     IMaterialBatcherEvents* CachedInterface; // retail this+0x74, slots 14/15 (AddRef/Release-managed)
     void* Field78;                 // retail this+0x78, slots 16/17 (plain)
     void* Field7C;                 // retail this+0x7C, slots 18/19 (plain)
-    unsigned long FrameValue;      // retail this+0x88
-    unsigned long PendingFrameValue; // retail this+0x8C
+    uint32_t FrameValue;      // retail this+0x88
+    uint32_t PendingFrameValue; // retail this+0x8C
     FMaterialBatcherController Controller; // retail nondelegating unknown @ +0x94
     IDAComponent* ControllingUnknown; // retail +90, distinct from initialized Outer+50
 
     GENRESULT InitializeFromDescriptor(const FMaterialAggregateDesc* Desc);
     GENRESULT StartupFromOuter();
     void ResetScratch();
-    void InitializeScratch(unsigned long Size);
-    void* AllocateScratch(unsigned long Size);
-    unsigned short* CloneIndices(const unsigned short* Source, unsigned long Count);
-    void CloneVertexStream(const FRpVertexStream& Source, FRpVertexStream& Dest, unsigned long IndexCount);
+    void InitializeScratch(uint32_t Size);
+    void* AllocateScratch(uint32_t Size);
+    unsigned short* CloneIndices(const unsigned short* Source, uint32_t Count);
+    void CloneVertexStream(const FRpVertexStream& Source, FRpVertexStream& Dest, uint32_t IndexCount);
     void CopyVertexSource(const FRpVertexSrcDesc& Source, FRpVertexSrcDesc& Dest);
     FRpVertexSrcDesc* CloneVertexSource(const FRpVertexSrcDesc& Source);
     void ParseBatchedMaterials();

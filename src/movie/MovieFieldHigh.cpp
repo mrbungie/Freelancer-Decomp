@@ -14,10 +14,10 @@
 // Callees this file does not define. Signatures are the pushes at the call
 // sites (stdcall: the caller does not adjust ESP).
 
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
+int32_t __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
+int32_t __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
+int32_t __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
 unsigned int __stdcall Movie_DrawBoundedLimb(unsigned int Minuend, unsigned int Subtrahend);
 int __stdcall Movie_ExponentiateByWindow(unsigned int* Base, unsigned int* Exponent, unsigned int Count, unsigned int* Dest, unsigned int* Context);
 
@@ -53,7 +53,7 @@ int __stdcall LimbBitLength(int Limbs, int Count)
         return 0;
     }
     Limb = Words[Left - 1];
-    unsigned long BitIndex = 0;
+    uint32_t BitIndex = 0;
     _BitScanReverse(&BitIndex, Limb);
     unsigned int Length = (unsigned int)Left + 0x07ffffffu;
     Length = (Length << 5) + BitIndex + 1u;
@@ -217,7 +217,7 @@ void __stdcall ShiftLimbsByBits(unsigned int* Source, unsigned int BitCount, uns
 }
 
 // 0x06ac8a90. Magnitude compare. 1 if Left is greater, -1 if Right is greater, 0 if equal.
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount)
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount)
 {
     unsigned int* LeftLimbs = (unsigned int*)Left;
     unsigned int* RightLimbs = (unsigned int*)Right;
@@ -264,7 +264,7 @@ long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int Rig
 }
 
 // 0x06ac89d0. Subtract Count limbs. Returns the borrow.
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count)
+int32_t __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count)
 {
     unsigned int* Diff = (unsigned int*)Difference;
     unsigned int Borrow = 0;
@@ -280,11 +280,11 @@ long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, in
         Diff[Index] = Limb - (unsigned int)Need;
         Borrow = (Limb < Need) ? 1u : 0u;
     }
-    return (long)Borrow;
+    return (int32_t)Borrow;
 }
 
 // 0x06ac8500. Add RightCount limbs, then propagate the carry through Left. Returns the carry.
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum)
+int32_t __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum)
 {
     unsigned int* SumLimbs = (unsigned int*)Sum;
     unsigned int Carry = 0;
@@ -313,7 +313,7 @@ long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, 
     }
     if (Remain == 0)
     {
-        return (long)Carry;
+        return (int32_t)Carry;
     }
     if (SumLimbs != Left)
     {
@@ -332,7 +332,7 @@ void __stdcall StoreLeadingReciprocal(int Limbs, unsigned int Count, unsigned in
 {
     unsigned int* Words = (unsigned int*)Limbs;
     unsigned int Top = Words[Count - 1u];
-    unsigned long BitIndex = 0;
+    uint32_t BitIndex = 0;
     _BitScanReverse(&BitIndex, Top);
     unsigned int Shift = 0x20u - (BitIndex + 1u);
     unsigned int Mid = 0;
@@ -484,7 +484,7 @@ struct FShiftXorSide
 };
 
 // 0x06ac9d20. Shift-and-XOR the longer side into the shorter until one bit length is zero.
-long __stdcall ReduceLimbsShiftXor(unsigned int* Left, unsigned int LeftBits, unsigned int* Right, unsigned int RightBits, unsigned int* Coefficient, unsigned int* Remainder)
+int32_t __stdcall ReduceLimbsShiftXor(unsigned int* Left, unsigned int LeftBits, unsigned int* Right, unsigned int RightBits, unsigned int* Coefficient, unsigned int* Remainder)
 {
     unsigned int LeftWords = (LeftBits + 0x1fu) >> 5;
     unsigned int RightWords = (RightBits + 0x1fu) >> 5;
@@ -566,11 +566,11 @@ long __stdcall ReduceLimbsShiftXor(unsigned int* Left, unsigned int LeftBits, un
 }
 
 // 0x06ac9f60. Bit-serial shift-XOR multiply of Left by Right, reduced by Modulus.
-long __stdcall MultiplyLimbsShiftXor(int Left, int Right, unsigned int* Product, int Modulus, unsigned int ModulusBits)
+int32_t __stdcall MultiplyLimbsShiftXor(int Left, int Right, unsigned int* Product, int Modulus, unsigned int ModulusBits)
 {
     unsigned int Words = (ModulusBits + 0x1fu) >> 5;
     int Length = LimbBitLength(Modulus, (int)((ModulusBits >> 5) + 1u));
-    long Fits = 0;
+    int32_t Fits = 0;
     unsigned int ProductLimbs[64];
     unsigned int Index;
     if (Length == (int)(ModulusBits + 1u))
@@ -617,13 +617,13 @@ long __stdcall MultiplyLimbsShiftXor(int Left, int Right, unsigned int* Product,
 }
 
 // 0x06ac6bb0. Seed the work buffer from the field, or hand the same buffers to 0x06ac7570.
-long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper)
+int32_t __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper)
 {
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int LimbCount = Field[0];
     if (Movie_FieldElementIsUnit((int)Value, FieldHolder) != 0)
     {
-        long Step = Movie_LoadFieldOne(Work, FieldHolder, Upper);
+        int32_t Step = Movie_LoadFieldOne(Work, FieldHolder, Upper);
         if (Step != 0)
         {
             return 1;
@@ -646,7 +646,7 @@ long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* Field
 }
 
 // 0x06ac8010. Multiply the value through the two field factors at +4 and +0x104.
-long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
+int32_t __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
 {
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int* High = Value + Field[0];
@@ -710,7 +710,7 @@ long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder)
 }
 
 // 0x06ac8190. When the field kind is 1, duplicate the constant at Field+0x10. Otherwise call 0x06ac3110.
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder)
+int32_t __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder)
 {
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int LimbCount = Field[0];
@@ -736,7 +736,7 @@ long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder)
 }
 
 // 0x06ac7210. Field multiply of Left by Right through Scratch. Kind selects the factor chain.
-long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch)
+int32_t __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch)
 {
     unsigned int* Field = (unsigned int*)FieldHolder[0];
     unsigned int LimbCount = Field[0];
@@ -811,7 +811,7 @@ long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* 
 }
 
 // 0x06ac5d70. For each row, square the work buffer, then keep the row or store the field unit.
-long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowCount, void* Table, void* FieldHolder)
+int32_t __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowCount, void* Table, void* FieldHolder)
 {
     unsigned int* Field = *(unsigned int**)FieldHolder;
     unsigned int LimbCount = Field[0];
@@ -820,7 +820,7 @@ long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowC
     unsigned int* Rows = 0;
     unsigned int* Work = 0;
     unsigned int* Upper = 0;
-    long Ok = 0;
+    int32_t Ok = 0;
     unsigned int Hits = 0;
     if (GMovieGraphCode == 0x2b)
     {
@@ -915,7 +915,7 @@ long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowC
         {
             unsigned int* Second = (unsigned int*)((unsigned int)Rows + LimbCount * (unsigned int)RowCount * 4u);
             unsigned int* Base = (unsigned int*)Workspace;
-            long Flag = 0;
+            int32_t Flag = 0;
             unsigned int Back;
             if (Ok != 0)
             {
@@ -1037,7 +1037,7 @@ long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowC
 }
 
 // 0x06ac8360. Rewrite Dest until it compares below Source. Top limb comes from 0x06ac8300.
-long __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Count)
+int32_t __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Count)
 {
     unsigned int* Reference = (unsigned int*)Source;
     unsigned int* Buffer = (unsigned int*)Dest;
@@ -1054,7 +1054,7 @@ long __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Co
     }
     for (;;)
     {
-        long Relation = 0;
+        int32_t Relation = 0;
         Movie_FillByteBuffer(Dest, Count * 4u - 4u);
         Buffer[Count - 1u] = Movie_DrawBoundedLimb(0u, Top);
         Index = Count;
@@ -1084,7 +1084,7 @@ long __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Co
 }
 
 // 0x06aca0f0. Shift out factors of two and subtract until one window is zero.
-long __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigned int* Coefficient, unsigned int* Result)
+int32_t __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigned int* Coefficient, unsigned int* Result)
 {
     unsigned int Count = Context[0x40];
     unsigned int Keep = (Coefficient != 0) ? 1u : 0u;
@@ -1174,7 +1174,7 @@ long __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigne
             if ((~Window[0] & 1u) != 0u)
             {
                 unsigned int Forced = Window[0] | 0x80000000u;
-                unsigned long Bit = 0;
+                uint32_t Bit = 0;
                 _BitScanForward(&Bit, Forced);
                 if ((Bit & 1u) != 0u)
                 {
@@ -1194,7 +1194,7 @@ long __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigne
             else
             {
                 unsigned int* OtherWindow = Block + (Other * 0x40u);
-                long Relation = 0;
+                int32_t Relation = 0;
                 unsigned int Probe = Count;
                 while (Probe != 0u)
                 {
@@ -1262,7 +1262,7 @@ long __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigne
         }
     }
     Movie_FreeBlock(Block);
-    return (long)Sign;
+    return (int32_t)Sign;
 }
 
 // 0x06aca470. Kind is the low 3 bits of Context. Every path squares Output and

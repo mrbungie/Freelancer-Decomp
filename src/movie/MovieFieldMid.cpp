@@ -14,11 +14,11 @@
 #include <intrin.h>
 
 // Callees defined in other movie translation units.
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
-long __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Count);
+int32_t __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
+int32_t __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
+int32_t __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+int32_t __stdcall ReduceLimbsBelow(int Source, unsigned char* Dest, unsigned int Count);
 
 // 0x06ac52f0
 // One-limb division. A leading dividend limb below the divisor is the starting remainder
@@ -112,7 +112,7 @@ unsigned int __stdcall Movie_DivideByLimb(unsigned int* Dividend, unsigned int D
 
 // 0x06ac7570
 // Field+0x12c is the odd constant installed by 0x06ac32b0. Two copies, then three zero groups.
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch)
+int32_t __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch)
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
@@ -135,7 +135,7 @@ long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned
 
 // 0x06ac75d0
 // NEG / SBB / NEG on the unit path folds any nonzero 0x06ac8190 result to 1.
-long __stdcall Movie_ScalePairByTail(unsigned int* First, unsigned int* Second, int* FieldHolder, unsigned int* Scratch)
+int32_t __stdcall Movie_ScalePairByTail(unsigned int* First, unsigned int* Second, int* FieldHolder, unsigned int* Scratch)
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
@@ -265,7 +265,7 @@ void __stdcall Movie_AssignWindowSlot(unsigned int* First, unsigned int* Second,
 }
 
 // NEG / SBB / NEG. Any nonzero EAX becomes 1.
-static long Movie_Flag(long Value)
+static int32_t Movie_Flag(int32_t Value)
 {
     if (Value != 0)
     {
@@ -276,7 +276,7 @@ static long Movie_Flag(long Value)
 
 // 0x06ac7a3d. Kind 2/3 epilogue. The XOR runs even when the multiplies returned 0,
 // reading whatever the stack buffers hold.
-static long Movie_MixBinaryElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, int* Field, int Count, unsigned int* TempA, unsigned int* TempB, unsigned int* TempC, int Succeeded)
+static int32_t Movie_MixBinaryElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, int* Field, int Count, unsigned int* TempA, unsigned int* TempB, unsigned int* TempC, int Succeeded)
 {
     int Keep = 0;
     unsigned int* FieldWords = (unsigned int*)Field;
@@ -323,7 +323,7 @@ static long Movie_MixBinaryElements(unsigned int* Left, unsigned int* Right, uns
 }
 
 // 0x06ac7d67. Kind 1 tail after the common product is in TempB.
-static long Movie_FinishKind1Add(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int* Field, int Count, unsigned int* TempA, unsigned int* TempB, unsigned int* TempC)
+static int32_t Movie_FinishKind1Add(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int* Field, int Count, unsigned int* TempA, unsigned int* TempB, unsigned int* TempC)
 {
     unsigned int* FieldWords = (unsigned int*)Field;
     unsigned int* LeftHigh = Left + Count;
@@ -360,7 +360,7 @@ static long Movie_FinishKind1Add(unsigned int* Left, unsigned int* Right, unsign
 }
 
 // 0x06ac78a0
-long __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int Sign, unsigned int* FieldHolder)
+int32_t __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int Sign, unsigned int* FieldHolder)
 {
     int* Field = (int*)FieldHolder[0];
     int Kind = Field[2];
@@ -508,7 +508,7 @@ long __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, u
 // 0x06ac7e60
 // Kind 1 compares each half with Field[4] from the top limb (CMP / SBB / OR 1, then reject any difference).
 // Any other kind returns 1 only when all 2*Count limbs are 0 (SETZ).
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder)
+int32_t __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder)
 {
     int* Field = (int*)FieldHolder[0];
     int Kind = Field[2];
@@ -558,7 +558,7 @@ long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder)
 
 // 0x06ac7f20
 // NEG / SBB / NEG on both call results. Sign is compared with CMP, so only +1 and -1 match.
-long __stdcall Movie_CopyOrNegatePair(unsigned int* Source, unsigned int* Dest, int* FieldHolder, int Sign)
+int32_t __stdcall Movie_CopyOrNegatePair(unsigned int* Source, unsigned int* Dest, int* FieldHolder, int Sign)
 {
     if (Sign == 1)
     {
@@ -574,13 +574,13 @@ long __stdcall Movie_CopyOrNegatePair(unsigned int* Source, unsigned int* Dest, 
 // 0x06ac7f80
 // A unit source copies its high half. Kind 1 otherwise negates the high half.
 // Any other kind adds the low half to the high half. The low half is then copied.
-long __stdcall Movie_NegateFieldPair(unsigned int* Source, unsigned int* Dest, int* FieldHolder)
+int32_t __stdcall Movie_NegateFieldPair(unsigned int* Source, unsigned int* Dest, int* FieldHolder)
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
     unsigned int* SourceHigh = Source + LimbCount;
     unsigned int* DestHigh = Dest + LimbCount;
-    long Step;
+    int32_t Step;
     if (Movie_FieldElementIsUnit((int)Source, FieldHolder) != 0)
     {
         Step = Movie_CopyFieldGroups(SourceHigh, DestHigh, 1, Field);
@@ -608,7 +608,7 @@ long __stdcall Movie_NegateFieldPair(unsigned int* Source, unsigned int* Dest, i
 // Kind 1 builds 0x1B * Right^3 and (Left+Left)^2, then Left * that sum + the cube, and rejects a zero.
 // Kinds 2 and 3 reject a zero Right. Success copies both inputs over those temporaries.
 // Record[0] = Field is stored before the copies and is left in place if a copy returns 0.
-long __stdcall Movie_CommitFieldPair(unsigned int* Left, unsigned int* Right, unsigned int* FieldWords, unsigned int* Record)
+int32_t __stdcall Movie_CommitFieldPair(unsigned int* Left, unsigned int* Right, unsigned int* FieldWords, unsigned int* Record)
 {
     int* Field = (int*)FieldWords;
     int Kind = Field[2];
@@ -675,7 +675,7 @@ unsigned int __stdcall Movie_DrawBoundedLimb(unsigned int Minuend, unsigned int 
 {
     unsigned int Gap;
     unsigned int Mixed;
-    unsigned long BitIndex;
+    uint32_t BitIndex;
     unsigned int Shift;
     unsigned int Drawn;
     if (Subtrahend < Minuend)
@@ -760,7 +760,7 @@ unsigned int __stdcall Movie_AddScaledLimbs(int Source, unsigned int Scale, unsi
 // 0x06ac85c0
 // SAR of -Count selects the odd limb. Pairs then use ADC. The second right limb of a pair is read
 // before the first limb is stored. Count 0 returns 0. The final ADC EAX,EAX is the carry, 0 or 1.
-long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count)
+int32_t __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count)
 {
     int Steps;
     int Half;
@@ -793,7 +793,7 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
         if (Half == 0)
         {
             *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
-            return (long)Carry;
+            return (int32_t)Carry;
         }
         *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
         Sum = Cursor[0];
@@ -821,7 +821,7 @@ long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int 
         Other = *(RightPast + (Half * 2));
     }
     *(unsigned int*)((unsigned char*)Cursor + Delta - 4) = Sum;
-    return (long)Carry;
+    return (int32_t)Carry;
 }
 
 // 0x06ac8630

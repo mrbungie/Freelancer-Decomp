@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "fl_fx_mesh.h"
+#include "fl/handles.h"
 
 #include "client_cliobj.h"     // Archetype::ReleaseMaterialEntrySlot (FUN_0041b030)
 #include "client_mesh_load.h"  // FMeshHolder (retail ObjectHandle) and its FUN_00420xxx helpers
@@ -107,13 +108,13 @@ namespace
 
     struct FLFxMeshComponent : FLFxMesh
     {
-        unsigned long RefCount; // +0x14 DAComponent<FLFxMesh>
+        uint32_t RefCount; // +0x14 DAComponent<FLFxMesh>
 
         FLFxMeshComponent() : RefCount(1) {}
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
     };
     static_assert(offsetof(FLFxMeshComponent, EngineInstance) == 0x08, "FLFxMeshComponent instance +0x08");
     static_assert(offsetof(FLFxMeshComponent, RefCount) == 0x14, "FLFxMeshComponent reference count +0x14");
@@ -142,14 +143,14 @@ namespace
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FLFxMeshComponent::AddRef()
+    uint32_t DACOM_API FLFxMeshComponent::AddRef()
     {
         // LAB_004f6cd0.
         RefCount += 1;
         return RefCount;
     }
 
-    unsigned long DACOM_API FLFxMeshComponent::Release()
+    uint32_t DACOM_API FLFxMeshComponent::Release()
     {
         // LAB_004f6ce0: an unsigned decrement that stops at zero; at zero the count is set back
         // to 1 and the ObjectHandle face's slot 0 (FUN_004f6bc0, the scalar deleting destructor)
@@ -207,7 +208,7 @@ namespace
         // +0x10 is left alone), then a bound instance (+0x08 != -1) destroyed through
         // DALib::Engine slot 24 and set back to -1.
         Archetype::ReleaseMaterialEntrySlot(&MaterialEntry);
-        void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+        void* const NoInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
         if (EngineInstance != NoInstance)
         {
             DALib::Engine->DestroyInstance(EngineInstance);
@@ -233,13 +234,13 @@ namespace
 
     struct FLFxMeshFactoryComponent : FLFxMeshFactory
     {
-        unsigned long RefCount; // +0x04 DAComponent<FLFxMeshFactory>
+        uint32_t RefCount; // +0x04 DAComponent<FLFxMeshFactory>
 
         FLFxMeshFactoryComponent() : RefCount(1) {}
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
     };
     static_assert(offsetof(FLFxMeshFactoryComponent, RefCount) == 0x4, "FLFxMeshFactoryComponent reference count +0x4");
     static_assert(sizeof(FLFxMeshFactoryComponent) == 0x8, "FLFxMeshFactoryComponent is operator new(8)");
@@ -258,14 +259,14 @@ namespace
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FLFxMeshFactoryComponent::AddRef()
+    uint32_t DACOM_API FLFxMeshFactoryComponent::AddRef()
     {
         // LAB_0051e8e0 (shared with other DAComponent<> instantiations whose count is at +4).
         RefCount += 1;
         return RefCount;
     }
 
-    unsigned long DACOM_API FLFxMeshFactoryComponent::Release()
+    uint32_t DACOM_API FLFxMeshFactoryComponent::Release()
     {
         // LAB_004f6dc0: as FLFxMesh::Release, but the destructor is this face's own slot 4
         // (FUN_004f6b30: FUN_004f6bf0 restores the abstract vtable 005d9944, then the free).
@@ -298,7 +299,7 @@ namespace
 
         // 0x004f689e..0x004f68b5: Archetype::Load(path, &handle, 0); failure returns 0 with *Out
         // untouched and the new mesh never released.
-        long ArchHandle = 0;
+        int32_t ArchHandle = 0;
         if (!Archetype::Load(Path.Text, &ArchHandle, nullptr))
             return GR_OK;
 
@@ -306,7 +307,7 @@ namespace
         // FUN_00420d70(handle), FUN_00420fd0(Position), then DALib::Engine slot 15
         // ReleaseHandle on the archetype handle.
         *Out = Mesh;
-        void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(ArchHandle));
+        void* const Loaded = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(ArchHandle)));
         ClientMeshHolderSetMaterials(Mesh, Path.Text, nullptr);
         ClientMeshHolderBindInstance(Mesh, Loaded);
         ClientMeshHolderSetPosition(Mesh, Position);

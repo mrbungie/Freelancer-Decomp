@@ -44,9 +44,12 @@ struct FQuaternion
     float Z;
 };
 
+// Descriptor sizes are a wire protocol (retail: 3 DWORD fields = 0xC), not sizeof of this wider struct.
+static const uint32_t kRetailMathDescSize = 0xC;
+
 struct FMathDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* InterfaceName;
     const char* Implementation;
 };

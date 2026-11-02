@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "common_cobject_internal.h" // CmnCobject helpers defined below
 #include "x86math.h"
 
@@ -175,7 +176,7 @@ namespace CmnCobject
     }
 } // namespace CmnCobject
 
-void DACOM_API CObject::destroy_instance(long Inst)
+void DACOM_API CObject::destroy_instance(int32_t Inst)
 {
     // Listing 0x4f610 stdcall. this+4 = -1; if RefCount==1, RefCount=0 then
     // vcall +0x38(1) (scalar deleting dtor). Not FindChild / IVP.
@@ -244,7 +245,7 @@ CObject::~CObject()
     // 062af4be..062af4d1: IEngine+0x60 DestroyInstance if the instance is set; the field is
     // not reset.
     if (EngineInstanceId != -1)
-        DALib::Engine->DestroyInstance((void*)EngineInstanceId);
+        DALib::Engine->DestroyInstance((void*)fl::HandleToPtr(EngineInstanceId));
     // 062af4d4..062af4f1: every advisor gets CBase::notify_of_destruction(this) (the ICF body
     // at .text:062ed730, `RET 4`).
     for (std::list<CBase*>::iterator It = Advisors.begin(); It != Advisors.end(); ++It)
@@ -276,7 +277,7 @@ static Heap GObjectHeapF0(0xf0, -1);
 static Heap GObjectHeap1ec(0x1ec, -1);
 static Heap GObjectHeap2dc(0x2dc, -1);
 
-void* CObject::operator new(unsigned int Size) noexcept
+void* CObject::operator new(size_t Size) noexcept
 {
     // .text:062adbc0. Size switch: 0x120, 0x9c, 0xf0, 0x104 below the JA, 0x1ec and 0x2dc
     // above it; anything else goes to the CRT malloc.
@@ -299,7 +300,7 @@ void* CObject::operator new(unsigned int Size) noexcept
     }
 }
 
-void CObject::operator delete(void* Ptr, unsigned int Size)
+void CObject::operator delete(void* Ptr, size_t Size)
 {
     // .text:062adc40. The same size switch, returning the block to its pool or to free().
     switch (Size)
@@ -413,7 +414,7 @@ int __cdecl CObject::Count(Class ObjectClass)
     return (int)List->size();
 }
 
-CObject* __cdecl CObject::Find(long EngineInstanceId, Class ObjectClass)
+CObject* __cdecl CObject::Find(int32_t EngineInstanceId, Class ObjectClass)
 {
     // .text:062ae960..062aea30: -1 or a class without a list -> null; the first entry whose
     // instance (+0x4) matches gets RefCount (+0x98) + 1 and is returned.
@@ -550,7 +551,7 @@ float CObject::get_physical_radius_r(Vector& OutCenter) const
     // this+0x08 (Orientation + WorldPosition, one Transform), OutCenter); Out = tmp; return
     // Radius. No null tests.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent((void*)EngineInstanceId, 0, &Radius, (float*)&OutCenter);
+    DALib::Engine->GetInstanceExtent((void*)fl::HandleToPtr(EngineInstanceId), 0, &Radius, (float*)&OutCenter);
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
@@ -576,14 +577,14 @@ namespace
     // inserted into Set (find, absent -> insert at the end, then found again; the result is
     // not used) and descended from ITS OWN engine instance (+0x04). No null test on the user
     // data.
-    void CollectHierarchyObjects(CObject* Parent, long Inst, CheapSet<CObject*, std::less<CObject*>>& Set)
+    void CollectHierarchyObjects(CObject* Parent, int32_t Inst, CheapSet<CObject*, std::less<CObject*>>& Set)
     {
         // IEngine passes instance handles as pointer-sized values.
-        void* const InstHandle = (void*)Inst;
-        long Child = (long)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)(intptr_t)-1);
+        void* const InstHandle = (void*)fl::HandleToPtr(Inst);
+        int32_t Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)(intptr_t)-1));
         while (Child != -1)
         {
-            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData((void*)Child);
+            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData((void*)fl::HandleToPtr(Child));
             if (Obj == Parent)
             {
                 CollectHierarchyObjects(Parent, Child, Set);              // 062ad785..062ad788
@@ -593,7 +594,7 @@ namespace
                 Set.Insert(Obj);                                           // 062ad73a..062ad77b
                 CollectHierarchyObjects(Obj, Obj->EngineInstanceId, Set); // 062ad77d..062ad788
             }
-            Child = (long)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)Child);
+            Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)fl::HandleToPtr(Child)));
         }
     }
 }
@@ -695,7 +696,7 @@ void CObject::remake_physical(PhySys::CreateParms const& Parms, float Radius)
     enable_controllers();
 }
 
-long CObject::part_to_inst(unsigned PartId) const
+int32_t CObject::part_to_inst(unsigned PartId) const
 {
     // .text:0627d1e0..0627d214: SurfaceManager (+0x5c) == 0 -> EngineInstanceId; else the
     // first PartMap entry with PartId -> its instance; none -> -1.
@@ -741,7 +742,7 @@ void CObject::add_impulse(Vector const& Impulse, Vector const& Point)
     }
 }
 
-unsigned CObject::inst_to_part(long EngineInst) const
+unsigned CObject::inst_to_part(int32_t EngineInst) const
 {
     // .text:0627d220..0627d243: the first PartMap entry whose instance matches -> its PartId;
     // none -> 0. No +0x5c test.

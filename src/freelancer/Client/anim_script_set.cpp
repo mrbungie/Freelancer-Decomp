@@ -102,7 +102,7 @@ int FAnimScriptSet::Find(char const* Name) const
     return -1;
 }
 
-int FAnimScriptSet::Load(unsigned long NewScript)
+int FAnimScriptSet::Load(uint32_t NewScript)
 {
     // FUN_00555bf0. 0x00555bfa..0x00555bfd: both handles take the argument.
     Script = NewScript;
@@ -114,7 +114,7 @@ int FAnimScriptSet::Load(unsigned long NewScript)
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&CountScriptName),
                                      reinterpret_cast<void*>(NewScript), this);
         // 0x00555c1d..0x00555c39: one pointer and one float per name.
-        Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * 4));
+        Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * sizeof(char*)));
         Durations = static_cast<float*>(operator new(static_cast<size_t>(Count) * 4));
         FillCursor = 0;
         // 0x00555c40..0x00555c58: fill them.
@@ -128,14 +128,14 @@ int FAnimScriptSet::Load(unsigned long NewScript)
     return Result;
 }
 
-unsigned long FAnimScriptSet::Play(void* Root, int Index)
+uint32_t FAnimScriptSet::Play(void* Root, int Index)
 {
     // FUN_00555c70: Anim +0x24 (Script, Root, Names[Index], 0, 0).
     return DALib::Anim->PlayScript(reinterpret_cast<void*>(Script), Root, Names[Index], nullptr,
                                    nullptr);
 }
 
-void AnimScriptSetStopPlayback(unsigned long* Playback)
+void AnimScriptSetStopPlayback(uint32_t* Playback)
 {
     // FUN_00555ca0: Anim +0x38 then Anim +0x28 on the playback, then -1.
     if (*Playback == 0xffffffffu)

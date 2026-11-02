@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "ClientImpl.h"
+#include "fl/handles.h"
 #include "rpc_packet_codec.h"
 #include "rpc_server_channel_codec.h"
 #include "rpc_iclient_args.h"        // kPlayerListKind* (0x52 PLAYERLIST)
@@ -1083,7 +1084,7 @@ void CClientImpl::SendServerSetMissionMessage(const unsigned int& ClientId, cons
 }
 
 // RC 06b36760, 0x5b MISSIONSAVEA, by value.
-void CClientImpl::SendServerMissionSaveA(unsigned int ClientId, unsigned long MissionId) {
+void CClientImpl::SendServerMissionSaveA(unsigned int ClientId, uint32_t MissionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 0x5b, &Packet) == 0) {
         static_cast<FRpcServerMissionSaveAPacket*>(Packet)->Value = MissionId;
@@ -1369,7 +1370,7 @@ void CClientImpl::SendServerSendComm(unsigned int ClientId, unsigned int SenderI
         Frame[17] = VoiceId;
         std::memcpy(&Frame[18], &CommCostume, sizeof(Costume));
         Frame[31] = CommType;
-        Frame[32] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(TextIds));
+        Frame[32] = static_cast<unsigned int>(fl::PtrToHandle(TextIds));
         Frame[33] = static_cast<unsigned int>(TextCount);
         Frame[34] = Mood;
         std::memcpy(&Frame[35], &Duration, sizeof(float));

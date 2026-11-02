@@ -5,6 +5,8 @@
 // Author: Giperion.
 
 #include "rpc_server_channel_codec.h"
+#include "wire_wchar.h"
+#include "platform/fl_x87.h"
 #include "common_goods.h" // RS-P2: EquipDesc, EquipDescVector, StringAlloc (0x24/0x25)
 
 // ===== shared SERVER helpers =====
@@ -21,6 +23,7 @@ unsigned char RpcServerQuantize127(const float* Value) {
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fld dword ptr [ecx]
@@ -33,17 +36,25 @@ unsigned char RpcServerQuantize127(const float* Value) {
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    Quantized = PortableChopToInt64(static_cast<double>(*Value) * GRpcServerScale127);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned char>(Quantized);
 }
 
 void RpcServerExpand127(unsigned char Encoded, float* Value) {
     const int Quantized = static_cast<signed char>(Encoded);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fild dword ptr Quantized
         fmul qword ptr GRpcServerInverse127
         fstp dword ptr [ecx]
     }
+#else
+    *Value = static_cast<float>(static_cast<double>(Quantized) * GRpcServerInverse127);
+#endif
 }
 
 // --- create-object block: 0x04 CREATESHIP and 0x42 CREATESOLAR (RS-P10) ---
@@ -64,6 +75,7 @@ static unsigned char RpcServerQuantize255(const float* Value) {
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fld dword ptr [ecx]
@@ -76,6 +88,10 @@ static unsigned char RpcServerQuantize255(const float* Value) {
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    Quantized = PortableChopToInt64(static_cast<double>(*Value) * GRpcServerScale255);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned char>(Quantized);
 }
 
@@ -83,12 +99,16 @@ static unsigned char RpcServerQuantize255(const float* Value) {
 // 06c09724..06c09743).
 static void RpcServerExpand255(unsigned char Encoded, float* Value) {
     const int Widened = static_cast<int>(Encoded);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fild dword ptr Widened
         fmul qword ptr GRpcServerInverse255
         fstp dword ptr [ecx]
     }
+#else
+    *Value = static_cast<float>(static_cast<double>(Widened) * GRpcServerInverse255);
+#endif
 }
 
 // 06c089bc..06c089e6, the hull byte: FILD the int hit points, FSTP to a float local
@@ -97,14 +117,19 @@ static void RpcServerExpand255(unsigned char Encoded, float* Value) {
 // (0x8000000000000000) has a low byte of 0, as in retail.
 static unsigned char RpcServerQuantizeHull(int HitPts, unsigned int ArchetypeId) {
     float Points;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         fild dword ptr HitPts
         fstp dword ptr Points
     }
+#else
+    Points = static_cast<float>(HitPts);
+#endif
     const int MaxHitPts = Archetype::GetArchMaxHitPts(ArchetypeId);
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         fild dword ptr MaxHitPts
         fdivr dword ptr Points
@@ -117,6 +142,10 @@ static unsigned char RpcServerQuantizeHull(int HitPts, unsigned int ArchetypeId)
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    Quantized = PortableChopToInt64((static_cast<double>(Points) / static_cast<double>(MaxHitPts)) * GRpcServerScale255);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned char>(Quantized);
 }
 
@@ -128,6 +157,7 @@ static int RpcServerExpandHull(unsigned char Encoded, unsigned int ArchetypeId) 
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         fild dword ptr MaxHitPts
         fild dword ptr Widened
@@ -141,6 +171,11 @@ static int RpcServerExpandHull(unsigned char Encoded, unsigned int ArchetypeId) 
         fistp qword ptr Result
         fldcw OldControl
     }
+#else
+    Result = PortableChopToInt64(static_cast<double>(MaxHitPts) *
+                                 (static_cast<double>(Widened) * GRpcServerInverse255));
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<int>(Result);
 }
 
@@ -634,6 +669,7 @@ void RpcServerCreateObjectRead(const FRpcServerCreateObjectFields* Fields,
     // 06bd531c..06bd532b: FLD z, y, x, then FSTP x, y, z.
     const float* PositionIn = &Fields->Position.x;
     float* PositionOut = &Info->Position.x;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov eax, PositionIn
         mov edx, PositionOut
@@ -644,6 +680,15 @@ void RpcServerCreateObjectRead(const FRpcServerCreateObjectFields* Fields,
         fstp dword ptr [edx + 4]
         fstp dword ptr [edx + 8]
     }
+#else
+    float Z, Y, X;
+    FlX87CopyFloat(PositionIn + 2, &Z);
+    FlX87CopyFloat(PositionIn + 1, &Y);
+    FlX87CopyFloat(PositionIn, &X);
+    PositionOut[0] = X;
+    PositionOut[1] = Y;
+    PositionOut[2] = Z;
+#endif
     // 06bd532e..06bd533b: an identity quaternion is built in place, then 06bd533e..
     // 06bd5353 overwrite it with integer moves.
     Info->Orientation.w = 1.0f;
@@ -1127,12 +1172,16 @@ unsigned int FRpcServerCharSelectVerifiedPacket::Encode(unsigned char** BufferHo
     const double* Source = &Time;
     const unsigned int Cached = MarshalPtr;                            // 06b5ff75
     double* Destination = reinterpret_cast<double*>(Cached);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov eax, Source
         mov edx, Destination
         fld qword ptr [eax]
         fstp qword ptr [edx]
     }
+#else
+    FlX87CopyDouble(Source, Destination);
+#endif
     MarshalPtr = Cached + 8u;                                          // 06b5ff87
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b5ff89
 }
@@ -3233,7 +3282,7 @@ unsigned int FRpcServerPlayerListPacket::Encode(unsigned char** BufferHolder,
     }
     if (!Stream.Put(&Count, 1u)) return 0x16u;
     if (Count != 0) {
-        if (!Stream.PutBlock(Name, static_cast<unsigned int>(Count) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(Name, static_cast<unsigned int>(Count)), static_cast<unsigned int>(Count) * 2u)) return 0x16u;
     }
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b4689f
 }
@@ -3258,8 +3307,9 @@ unsigned int FRpcServerPlayerListPacket::Decode(const unsigned char* Buffer,
         if (MarshalCursor + Bytes > MarshalLimit) MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
 #endif
-        Name = static_cast<wchar_t*>(std::malloc(Bytes));
-        if (!Stream.Get(Name, Bytes)) return MarshalError;
+        Name = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Count) + 1u) * sizeof(wchar_t)));
+        if (!Stream.Get(FlWire16In(Name, Count), Bytes)) return MarshalError;
+        Name[Count] = 0;
     }
     return Stream.Finish(OutLength, false);
 }
@@ -3313,6 +3363,7 @@ static unsigned char RpcServerSendCommQuantize(const float* Value) {
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fld dword ptr [ecx]
@@ -3326,17 +3377,25 @@ static unsigned char RpcServerSendCommQuantize(const float* Value) {
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    Quantized = PortableChopToInt64(static_cast<double>(*Value) * static_cast<double>(GRpcServerSendCommTenth) * GRpcServerSendCommScale255);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned char>(Quantized);
 }
 
 static void RpcServerSendCommExpand(unsigned char Encoded, float* Value) {
     const int Widened = static_cast<int>(Encoded);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Value
         fild dword ptr Widened
         fmul qword ptr GRpcServerSendCommExpand
         fstp dword ptr [ecx]
     }
+#else
+    *Value = static_cast<float>(static_cast<double>(Widened) * GRpcServerSendCommExpand);
+#endif
 }
 
 // RC 06b4cd10 / RS 06be7910.
@@ -3543,7 +3602,7 @@ unsigned int FRpcServerMiscObjUpdatePacket::Encode(unsigned char** BufferHolder,
     if ((Flags & 0x10u) != 0) {
         const unsigned short Length = static_cast<unsigned short>(Text.size());
         if (!Stream.Put(&Length, 2u)) return 0x16u;
-        if (!Stream.PutBlock(Text.c_str(), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(Text.c_str(), static_cast<unsigned int>(Length)), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
     }
     if ((Flags & 0x20u) != 0) {
         if (!Stream.Put(&Field_0x54, 4u)) return 0x16u;
@@ -3595,12 +3654,12 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
 #if defined(REMOTECLIENT_EXPORTS)
         if (MarshalCursor + Length > MarshalLimit) MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Length) + 1u) * sizeof(wchar_t)));
         if (Chars == nullptr) return 5u;
 #else
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Length) + 1u) * sizeof(wchar_t)));
 #endif
-        if (!Stream.Get(Chars, static_cast<unsigned int>(Length) * 2u)) return MarshalError;
+        if (!Stream.Get(FlWire16In(Chars, static_cast<unsigned int>(Length)), static_cast<unsigned int>(Length) * 2u)) return MarshalError;
         Chars[Length] = 0;
         Text.assign(Chars, std::wcslen(Chars));
         std::free(Chars);

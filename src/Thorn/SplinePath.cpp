@@ -96,6 +96,7 @@ namespace
     // changes the first unmasked exception from precision to invalid.
     void QuatInverseScaleRetail(const FQuat& Q, float& Scale)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         __asm
         {
@@ -115,12 +116,17 @@ namespace
             fdivr One
             fstp dword ptr [ecx]
         }
+#else
+        float normSq = Q.X * Q.X + Q.Y * Q.Y + Q.Z * Q.Z + Q.W * Q.W;
+        Scale = 1.0f / normSq;
+#endif
     }
 
     // Debug C++ rounds Product to double before doubling: actual PC64
     // probes differ in the final float and denormal-operand status.
     float SquadBlendRetail(const float* T)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         float Blend;
         __asm
@@ -133,6 +139,9 @@ namespace
             fstp Blend
         }
         return Blend;
+#else
+        return (1.0f - *T) * (*T) * 2.0f;
+#endif
     }
 
     // LAB_06f34420, 06f34440..345e8. The ordinary C++ candidate differs
@@ -143,6 +152,7 @@ namespace
     {
         float Scratch[27];
         std::memcpy(Scratch + 3, &Tangent, sizeof(Tangent));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         const float Zero = 0.0f;
         __asm
@@ -247,6 +257,40 @@ namespace
             fstp dword ptr [edx + 40h]
             fstp dword ptr [edx + 4ch]
         }
+#else
+        float invT = 1.0f / std::sqrt(Tangent.X * Tangent.X + Tangent.Y * Tangent.Y + Tangent.Z * Tangent.Z);
+        float zx = -Tangent.X * invT;
+        float zy = -Tangent.Y * invT;
+        float zz = -Tangent.Z * invT;
+        Scratch[3] = zx;
+        Scratch[4] = zy;
+        Scratch[5] = zz;
+
+        float xx = zz;
+        float xy = 0.0f;
+        float xz = -zx;
+        float invX = 1.0f / std::sqrt(xx * xx + xy * xy + xz * xz);
+        xx *= invX;
+        xy *= invX;
+        xz *= invX;
+        Scratch[6] = xx;
+        Scratch[7] = xy;
+        Scratch[8] = xz;
+
+        float yx = zy * xz - zz * xy;
+        float yy = zz * xx - zx * xz;
+        float yz = zx * xy - zy * xx;
+        float invY = 1.0f / std::sqrt(yx * yx + yy * yy + yz * yz);
+        yx *= invY;
+        yy *= invY;
+        yz *= invY;
+
+        Scratch[16] = xx;
+        Scratch[17] = yx;
+        Scratch[19] = xy;
+        Scratch[20] = yy;
+        Scratch[23] = yz;
+#endif
         std::memcpy(Scratch + 18, Scratch + 3, sizeof(float));
         std::memcpy(Scratch + 21, Scratch + 4, sizeof(float));
         std::memcpy(Scratch + 24, Scratch + 5, sizeof(float));
@@ -274,10 +318,10 @@ namespace
     static const char G_PersistQuatFmt[] = "{%f,%f,%f,%f}, ";
     static const char G_PersistDigits[] = "0123456789.";
     static const char G_PersistNumberChars[] = "-0123456789.";
-    static const unsigned long G_PersistPrefixBytes = 10;
-    static const unsigned long G_PersistVec3Bytes = 36;       // LAB_06f34ca0: count*9*4
-    static const unsigned long G_PersistOrientVec3Bytes = 40; // LAB_06f356c0: count*5*8
-    static const unsigned long G_PersistQuatBytes = 51;       // LAB_06f356c0: count*0x33
+    static const uint32_t G_PersistPrefixBytes = 10;
+    static const uint32_t G_PersistVec3Bytes = 36;       // LAB_06f34ca0: count*9*4
+    static const uint32_t G_PersistOrientVec3Bytes = 40; // LAB_06f356c0: count*5*8
+    static const uint32_t G_PersistQuatBytes = 51;       // LAB_06f356c0: count*0x33
 
     // FUN_06f34a10 (Needed=3) / FUN_06f34ae0 (Needed=4).
     bool ParsePersistFloats(const char** Cursor, float* Out, int Needed)
@@ -409,6 +453,7 @@ namespace
                                        const float& GlobalOffset, float& SegmentLength,
                                        float& SampleTime)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov edx, Cur
@@ -445,6 +490,15 @@ namespace
             mov edx, SampleTime
             fstp dword ptr [edx]
         }
+#else
+        float dx = Cur.X - Prev.X;
+        float dy = Cur.Y - Prev.Y;
+        float dz = Cur.Z - Prev.Z;
+        Prev = Cur;
+        float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+        SegmentLength += dist;
+        SampleTime = SegmentLength + GlobalOffset;
+#endif
     }
 
     // Observe pending exceptions after Total is stored and before Time is published.
@@ -458,6 +512,7 @@ namespace
     // loaded element; actual Debug/Release probes differ in NaN payload/DE.
     void NormalizeSegmentSamplesRetail(float* Table, float Total)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         const int Count = G_SamplesPerSegment;
         __asm
@@ -475,6 +530,11 @@ namespace
             jnz NormalizeSample
             fstp st(0)
         }
+#else
+        float invTotal = 1.0f / Total;
+        for (int i = 0; i < G_SamplesPerSegment; ++i)
+            Table[i] *= invTotal;
+#endif
     }
 
     void LerpVec3(const FVec3& A, const FVec3& B, float F, FVec3& Out)
@@ -495,6 +555,7 @@ namespace
     // The two input columns are read before rotational output publication.
     void NormalizeLookAtVector(FVec3& Vector)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         // The intrinsic C++ candidate changes PC24/RC_DOWN output bits and
         // spills Inverse to qword in Debug. 341cc..34215 retains it through
@@ -523,10 +584,17 @@ namespace
             fstp dword ptr [edx + 8]
             fstp st(0)
         }
+#else
+        float inv = 1.0f / std::sqrt(Vector.X * Vector.X + Vector.Y * Vector.Y + Vector.Z * Vector.Z);
+        Vector.X *= inv;
+        Vector.Y *= inv;
+        Vector.Z *= inv;
+#endif
     }
 
     void CrossLookAtVector(FVec3& Result, const FVec3& A, const FVec3& B, bool bReverseOrder)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         // Retain the old matrix column before products. First cross computes
         // X/Y/Z; the second computes Z/Y/X. The ordinary Release candidate
         // changes operand stages and output before an unmasked exception.
@@ -588,6 +656,20 @@ namespace
             fstp st(0)
         LookAtCrossDone:
         }
+#else
+        if (!bReverseOrder)
+        {
+            Result.X = A.Y * B.Z - A.Z * B.Y;
+            Result.Y = A.Z * B.X - A.X * B.Z;
+            Result.Z = A.X * B.Y - A.Y * B.X;
+        }
+        else
+        {
+            Result.X = B.Y * A.Z - B.Z * A.Y;
+            Result.Y = B.Z * A.X - B.X * A.Z;
+            Result.Z = B.X * A.Y - B.Y * A.X;
+        }
+#endif
     }
 
     void BuildLookAtFromTangent(const FVec3& Tangent, float* OutXform)
@@ -622,6 +704,7 @@ namespace
         // 3435d..343d2: the Z product precedes the first caller store, its
         // float store follows it. Ordinary Release publishes output before
         // its unmasked invalid exception; retain this arithmetic/store span.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             lea edx, AxisZ
@@ -674,12 +757,33 @@ namespace
             mov eax, dword ptr [edx + 8]
             mov dword ptr [ecx + 32], eax
         }
+#else
+        float lenSq = AxisZ.X * AxisZ.X + AxisZ.Y * AxisZ.Y + AxisZ.Z * AxisZ.Z;
+        float invLen = 1.0f / std::sqrt(lenSq);
+        AxisZ.X *= invLen;
+        AxisZ.Y *= invLen;
+        AxisZ.Z *= invLen;
+
+        OutXform[0] = Forward.X;
+        OutXform[1] = AxisY.X;
+        OutXform[3] = Forward.Y;
+        OutXform[6] = Forward.Z;
+        OutXform[4] = AxisY.Y;
+        OutXform[7] = AxisY.Z;
+
+        AxisZ.X = -AxisZ.X;
+        AxisZ.Y = -AxisZ.Y;
+        AxisZ.Z = -AxisZ.Z;
+
+        OutXform[5] = AxisZ.Y;
+        OutXform[2] = AxisZ.X;
+        OutXform[8] = AxisZ.Z;
+#endif
     }
 
     void QuatAdd(FQuat& Dst, const FQuat& A, const FQuat& B)
     {
-        // Ordinary double temporaries spill to qword in Debug. At PC64,
-        // 1 + 2^-60 then traps on that spill before the retail W publication.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov edx, A
@@ -698,16 +802,21 @@ namespace
             fstp dword ptr [edx + 8]
             fstp dword ptr [edx + 12]
         }
+#else
+        Dst.W = A.W + B.W;
+        Dst.X = A.X + B.X;
+        Dst.Y = A.Y + B.Y;
+        Dst.Z = A.Z + B.Z;
+#endif
     }
 
     void QuatScale(FQuat& Dst, const FQuat& Q, float S)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         float W;
         float X;
         float Y;
         float Z;
-        // Release C++ retained S and reversed the first three FMUL operands:
-        // the differential probe found NaN payload and denormal flag changes.
         __asm
         {
             mov edx, Q
@@ -733,6 +842,12 @@ namespace
             mov eax, Z
             mov dword ptr [edx + 12], eax
         }
+#else
+        Dst.W = Q.W * S;
+        Dst.X = Q.X * S;
+        Dst.Y = Q.Y * S;
+        Dst.Z = Q.Z * S;
+#endif
     }
 
     // FUN_06f24070 is conjugation, with a raw retained W and negated XYZ.
@@ -752,7 +867,9 @@ namespace
 
     // Standalone FUN_06f24190 keeps the ratio extended; the three
     // inline FUN_06f21770 log paths store it as float before scaling.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 #pragma intrinsic(acos)
+#endif
     __declspec(noinline) bool IsQuatLogAccepted(const float& W)
     {
         // An inline gate lets Release retain W for acos and pop it on the
@@ -777,10 +894,11 @@ namespace
         const double Angle = std::acos(static_cast<double>(Q.W));
         const float Epsilon = G_QuatSinEps;
         float Scale;
+        bool bFallback = false;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         float X;
         float Y;
         float Z;
-        bool bFallback = false;
         // The intrinsic candidate spills Z before publishing X/Y: with a
         // denormal Z and unmasked DE, both builds trap before those stores.
         // 241ce..241f0 publishes X/Y between the Z product and its float store.
@@ -828,6 +946,25 @@ namespace
             mov bFallback, 1
         LogArithmeticDone:
         }
+#else
+        double sinAngle = std::sin(Angle);
+        if (sinAngle < static_cast<double>(Epsilon))
+        {
+            bFallback = true;
+        }
+        else
+        {
+            Scale = static_cast<float>(Angle / sinAngle);
+            if (!bRoundScale)
+            {
+                Dst.W = 0.0f;
+                Dst.X = Q.X * Scale;
+                Dst.Y = Q.Y * Scale;
+                Dst.Z = Q.Z * Scale;
+                return;
+            }
+        }
+#endif
         if (bFallback)
         {
             const unsigned int Zero = 0;
@@ -862,6 +999,7 @@ namespace
         float Norm;
         float Scale;
         bool bScaleVector = false;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         // Intrinsic C++ changes FSIN/FCOS results and drops the float scale
         // boundary in Release; the root PC/RC probe confirms numeric cases.
         __asm
@@ -890,6 +1028,15 @@ namespace
             fstp st(0)
         FirstExpVectorReady:
         }
+#else
+        Norm = std::sqrt(Q.X * Q.X + Q.Y * Q.Y + Q.Z * Q.Z);
+        float sinNorm = std::sin(Norm);
+        if (sinNorm >= Epsilon)
+        {
+            Scale = sinNorm / Norm;
+            bScaleVector = true;
+        }
+#endif
         FQuat Result;
         if (bScaleVector)
             ThornSplineMath::Scale(&Result.X, &Q.X, Scale);
@@ -900,12 +1047,16 @@ namespace
             std::memcpy(&Result.Z, &Q.Z, sizeof(float));
         }
         // FCOS follows Scale3D, and consumes its explicit float norm.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld Norm
             fcos
             fstp Result.W
         }
+#else
+        Result.W = std::cos(Norm);
+#endif
         std::memcpy(&Dst, &Result, sizeof(Result));
     }
 
@@ -920,6 +1071,7 @@ namespace
         Result.X = Q.X;
         Result.Y = Q.Y;
         Result.Z = Q.Z;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov edx, Q
@@ -978,6 +1130,18 @@ namespace
             fstp dword ptr [ecx]
         ExpDone:
         }
+#else
+        Norm = std::sqrt(Q.X * Q.X + Q.Y * Q.Y + Q.Z * Q.Z);
+        float sinNorm = std::sin(Norm);
+        if (sinNorm >= Epsilon)
+        {
+            float scale = sinNorm / Norm;
+            Result.X = Q.X * scale;
+            Result.Y = Q.Y * scale;
+            Result.Z = Q.Z * scale;
+        }
+        Result.W = std::cos(Norm);
+#endif
         Dst = Result;
     }
 
@@ -1145,9 +1309,9 @@ namespace
             return Outer_->QueryInterface(Iid, Out);
         }
 
-        unsigned long DACOM_API AddRef() override { return Outer_->AddRef(); }
+        uint32_t DACOM_API AddRef() override { return Outer_->AddRef(); }
 
-        unsigned long DACOM_API Release() override { return Outer_->Release(); }
+        uint32_t DACOM_API Release() override { return Outer_->Release(); }
 
         // LAB_06f377c0 (thorn.dll.txt:46136-46227), the embedded inner
         // unknown's NON-delegating QueryInterface: walks the {IID, facet
@@ -1196,7 +1360,7 @@ namespace
             return SetPointInternal(static_cast<int>(Index), OutPoint);
         }
 
-        GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, unsigned long Count) override
+        GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, uint32_t Count) override
         {
             return LoadPoints(Pts, static_cast<int>(Count));
         }
@@ -1238,11 +1402,11 @@ namespace
 
         // LAB_06f34930 -> FUN_06f224f0: return inner+0x58 (LastLive).
         // FUN_06f22500 sets it to N+1 for a closed path, N for an open path.
-        unsigned long DACOM_API Slot5() override
+        uint32_t DACOM_API Slot5() override
         {
             if (!bInnerAllocated_)
                 return 0;
-            return static_cast<unsigned long>(LastLive_);
+            return static_cast<uint32_t>(LastLive_);
         }
 
         // FUN_06f34990 / FUN_06f349d0: wrapper-level failure is -1; the
@@ -1617,14 +1781,14 @@ namespace
             return GR_OK;
         }
 
-        unsigned long PersistEstimateSize() const
+        uint32_t PersistEstimateSize() const
         {
-            const unsigned long PositionCount = bInnerAllocated_
-                ? static_cast<unsigned long>(LastLive_) : 0ul;
+            const uint32_t PositionCount = bInnerAllocated_
+                ? static_cast<uint32_t>(LastLive_) : 0ul;
             if (bOrientation_)
             {
-                const unsigned long OrientationCount = bInnerAllocated_
-                    ? static_cast<unsigned long>(LastLive_) : 0ul;
+                const uint32_t OrientationCount = bInnerAllocated_
+                    ? static_cast<uint32_t>(LastLive_) : 0ul;
                 return PositionCount * G_PersistOrientVec3Bytes
                     + OrientationCount * G_PersistQuatBytes + G_PersistPrefixBytes;
             }
@@ -1726,11 +1890,11 @@ namespace
             return GR_OK;
         }
 
-        GENRESULT SavePersist(char* Buffer, unsigned long Size)
+        GENRESULT SavePersist(char* Buffer, uint32_t Size)
         {
             // FUN_06f34bc0: ICRSpline slot 5 = LastLive, then persist slot 5 size check.
-            const unsigned long SavedCount = Slot5();
-            const unsigned long RequiredSize = PersistEstimateSize();
+            const uint32_t SavedCount = Slot5();
+            const uint32_t RequiredSize = PersistEstimateSize();
             if (SavedCount == 0 || RequiredSize > Size)
                 return GR_GENERIC;
 
@@ -1738,7 +1902,7 @@ namespace
             const int Used =
                 sprintf(Buffer, G_PersistFlagFmt, bClosedToken ? G_PersistClosed : G_PersistOpen);
 
-            unsigned long Offset = static_cast<unsigned long>(Used);
+            uint32_t Offset = static_cast<uint32_t>(Used);
 
             // FUN_06f22500(inner, 0) Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ force OPEN ghosts, then emit SavedCount points via slot 6.
             bClosed_ = false;
@@ -1756,7 +1920,7 @@ namespace
                 const int VecWrote =
                     sprintf(Buffer + Offset, G_PersistVec3Fmt, PointX, PointY, PointZ);
 
-                Offset += static_cast<unsigned long>(VecWrote);
+                Offset += static_cast<uint32_t>(VecWrote);
 
                 if (bOrientation_)
                 {
@@ -1769,7 +1933,7 @@ namespace
                     const int QuatWrote =
                         sprintf(Buffer + Offset, G_PersistQuatFmt, QuatW, QuatX, QuatY, QuatZ);
 
-                    Offset += static_cast<unsigned long>(QuatWrote);
+                    Offset += static_cast<uint32_t>(QuatWrote);
                 }
 
                 if (Offset >= Size)
@@ -1831,13 +1995,13 @@ namespace
         // Slot 3, FUN_06f34cc0 (position).
         GENRESULT DACOM_API Slot3Load(const char* Text) override { return LoadPersist(Text); }
         // Slot 4, FUN_06f34bc0 (position) / FUN_06f35580 (orientation).
-        GENRESULT DACOM_API Slot4Save(char* Buffer, unsigned long Size) override
+        GENRESULT DACOM_API Slot4Save(char* Buffer, uint32_t Size) override
         {
             return SavePersist(Buffer, Size);
         }
         // Slot 5, LAB_06f34ca0 (position: this -= 8, ICRSpline slot 5 count * 0x24 + 10,
         // RET 4, no test) / LAB_06f356c0 (orientation).
-        unsigned long DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
+        uint32_t DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
 
     private:
         // The real core owns Points, Quats, Times and individual sample rows.
@@ -1939,6 +2103,7 @@ namespace
         // before a signalling Y; retail instead reaches Y and traps invalid.
         static void SubtractGhostVector(FVec3& OutputVector, const FVec3& A, const FVec3& B)
         {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov eax, A
@@ -1954,6 +2119,11 @@ namespace
                 fstp dword ptr [edx + 4]
                 fstp dword ptr [edx + 8]
             }
+#else
+            OutputVector.X = A.X - B.X;
+            OutputVector.Y = A.Y - B.Y;
+            OutputVector.Z = A.Z - B.Z;
+#endif
         }
 
         // OPEN construction uses CR at 0.1/0.9, with different endpoint staging.
@@ -1974,6 +2144,7 @@ namespace
                            Points_[LiveCount_], 0.9f, Points_[EndGhost]);
             const FVec3* LastPoint = &Points_[LiveCount_];
             FVec3* GhostPoint = &Points_[EndGhost];
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             float DifferenceZ;
             float X;
             float Y;
@@ -2007,6 +2178,11 @@ namespace
                 mov eax, Z
                 mov dword ptr [edx + 8], eax
             }
+#else
+            GhostPoint->X = 2.0f * LastPoint->X - GhostPoint->X;
+            GhostPoint->Y = 2.0f * LastPoint->Y - GhostPoint->Y;
+            GhostPoint->Z = 2.0f * LastPoint->Z - GhostPoint->Z;
+#endif
         }
 
         void ApplyLoadedQuats(const FQuat* Quats, int Count)

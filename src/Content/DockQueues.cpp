@@ -10,6 +10,7 @@
 // the TU's other dynamic initializers (the dock lists, LAB_06f6bb10, LAB_06f6eec0). The
 // dock-type tests read the last four (GIdCanUseBerths .. GIdCanUseLargeMoors).
 #include "ContentStaticIds.h"
+#include "fl/handles.h"
 
 #include "DockQueues.h"
 
@@ -1702,7 +1703,7 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
     if (*ShipRep != -1)
     {
         // 06f6cbd1: the target rep lands in the ShipRep argument's slot.
-        int TargetRep = static_cast<int>(reinterpret_cast<uintptr_t>(ShipRep));
+        int TargetRep = static_cast<int>(fl::PtrToHandle(ShipRep));
         pub::SpaceObj::GetRep(*DockTargetId, TargetRep);
         pub::Reputation::GetAttitude(TargetRep, *ShipRep, Attitude);
     }
@@ -1710,9 +1711,9 @@ bool __cdecl CanUseDockTarget(std::vector<unsigned int> const* ClassIds, int con
     {
         // 06f6cd03: the target rep lands in the Group argument's slot, 06f6cd0f: the
         // affiliation in the ShipId argument's slot.
-        int TargetRep = static_cast<int>(reinterpret_cast<uintptr_t>(Group));
+        int TargetRep = static_cast<int>(fl::PtrToHandle(Group));
         pub::SpaceObj::GetRep(*DockTargetId, TargetRep);
-        unsigned int Affiliation = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(ShipId));
+        unsigned int Affiliation = static_cast<unsigned int>(fl::PtrToHandle(ShipId));
         pub::Reputation::GetAffiliation(TargetRep, Affiliation);
         if (Affiliation != 0xffffffffu)
             pub::Reputation::GetReputation(Affiliation, *Group, Attitude);

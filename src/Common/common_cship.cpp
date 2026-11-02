@@ -6,6 +6,7 @@
 
 // CShip (retail CShip.cpp), FAnimScriptRef and the CShip-only helpers.
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "common_cobject_internal.h" // CmnCobject::RotateWorldToObjectSpace, GetObjectDbCollisionGroup
 #include "x86math.h"
 #include "x87_trig.h"   // retail's inline FSIN / FCOS (CShip::generate_follow_offset)
@@ -99,7 +100,7 @@ void FAnimScriptRef::Release()
     if (Index != -1)                                               // .text:0629abd5
     {
         DALib::Anim->StopPlayback(Index);                          // .text:0629abe5 slot 0x38
-        DALib::Anim->DestroyScript((void*)Index); // .text:0629abf5 slot 0x28
+        DALib::Anim->DestroyScript((void*)fl::HandleToPtr(Index)); // .text:0629abf5 slot 0x28
         Index = -1;                                                // .text:0629abf8
     }
 }
@@ -254,7 +255,7 @@ void CShip::init(CreateParms const& Parms)
     Archetype::Ship const* const ShipArch = shiparch();
     if (ShipArch->BayDoorAnim.Value[0] != '\0')
     {
-        unsigned long const PlayId = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->AnimIndex),
+        uint32_t const PlayId = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->AnimIndex),
                                                              AsOpaqueDword(EngineInstanceId),
                                                              ShipArch->BayDoorAnim.Value,
                                                              nullptr, nullptr);
@@ -1671,7 +1672,7 @@ void CShip::VerifyTarget()
     // (class & 0x103); then CEqObj::sub_obj_id_to_inst (vtable +0xf8) on the sub-target.
     // Otherwise the instance is -1. Retail fetches cobject() twice; the second fetch is the
     // same call on the same watcher.
-    long SubInst = -1;
+    int32_t SubInst = -1;
     CObject const* const Obj = TargetObj->cobject();
     if (Obj != nullptr && (Obj->ObjectClass & CObject::ClassEqObj) == CObject::ClassEqObj)
     {
@@ -1818,7 +1819,7 @@ void CShip::flush_animations()
     if (BayAnim.Index != -1)
     {
         DALib::Anim->StopPlayback(BayAnim.Index);                         // 062b0df9 slot 0x38
-        DALib::Anim->DestroyScript((void*)BayAnim.Index); // 062b0e0d slot 0x28
+        DALib::Anim->DestroyScript((void*)fl::HandleToPtr(BayAnim.Index)); // 062b0e0d slot 0x28
         BayAnim.Index = -1;                                               // 062b0e10
     }
 
@@ -1913,7 +1914,7 @@ int CShip::update(float Dt, unsigned Flags)
     if (BayState == 3)
     {
         float const ScriptDuration =
-            DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+            DALib::Anim->GetScriptDuration((void*)fl::HandleToPtr(BayAnim.Index));
         float const StoredDuration = DALib::Anim->GetStoredDuration(BayAnim.Index);
         if (StoredDuration >= ScriptDuration)
             BayState = 2;
@@ -2002,7 +2003,7 @@ double CShip::open_bay()
         // stored duration (slot 0x40, called first and rounded by FSTP dword); the
         // difference is returned off the FPU unrounded. No Anim / handle test.
         float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-        float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+        float const Script = DALib::Anim->GetScriptDuration((void*)fl::HandleToPtr(BayAnim.Index));
         return (double)Script - Stored;
     }
 
@@ -2022,7 +2023,7 @@ double CShip::open_bay()
     AnimDB::Add(BayAnim.Index);                                       // 062b2b21
     // 062b2b26..062b2b63: Script - Stored (Stored rounded first), FSTP dword.
     float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-    float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+    float const Script = DALib::Anim->GetScriptDuration((void*)fl::HandleToPtr(BayAnim.Index));
     float const Result = (float)((double)(Script) - Stored);
 
     // 062b2b5b..062b2b79: with an INotify (+0x168), notify(2, &bOpen) (vtable +0xc8,
@@ -2645,7 +2646,7 @@ float const CShip::JETTISON_CLEARANCE_TIME = 4.0f;
 // Listing 0x52310: reads Target at +0x220, then subtarget index at +0x228
 // ============================================================================
 
-long CShip::get_renderable_subtarget() const
+int32_t CShip::get_renderable_subtarget() const
 {
     // .text:062b2310..062b23b4: no target, SubTargetIndex == SUBOBJ_ID_NONE, or a target
     // object (slot 0x150 cobject) that is not a CEqObj (class & 0x103) -> -1. Otherwise

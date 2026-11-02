@@ -37,7 +37,7 @@ void __stdcall Movie_SubtractModulo(unsigned int* Left, unsigned int* Right, uns
 void __stdcall Movie_SplitLimbs(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Bound);
 
 // 0x06ac4e20. RET 0x10. 0 if the workspace allocation fails, 1 otherwise.
-long __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus);
+int32_t __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus);
 
 // 0x06ac4f40. cdecl.
 void __cdecl Movie_InitForProcessor();

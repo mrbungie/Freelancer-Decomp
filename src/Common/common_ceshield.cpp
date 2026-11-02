@@ -8,6 +8,7 @@
 // Declared in common_cequip.h; helpers shared with the sibling TUs are in
 // common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
+#include "fl/handles.h"
 #include "x86math.h"
 
 #include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
@@ -418,15 +419,15 @@ bool CEShield::Connect(char const* HpName)
     // (vtable+8); its vtable+0x64 radius is stored as float (FSTP 0629c519); the math engine
     // comes from the lazily filled per-TU cache DAT_063fc204 (FUN_06391cf0 =
     // Acquire3DMathEngine).
-    long const Root = Attachment->GetRootIndex();
+    int32_t const Root = Attachment->GetRootIndex();
     CObject* RadiusOwner = Attachment->GetPhysicsOwner();
     Vector WorldCenter;
     float const Radius = RadiusOwner->get_physical_radius_r(WorldCenter);
-    FTransform const* InstXform = (FTransform const*)DALib::Engine->GetInstanceTransform((void*)Root);
+    FTransform const* InstXform = (FTransform const*)DALib::Engine->GetInstanceTransform((void*)fl::HandleToPtr(Root));
     I3DMathEngine* Math = Acquire3DMathEngine();
     Vector LocalCenter;
     Math->InverseTransform((FVector&)LocalCenter, *InstXform, (FVector const&)WorldCenter); // +0x3c
-    DALib::Engine->SetInstanceExtent((void*)Root, 1, Radius, (float const*)&LocalCenter);   // +0x84
+    DALib::Engine->SetInstanceExtent((void*)fl::HandleToPtr(Root), 1, Radius, (float const*)&LocalCenter);   // +0x84
 
     return true;
 }
@@ -515,7 +516,7 @@ void CEShieldIntruderChecker::Attach(CEShield* Shield)
     // Part id = the CRC half of IEngine::GetInstanceName(GetRootIndex()) (+0x68), looked up on
     // the shield's archetype.
     FEngineName Name;
-    DALib::Engine->GetInstanceName(&Name, (void*)Shield->GetRootIndex());   // vt+0x84
+    DALib::Engine->GetInstanceName(&Name, (void*)fl::HandleToPtr(Shield->GetRootIndex()));   // vt+0x84
     PhyArch::Part const* Part = Shield->Arch->get_phy_part(Name.Crc);
     if (Part != nullptr)
     {

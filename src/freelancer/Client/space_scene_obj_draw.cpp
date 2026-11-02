@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "space_scene_obj_draw.h"
+#include "fl/handles.h"
 
 #include "alchemy.h"
 #include "beam_effect.h"
@@ -474,14 +475,14 @@ namespace
                 Ifl->Release();
             return false;
         }
-        bool const bOk = Ifl->SetInstanceValue(static_cast<int>(reinterpret_cast<intptr_t>(InstId)), ArchPath) >= 0;
+        bool const bOk = Ifl->SetInstanceValue(static_cast<int>(fl::PtrToHandle(InstId)), ArchPath) >= 0;
         if (Ifl != nullptr)
             Ifl->Release();
         return bOk;
     }
 
     // FUN_00533930 (cdecl) -- the same shape as FUN_00533880 around Slot8 (+0x20) (arg1, arg2).
-    bool GetAppearanceOverrideMaterial(unsigned long Index, void** Out)
+    bool GetAppearanceOverrideMaterial(uint32_t Index, void** Out)
     {
         IFLAppearance* Ifl = nullptr;
         if (DALib::Engine->QueryInterface(Iids::FLAppearance, reinterpret_cast<void**>(&Ifl)) < 0)
@@ -671,8 +672,8 @@ namespace
         if (Payload == nullptr)
             return;
         Payload->Next = Cur->Payload;
-        Payload->Light = reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(
-            static_cast<unsigned>(Record5[1])));
+        Payload->Light = static_cast<FEngineLight*>(fl::HandleToPtr(
+            static_cast<uint32_t>(Record5[1])));
         Payload->Ix = Record5[2];
         Payload->Iz = Record5[3];
         Payload->Range = Record5[4];
@@ -694,7 +695,7 @@ namespace
                 continue;
             int Record[5];
             Record[0] = 0;
-            Record[1] = static_cast<int>(reinterpret_cast<uintptr_t>(Light));
+            Record[1] = static_cast<int>(fl::PtrToHandle(Light));
             Record[2] = static_cast<int>(Light->Position[0]);
             Record[3] = static_cast<int>(Light->Position[2]);
             Record[4] = static_cast<int>(Light->D3d.Range);
@@ -721,7 +722,7 @@ namespace
     // static initializer LAB_004f6ed0 sets it to -1 and nothing else writes it (XREFs 004f6ed0 W,
     // 004f774d R). -1 is FUN_00403ea0's "current list" key DAT_0061648c: the container of the
     // current material key is flushed.
-    unsigned long G_EffectsListKey = 0xffffffffu;
+    uint32_t G_EffectsListKey = 0xffffffffu;
 
     // FUN_00538200 (thiscall on the pool DAT_00675578, RET 0xc: out slot, node, query),
     // listing-traced 0x00538200..0x005382e4. `this` is only handed on to the recursion, so the
@@ -1201,7 +1202,7 @@ namespace
             memcpy(&Enclose, &EncloseBits, sizeof(float));
 
             float E;
-            if (reinterpret_cast<void*>(static_cast<uintptr_t>(DrawStateA)) != G_FieldController)
+            if (fl::HandleToPtr(static_cast<uint32_t>(DrawStateA)) != G_FieldController)
             {
                 // 0x0051f4c3..0x0051f4de: another enclosure -- above 0.25 (double 0x005cbf58)
                 // is dropped (TEST AH,0x41 / JZ); otherwise E = 0.0f.
@@ -1627,7 +1628,7 @@ namespace
             if (GetGameOption(kGameOptParticles) != 0 && Alchemy != nullptr)
             {
                 GENRESULT const BeginHr = Alchemy->BeginDraw();
-                if (static_cast<long>(BeginHr) >= 0)
+                if (static_cast<int32_t>(BeginHr) >= 0)
                 {
                     if (TypeIndex >= 0)
                     {
@@ -2316,7 +2317,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     // the player, FUN_004022d0(&Scale) (DAT_006101d4) FCOMP double 0.75 (DAT_005debf8), TEST
     // AH,0x41 / JP: greater or unordered -> 0; otherwise FUN_00402580(get_index (vt+0x1c), 1, 0)
     // with its result unused, and 0x80.
-    unsigned long Flags = 0;
+    uint32_t Flags = 0;
     if (static_cast<void*>(static_cast<IObjRW*>(Self)) != GetPlayerObjRW())
     {
         Flags = 8u;
@@ -2331,7 +2332,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         }
         else
         {
-            BindRendererLods(reinterpret_cast<void*>(static_cast<intptr_t>(Self->get_index())), 1,
+            BindRendererLods(static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Self->get_index()))), 1,
                              nullptr);
             Flags = 0x80u;
         }
@@ -2350,7 +2351,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
     }
 
     // 0x00539a5f..0x00539a68: EBX = get_index (vt+0x1c).
-    long const Inst = Self->get_index();
+    int32_t const Inst = Self->get_index();
 
     // 0x00539a66..0x00539a8d: FUN_005b3510(0) FCOMP 0.0f (DAT_005c7474), TEST AH,0x41 / JNZ
     // (not above, NaN included, skips); high word below 1; Extra null.
@@ -2372,14 +2373,14 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
             // 0x00539ad2..0x00539aec: FUN_00533930(4, &Extra); on success
             // FUN_00533880(Inst, name).
             if (GetAppearanceOverrideMaterial(4u, &Extra))
-                SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
+                SetAppearanceInstanceValue(static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Inst))),
                                    const_cast<char*>(Envmap));
         }
     }
 
     // 0x00539aef..0x00539b0f: DALib::Renderer vt+0x1c (Slot7)(Camera, Inst, 1.0f, Flags,
     // SubmitMatrix, Extra); no test of the renderer.
-    int const Result = DALib::Renderer->RenderInstance(Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
+    int const Result = DALib::Renderer->RenderInstance(Camera, static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Inst))),
                                               1.0f, Flags, SubmitMatrix, Extra);
 
     // 0x00539b14..0x00539b27: 3 and up (CMP ESI,3 / JL, signed) -> MaterialBatcher +0x28
@@ -2420,10 +2421,10 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
         // FUN_00533880(get_index (vt+0x1c), the float's bits).
         float const Opacity = static_cast<float>(1.0 - static_cast<double>(Fade));
         Self->Field_0xe0 = 1;
-        long const Inst = Self->get_index();
+        int32_t const Inst = Self->get_index();
         void* OpacityBits = nullptr;
         memcpy(&OpacityBits, &Opacity, sizeof(float));
-        SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), OpacityBits);
+        SetAppearanceInstanceValue(static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Inst))), OpacityBits);
 
         // 0x005337e0..0x00533825: the CEqObj again; its archetype (+0x88) non-null and +0x80
         // (bNomad) clear -> FUN_00533930(3, &Extra), the result ignored.
@@ -2439,7 +2440,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
     {
         // 0x00533827..0x0053384c: +0xe0 = 0; get_index != -1 -> FUN_00532170(index).
         Self->Field_0xe0 = 0;
-        long const Inst = Self->get_index();
+        int32_t const Inst = Self->get_index();
         if (Inst != -1)
             RemoveAppearanceInstanceValue(static_cast<int>(Inst));
     }
@@ -2769,9 +2770,9 @@ void SpaceObjDrawPass(FSpaceCamera* Cam, unsigned LayerFlags, unsigned Param2)
             if (!NebulaVolume::ShowsRealBackground())
 #endif
             {
-                ClearR = static_cast<unsigned char>(static_cast<long>(static_cast<double>(Col[0]) * 255.0f));
-                ClearG = static_cast<unsigned char>(static_cast<long>(static_cast<double>(Col[1]) * 255.0f));
-                ClearB = static_cast<unsigned char>(static_cast<long>(static_cast<double>(Col[2]) * 255.0f));
+                ClearR = static_cast<unsigned char>(static_cast<int32_t>(static_cast<double>(Col[0]) * 255.0f));
+                ClearG = static_cast<unsigned char>(static_cast<int32_t>(static_cast<double>(Col[1]) * 255.0f));
+                ClearB = static_cast<unsigned char>(static_cast<int32_t>(static_cast<double>(Col[2]) * 255.0f));
             }
         }
     }

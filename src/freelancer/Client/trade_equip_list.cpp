@@ -8,6 +8,7 @@
 // 0x004be6c0..0x004bfb53.
 
 #include "trade_equip_list.h"
+#include "fl/handles.h"
 
 #include "cargo_bar_control.h"
 #include "character_select_equip.h" // GetPlayerEquipDescListRetail (FUN_004c4060), credits (FUN_004c4ce0)
@@ -60,7 +61,7 @@ namespace
 
     int PointerField(void const* Pointer)
     {
-        return static_cast<int>(reinterpret_cast<intptr_t>(Pointer));
+        return static_cast<int>(fl::PtrToHandle(Pointer));
     }
 
     // Retail walks the circular VC6 list: from the first node, Steps times to ->next, where the

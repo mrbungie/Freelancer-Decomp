@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_scene.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "gf_script.h"
@@ -128,17 +129,17 @@ GENRESULT DACOM_API FThorn_Scene::GetReverb(float* OutEnvironment, float* OutVol
                                            float* OutDecay, float* OutDamping)
 {
     if (DALib::Sound != nullptr)
-        DALib::Sound->GetEaxPreview(reinterpret_cast<unsigned long*>(OutEnvironment),
-                                    reinterpret_cast<unsigned long*>(OutVolume),
-                                    reinterpret_cast<unsigned long*>(OutDecay),
-                                    reinterpret_cast<unsigned long*>(OutDamping));
+        DALib::Sound->GetEaxPreview(reinterpret_cast<uint32_t*>(OutEnvironment),
+                                    reinterpret_cast<uint32_t*>(OutVolume),
+                                    reinterpret_cast<uint32_t*>(OutDecay),
+                                    reinterpret_cast<uint32_t*>(OutDamping));
     return GR_OK;
 }
 
 // FUN_00450870.
 void* FThorn_Scene::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // LAB_00453ec0 (RET 8; ICF-shared with Thorn_Psys geo slot 3). Three dwords into +0x6c.

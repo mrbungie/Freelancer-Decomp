@@ -121,7 +121,7 @@ namespace
     {
         int Id;
         const char* Name;
-        unsigned long Default;
+        uint32_t Default;
         unsigned char bEnabled;
     };
 
@@ -342,12 +342,12 @@ namespace
         }
     }
 
-    unsigned long ReadProfileNumber(ICOManager* Dacom, IProfileParser* Held, const char* Section,
-                                    const char* Key, unsigned long Default, unsigned long* Out)
+    uint32_t ReadProfileNumber(ICOManager* Dacom, IProfileParser* Held, const char* Section,
+                                    const char* Key, uint32_t Default, uint32_t* Out)
     {
         // Retail's local_c is uninitialized and only read back when the IProfileParser QI fails
         // (then *Out is returned unwritten); the port starts it at 0 instead of reading garbage.
-        unsigned long Local = 0;
+        uint32_t Local = 0;
         if (Out == nullptr)
             Out = &Local;
         IProfileParser* Parser = nullptr;
@@ -376,12 +376,12 @@ namespace
                         *Out = strtoul(G_ProfileValueBuf, nullptr, 16);
                     else
                         // 06d16b09 also runs strspn(buf, "0123456789+-") and drops the result.
-                        *Out = (unsigned long)(MsvcrtAtoi(G_ProfileValueBuf));
+                        *Out = (uint32_t)(MsvcrtAtoi(G_ProfileValueBuf));
                 }
                 Parser->CloseSection(Handle);
             }
         }
-        const unsigned long Result = *Out;
+        const uint32_t Result = *Out;
         ReleaseStartupParser(&Parser);
         return Result;
     }
@@ -481,7 +481,7 @@ namespace
     struct FRp9TextureHandle
     {
         IDirect3DTexture9* Texture;
-        unsigned long Extra;
+        uint32_t Extra;
     };
 
     // RP8's buffer lists (kOffVbList 0x22E4 / kOffIbList 0x22F0), the scratch IB node (+0x14C)
@@ -489,7 +489,7 @@ namespace
     // named members VbList_, IbList_, ScratchIb_ and PipelineStates_ of FDirectX9 (RP9.h).
 
     // FUN_06d1b480(0x200): Flags = 0x200|8 (D3DUSAGE_DYNAMIC|WRITEONLY).
-    static const unsigned long kVbPoolUsage = 0x208;
+    static const uint32_t kVbPoolUsage = 0x208;
 
     // ---- Direct3D 8 numbering kept by the caches (dx8/include/d3d8types.h) ----
     //
@@ -508,16 +508,16 @@ namespace
     // D3DTEXTURESTAGESTATETYPE values that Direct3D 9 moved to sampler states (d3d8types.h
     // lines 446..458). The values they carry (D3DTEXTUREADDRESS, D3DTEXTUREFILTERTYPE, D3DCOLOR,
     // float bits, DWORD) keep their encoding in D3D9.
-    const unsigned long kD3d8TssAddressU = 13;      // D3DTSS_ADDRESSU
-    const unsigned long kD3d8TssAddressV = 14;      // D3DTSS_ADDRESSV
-    const unsigned long kD3d8TssBorderColor = 15;   // D3DTSS_BORDERCOLOR
-    const unsigned long kD3d8TssMagFilter = 16;     // D3DTSS_MAGFILTER
-    const unsigned long kD3d8TssMinFilter = 17;     // D3DTSS_MINFILTER
-    const unsigned long kD3d8TssMipFilter = 18;     // D3DTSS_MIPFILTER
-    const unsigned long kD3d8TssMipMapLodBias = 19; // D3DTSS_MIPMAPLODBIAS
-    const unsigned long kD3d8TssMaxMipLevel = 20;   // D3DTSS_MAXMIPLEVEL
-    const unsigned long kD3d8TssMaxAnisotropy = 21; // D3DTSS_MAXANISOTROPY
-    const unsigned long kD3d8TssAddressW = 25;      // D3DTSS_ADDRESSW
+    const uint32_t kD3d8TssAddressU = 13;      // D3DTSS_ADDRESSU
+    const uint32_t kD3d8TssAddressV = 14;      // D3DTSS_ADDRESSV
+    const uint32_t kD3d8TssBorderColor = 15;   // D3DTSS_BORDERCOLOR
+    const uint32_t kD3d8TssMagFilter = 16;     // D3DTSS_MAGFILTER
+    const uint32_t kD3d8TssMinFilter = 17;     // D3DTSS_MINFILTER
+    const uint32_t kD3d8TssMipFilter = 18;     // D3DTSS_MIPFILTER
+    const uint32_t kD3d8TssMipMapLodBias = 19; // D3DTSS_MIPMAPLODBIAS
+    const uint32_t kD3d8TssMaxMipLevel = 20;   // D3DTSS_MAXMIPLEVEL
+    const uint32_t kD3d8TssMaxAnisotropy = 21; // D3DTSS_MAXANISOTROPY
+    const uint32_t kD3d8TssAddressW = 25;      // D3DTSS_ADDRESSW
 
     // D3D8 caps bits with no D3D9 define (dx8/include/d3d8caps.h).
     const DWORD kD3d8Caps2CanRenderWindowed = 0x00080000;   // D3DCAPS2_CANRENDERWINDOWED
@@ -532,7 +532,7 @@ namespace
     const DWORD kD3d8SwapEffectCopyVsync = 4;
 
     // D3D8 TSS number -> D3D9 sampler state; false when the state stays a texture-stage state.
-    bool Rp9SamplerStateFromTss(unsigned long D3d8Type, D3DSAMPLERSTATETYPE* Out)
+    bool Rp9SamplerStateFromTss(uint32_t D3d8Type, D3DSAMPLERSTATETYPE* Out)
     {
         switch (D3d8Type)
         {
@@ -553,7 +553,7 @@ namespace
     // IDirect3DDevice8::SetTextureStageState with a D3D8 type number.
     // RP9-GAP: D3D8's D3DTEXF_FLATCUBIC (4) / D3DTEXF_GAUSSIANCUBIC (5) filter values are passed
     // through unchanged; D3D9 has no such filters (4/5 are not D3DTEXF values there).
-    HRESULT Rp9SetStageState(IDirect3DDevice9* Device, DWORD Stage, unsigned long D3d8Type,
+    HRESULT Rp9SetStageState(IDirect3DDevice9* Device, DWORD Stage, uint32_t D3d8Type,
                              DWORD Value)
     {
         D3DSAMPLERSTATETYPE Sampler;
@@ -563,7 +563,7 @@ namespace
     }
 
     // IDirect3DDevice8::GetTextureStageState with a D3D8 type number.
-    HRESULT Rp9GetStageState(IDirect3DDevice9* Device, DWORD Stage, unsigned long D3d8Type,
+    HRESULT Rp9GetStageState(IDirect3DDevice9* Device, DWORD Stage, uint32_t D3d8Type,
                              DWORD* Out)
     {
         D3DSAMPLERSTATETYPE Sampler;
@@ -575,7 +575,7 @@ namespace
     // IDirect3DDevice8::SetRenderState with a D3D8 state number. States D3D9 kept are sent as
     // they are (same numbers, same value encodings, D3DORDER_* = D3DDEGREE_*); the six D3D9
     // dropped are translated here.
-    HRESULT Rp9SendRenderState(IDirect3DDevice9* Device, unsigned int D3d8State, unsigned long Value,
+    HRESULT Rp9SendRenderState(IDirect3DDevice9* Device, unsigned int D3d8State, uint32_t Value,
                                int DepthBiasZBits)
     {
         switch (D3d8State)
@@ -706,7 +706,7 @@ namespace
 
     // FUN_06d01000 (cdecl; the name is pushed but never read): the value of the first record
     // of the database's live set whose name has the DACOM CRC Crc, or null.
-    const char* MgsdbFindFlag(FMgsdbDatabase* Db, const char* Name, unsigned long Crc)
+    const char* MgsdbFindFlag(FMgsdbDatabase* Db, const char* Name, uint32_t Crc)
     {
         (void)Name;
         const FMgsdbRecordSet* Set = Db->GetRecords();
@@ -733,7 +733,7 @@ namespace
         unsigned char bEnabled;     // +0 LightEnable state last committed to the device
         unsigned char bWantEnabled; // +1 state asked for by set_light_enable
         unsigned char bDataDirty;   // +2 Data must be resent with SetLight at the next flush
-        long Generation;            // +4 manager generation the record was queued in
+        int32_t Generation;            // +4 manager generation the record was queued in
         int D3dIndex;               // +8 D3D light index from the pool, -1 = none
         const D3DLIGHT8* Data;      // +C light data (add_light passes the handle itself)
         ~FRp9LightRecord();
@@ -752,7 +752,7 @@ namespace
     // FUN_06d2bd86: DAT_06d728f0 = empty vector of records queued for the next flush.
     std::vector<FRp9LightRecord*> G_DirtyLights;
     // FUN_06d2c01a: DAT_06d728cc = map<handle, record> (keys compared unsigned).
-    std::map<unsigned long, FRp9LightRecord> G_LightRecords;
+    std::map<uint32_t, FRp9LightRecord> G_LightRecords;
 
     // FUN_06d2c553: take an index from the pool. Used >= size -> resize(size + 0x10, 0) and
     // dump " exceeded 64 allocated lights. now at: %d" (StateCache.cpp 0x7c) with the new size;
@@ -795,9 +795,9 @@ namespace
 
     // map::find on DAT_06d728cc (FUN_06d2e9f0 lower_bound, then end or key < node key -> end);
     // the callers turn end into a null record.
-    FRp9LightRecord* LightFind(unsigned long Handle)
+    FRp9LightRecord* LightFind(uint32_t Handle)
     {
-        std::map<unsigned long, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
+        std::map<uint32_t, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
         if (It == G_LightRecords.end())
             return nullptr;
         return &It->second;
@@ -950,7 +950,7 @@ void FRp9LightManager::Initialize()
 
 // RP8: FRp8LightManager::FindOrCreate
 // formerly LightFindOrCreate
-int FRp9LightManager::FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data)
+int FRp9LightManager::FindOrCreate(uint32_t Handle, const D3DLIGHT8* Data)
 {
     FRp9LightRecord Record;
     Record.bEnabled = 0;
@@ -959,8 +959,8 @@ int FRp9LightManager::FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data)
     Record.Generation = -1;
     Record.D3dIndex = -1;
     Record.Data = Data;
-    std::pair<std::map<unsigned long, FRp9LightRecord>::iterator, bool> Result =
-        G_LightRecords.insert(std::pair<unsigned long, FRp9LightRecord>(Handle, Record));
+    std::pair<std::map<uint32_t, FRp9LightRecord>::iterator, bool> Result =
+        G_LightRecords.insert(std::pair<uint32_t, FRp9LightRecord>(Handle, Record));
     if (Result.second)
     {
         Result.first->second.D3dIndex = LightIndexAlloc();
@@ -972,9 +972,9 @@ int FRp9LightManager::FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data)
 
 // RP8: FRp8LightManager::Remove
 // formerly LightRemove
-bool FRp9LightManager::Remove(unsigned long Handle)
+bool FRp9LightManager::Remove(uint32_t Handle)
 {
-    std::map<unsigned long, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
+    std::map<uint32_t, FRp9LightRecord>::iterator It = G_LightRecords.find(Handle);
     if (It == G_LightRecords.end())
         return false;
     FRp9LightRecord* Record = &It->second;
@@ -995,7 +995,7 @@ bool FRp9LightManager::Remove(unsigned long Handle)
 
 // RP8: FRp8LightManager::GetEnable
 // formerly LightGetEnable
-unsigned char FRp9LightManager::GetEnable(unsigned long Handle)
+unsigned char FRp9LightManager::GetEnable(uint32_t Handle)
 {
     FRp9LightRecord* Record = LightFind(Handle);
     if (Record == nullptr)
@@ -1008,7 +1008,7 @@ unsigned char FRp9LightManager::GetEnable(unsigned long Handle)
 
 // RP8: FRp8LightManager::Update
 // formerly LightUpdate
-bool FRp9LightManager::Update(unsigned long Handle)
+bool FRp9LightManager::Update(uint32_t Handle)
 {
     FRp9LightRecord* Record = LightFind(Handle);
     if (Record == nullptr)
@@ -1023,7 +1023,7 @@ bool FRp9LightManager::Update(unsigned long Handle)
 
 // RP8: FRp8LightManager::SetEnable
 // formerly LightSetEnable
-bool FRp9LightManager::SetEnable(unsigned long Handle, int Enable)
+bool FRp9LightManager::SetEnable(uint32_t Handle, int Enable)
 {
     FRp9LightRecord* Record = LightFind(Handle);
     if (Record == nullptr)
@@ -1045,7 +1045,7 @@ void FRp9LightManager::Reset()
     G_DirtyLights.clear();
     Generation = 0;
     EnabledCount = 0;
-    for (std::map<unsigned long, FRp9LightRecord>::iterator It = G_LightRecords.begin();
+    for (std::map<uint32_t, FRp9LightRecord>::iterator It = G_LightRecords.begin();
          It != G_LightRecords.end(); ++It)
     {
         FRp9LightRecord* Record = &It->second;
@@ -1112,14 +1112,14 @@ GENRESULT DACOM_API FRp9Inner::QueryInterface(const char* Iid, void** Out)
 }
 
 // RP8: FRp8Inner::AddRef
-unsigned long DACOM_API FRp9Inner::AddRef()
+uint32_t DACOM_API FRp9Inner::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
 // RP8: FRp8Inner::Release
-unsigned long DACOM_API FRp9Inner::Release()
+uint32_t DACOM_API FRp9Inner::Release()
 {
     if (RefCount > 0)
         --RefCount;
@@ -1155,18 +1155,18 @@ GENRESULT DACOM_API FRp9Factory::QueryInterface(const char* Iid, void** Out)
 }
 
 // RP8: FRp8Factory::AddRef
-unsigned long DACOM_API FRp9Factory::AddRef()
+uint32_t DACOM_API FRp9Factory::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
 // RP8: FRp8Factory::Release
-unsigned long DACOM_API FRp9Factory::Release()
+uint32_t DACOM_API FRp9Factory::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    unsigned long Left = RefCount;
+    uint32_t Left = RefCount;
     if (Left == 0)
     {
         delete this;
@@ -1335,7 +1335,7 @@ GENRESULT DACOM_API FDirectX9::QueryInterface(const char* Iid, void** Out)
 }
 
 // RP8: FDirectX8::AddRef
-unsigned long DACOM_API FDirectX9::AddRef()
+uint32_t DACOM_API FDirectX9::AddRef()
 {
     if (Outer_ != nullptr && Outer_ != &Inner_)
         return Outer_->AddRef();
@@ -1344,7 +1344,7 @@ unsigned long DACOM_API FDirectX9::AddRef()
 }
 
 // RP8: FDirectX8::Release
-unsigned long DACOM_API FDirectX9::Release()
+uint32_t DACOM_API FDirectX9::Release()
 {
     return Outer_->Release();
 }
@@ -1451,7 +1451,7 @@ void FDirectX9::EnumAdapters()
         D3d_->GetAdapterDisplayMode(Index, &Adapter.DisplayMode);
         Adapter.ModeCount = AdapterModeCount(Index);
         Adapter.Modes = new FRp9AdapterMode[Adapter.ModeCount];
-        for (unsigned long Mode = 0; Mode < Adapter.ModeCount; ++Mode)
+        for (uint32_t Mode = 0; Mode < Adapter.ModeCount; ++Mode)
         {
             Adapter.Modes[Mode].PfIndex10 = PfIndex(0);
             Adapter.Modes[Mode].PfIndex14 = PfIndex(0);
@@ -1465,7 +1465,7 @@ void FDirectX9::EnumAdapters()
 }
 
 // RP8: FDirectX8::QueryVidMem (DirectDraw 7, unchanged)
-unsigned long FDirectX9::QueryVidMem()
+uint32_t FDirectX9::QueryVidMem()
 {
     static const GUID kIidDirectDraw7 = {
         0x15e65ec0, 0x3b9c, 0x11d2, {0xb9, 0x2f, 0x00, 0x60, 0x97, 0x97, 0xea, 0x5b}};
@@ -1477,16 +1477,16 @@ unsigned long FDirectX9::QueryVidMem()
     HRESULT Hr = DirectDrawCreateEx(nullptr, (void**)&Draw, kIidDirectDraw7, nullptr);
     if (SUCCEEDED(Hr))
         Hr = Draw->QueryInterface(Direct3D7Iid, (void**)&Direct3D7);
-    unsigned long Best = 0;
+    uint32_t Best = 0;
     if (SUCCEEDED(Hr))
     {
-        const unsigned long Masks[3] = {0x10007000ul, 0x10005000ul, 0x10004040ul};
+        const uint32_t Masks[3] = {0x10007000ul, 0x10005000ul, 0x10004040ul};
         for (int Index = 0; Index < 3; ++Index)
         {
             DDSCAPS2 Caps = {};
             Caps.dwCaps = Masks[Index];
-            unsigned long Total = 0;
-            unsigned long Free = 0;
+            uint32_t Total = 0;
+            uint32_t Free = 0;
             if (SUCCEEDED(Draw->GetAvailableVidMem(&Caps, &Total, &Free)) && Total != 0)
             {
                 if (Best == 0 || Total < Best)
@@ -1681,7 +1681,7 @@ void FDirectX9::ApplyAbilityOverrides()
 // (Rp9Caps8FromCaps9), so every bit test below reads what it reads in RP8.
 void FDirectX9::ApplyDeviceCaps(const FRp9Caps8* Caps)
 {
-    memset(Ability_, 0, 0x14 * sizeof(unsigned long));
+    memset(Ability_, 0, 0x14 * sizeof(uint32_t));
     Ability_[3] = VidMem_;
     Ability_[1] = (Caps->RasterCaps & 0x20000) != 0;
     Ability_[2] = (Caps->RasterCaps & 0x100000) != 0;
@@ -1707,7 +1707,7 @@ void FDirectX9::ApplyDeviceCaps(const FRp9Caps8* Caps)
     Ability_[6] = Caps->MaxTextureWidth != 0 ? Caps->MaxTextureWidth : 0x100;
     Ability_[7] = Caps->MaxTextureHeight != 0 ? Caps->MaxTextureHeight : 0x100;
 
-    unsigned long Stages = Caps->MaxTextureBlendStages;
+    uint32_t Stages = Caps->MaxTextureBlendStages;
     if (Stages >= 8)
         Stages = 7;
     // Pipeline-state id 6 {value +0x39C, +0x3A0, +0x3A4}: written only when +0x3A0 is set.
@@ -1771,7 +1771,7 @@ D3DFORMAT FDirectX9::PickDepthFormat(D3DFORMAT AdapterFormat, D3DFORMAT BackBuff
 
 // Keep format-specific capability gates before asking the device.
 // RP8: FDirectX8::CheckTextureFormat
-bool FDirectX9::CheckTextureFormat(unsigned int Format, unsigned long Usage, D3DRESOURCETYPE RType)
+bool FDirectX9::CheckTextureFormat(unsigned int Format, uint32_t Usage, D3DRESOURCETYPE RType)
 {
     if (Device_ == nullptr)
     {
@@ -2057,7 +2057,7 @@ void FDirectX9::PopulateFormatCatalog()
 }
 
 // Retail RP8 FUN_06d163f0 — vertex stride from D3D8 FVF dword.
-static unsigned int VertexStrideFromFvf(unsigned long Fvf)
+static unsigned int VertexStrideFromFvf(uint32_t Fvf)
 {
     unsigned int Stride = 0;
     if ((Fvf & 0xc) == 0xc)
@@ -2124,7 +2124,7 @@ void FRp9RenderStateCache::ResetGeneration() // formerly RsQueueResetGeneration
 
 // Returns the requested value even when a later device write fails.
 // RP8: FRp8RenderStateCache::GetPending
-unsigned long FRp9RenderStateCache::GetPending(unsigned int StateId) const // formerly RsQueueReadPending
+uint32_t FRp9RenderStateCache::GetPending(unsigned int StateId) const // formerly RsQueueReadPending
 {
     return Entries[StateId].Pending;
 }
@@ -2132,7 +2132,7 @@ unsigned long FRp9RenderStateCache::GetPending(unsigned int StateId) const // fo
 // RP8: FRp8RenderStateCache::Apply. StateId is a D3D8 number; the device receives its D3D9
 // translation (Rp9SendRenderState), the cache keeps the D3D8 value.
 HRESULT FRp9RenderStateCache::Apply(IDirect3DDevice9* Device, unsigned int StateId,
-                                    unsigned long Value) // formerly RsQueueApply
+                                    uint32_t Value) // formerly RsQueueApply
 {
     const HRESULT Hr = Rp9SendRenderState(Device, StateId, Value, DepthBiasZBits);
     if (SUCCEEDED(Hr))
@@ -2147,7 +2147,7 @@ static bool g_RsQueueOverflowReported = false;
 
 // Disabled states ignore requests; the result indicates membership in this generation.
 // RP8: FRp8RenderStateCache::MarkDirty
-bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, unsigned long Value) // formerly RsQueueMarkDirty
+bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, uint32_t Value) // formerly RsQueueMarkDirty
 {
     FRp9RenderStateEntry& Entry = Entries[StateId];
     if (Entry.bEnabled != 0)
@@ -2175,9 +2175,9 @@ bool FRp9RenderStateCache::MarkDirty(unsigned int StateId, unsigned long Value) 
 // RP8: FRp8RenderStateCache::Flush
 void FRp9RenderStateCache::Flush(IDirect3DDevice9* Device) // formerly RsQueueFlush
 {
-    for (unsigned long Index = 0; Index < DirtyCount; ++Index)
+    for (uint32_t Index = 0; Index < DirtyCount; ++Index)
     {
-        const unsigned long StateId = DirtyStates[Index];
+        const uint32_t StateId = DirtyStates[Index];
         const FRp9RenderStateEntry& Entry = Entries[StateId];
         if (Entry.Pending != Entry.Cached)
             Apply(Device, StateId, Entry.Pending);
@@ -2187,7 +2187,7 @@ void FRp9RenderStateCache::Flush(IDirect3DDevice9* Device) // formerly RsQueueFl
 
 // RP9 Ex only (no RP8 counterpart): EndExPass. Every state is queued through MarkDirty, so the
 // device sees the snapshot again at the next flush and Get* answers the pre-pass values.
-void FRp9RenderStateCache::RestorePending(const unsigned long* Snapshot)
+void FRp9RenderStateCache::RestorePending(const uint32_t* Snapshot)
 {
     for (unsigned int StateId = 0; StateId < StateCount; ++StateId)
     {
@@ -2239,7 +2239,7 @@ void FDirectX9::FlushDrawState(IDirect3DDevice9* Device)
         Cache.Flags.Dirty = (unsigned char)(Cache.Flags.Dirty & ~StreamDirtyVertexSource);
         FRp9Vb* Vb = Cache.VertexBuffer;
         IDirect3DVertexBuffer9* VbGpu = nullptr;
-        unsigned long Shader = 0;
+        uint32_t Shader = 0;
         if (Vb == nullptr)
         {
             Shader = Cache.Fvf;
@@ -2283,9 +2283,9 @@ void FDirectX9::FlushDrawState(IDirect3DDevice9* Device)
 
 // RP8: FRp8DeviceStateCaches::ReadTextureStageState
 // formerly ReadTssCache
-unsigned long FRp9DeviceStateCaches::ReadTextureStageState(IDirect3DDevice9* Device,
-                                                         unsigned long Stage,
-                                                         unsigned long Type)
+uint32_t FRp9DeviceStateCaches::ReadTextureStageState(IDirect3DDevice9* Device,
+                                                         uint32_t Stage,
+                                                         uint32_t Type)
 {
     FRp9TextureStageState& Entry = TextureStates[Stage][Type];
     if (Entry.bValid == 0)
@@ -2351,8 +2351,8 @@ FRp9Vb* FDirectX9::FindOrInsertPoolVb(unsigned int Fvf)
 {
     FRp9Vb Fresh = {};
     Fresh.Flags = kVbPoolUsage;
-    std::pair<std::map<unsigned long, FRp9Vb>::iterator, bool> Inserted =
-        VbPool_.insert(std::pair<const unsigned long, FRp9Vb>(Fvf, Fresh));
+    std::pair<std::map<uint32_t, FRp9Vb>::iterator, bool> Inserted =
+        VbPool_.insert(std::pair<const uint32_t, FRp9Vb>(Fvf, Fresh));
     return &Inserted.first->second;
 }
 
@@ -2386,15 +2386,15 @@ void FDirectX9::GrowPoolVb(FRp9Vb* Wrapper, unsigned int Fvf, unsigned int Count
 // RP8: FDirectX8::ReleasePoolVbs
 void FDirectX9::ReleasePoolVbs()
 {
-    std::map<unsigned long, FRp9Vb>& Pool = VbPool_;
-    for (std::map<unsigned long, FRp9Vb>::iterator It = Pool.begin(); It != Pool.end(); ++It)
+    std::map<uint32_t, FRp9Vb>& Pool = VbPool_;
+    for (std::map<uint32_t, FRp9Vb>::iterator It = Pool.begin(); It != Pool.end(); ++It)
         It->second.ReleaseGpu();
     Pool.clear();
 }
 
 // RP8: FRp8StreamCache::SelectVertexStream
 // formerly MarkStreamVb / MarkStreamFvf
-void FRp9StreamCache::SelectVertexStream(FRp9Vb* Buffer, unsigned long InFvf)
+void FRp9StreamCache::SelectVertexStream(FRp9Vb* Buffer, uint32_t InFvf)
 {
     if (Buffer != VertexBuffer || InFvf != Fvf)
     {
@@ -2426,7 +2426,7 @@ HRESULT FRp9Ib::LockRange(unsigned int Start, unsigned int Count, void** OutBits
         return E_FAIL;
     if (Count > Capacity)
         return E_FAIL;
-    unsigned long LockFlags = bSysLock != 0 ? 0ul : D3DLOCK_NOSYSLOCK;
+    uint32_t LockFlags = bSysLock != 0 ? 0ul : D3DLOCK_NOSYSLOCK;
     if ((Flags & D3DUSAGE_DYNAMIC) != 0)
     {
         if (Cursor + Count > Capacity)
@@ -2453,7 +2453,7 @@ HRESULT FRp9Ib::LockRange(unsigned int Start, unsigned int Count, void** OutBits
 }
 
 // RP8: FDirectX8::PrimCountFromVerts (D3DPRIMITIVETYPE values are the same in D3D9)
-unsigned int FDirectX9::PrimCountFromVerts(unsigned long Prim, unsigned int Count)
+unsigned int FDirectX9::PrimCountFromVerts(uint32_t Prim, unsigned int Count)
 {
     // FUN_06d010cf: JA on the type (unsigned); /2 is CDQ;SUB;SAR and /3 is CDQ;IDIV -- signed
     // divisions, so a negative count stays <= 0 for the callers' JLE test.
@@ -2483,8 +2483,8 @@ unsigned int FDirectX9::PrimCountFromVerts(unsigned long Prim, unsigned int Coun
 // 0 <= Id <= 0xE (get). Ids 0..0xD are PipelineStates_; RP8's Id 0xE lands on the three
 // ability dwords that follow the slots, Ability_[0..2], kept here.
 // RP9-GAP: any other id makes RP8 touch unrelated object memory; RP9 reports "no slot".
-bool FDirectX9::PipelineStateWords(int Id, unsigned long** OutValue,
-                                   unsigned long** OutHasDefault, unsigned long** OutOverridden)
+bool FDirectX9::PipelineStateWords(int Id, uint32_t** OutValue,
+                                   uint32_t** OutHasDefault, uint32_t** OutOverridden)
 {
     if (Id >= 0 && Id < (int)(kRp9PipelineStateCount))
     {
@@ -2520,7 +2520,7 @@ int FDirectX9::PipelineStateValue(int Id)
 }
 
 // RP8: FDirectX8::StageCount (kOffStageCount 0x39C = pipeline-state 6's value)
-unsigned long FDirectX9::StageCount()
+uint32_t FDirectX9::StageCount()
 {
     return PipelineStates_[PipelineStateStageCount].Value;
 }
@@ -2756,8 +2756,8 @@ void FDirectX9::ApplyDefaultTextureStages()
 {
     const float Identity12[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
                                   0.0f, 0.0f, 0.0f};
-    const unsigned long Stages = StageCount();
-    for (unsigned long Stage = 0; Stage <= Stages; ++Stage)
+    const uint32_t Stages = StageCount();
+    for (uint32_t Stage = 0; Stage <= Stages; ++Stage)
     {
         FRp9TextureBinding& Cache = DeviceStates_.TextureBindings[Stage];
         Cache.bValid = 0;
@@ -2783,7 +2783,7 @@ void FDirectX9::ApplyDefaultTextureStages()
                 continue;
             FRp9TextureStageState& Tss = DeviceStates_.TextureStates[Stage][State.Id];
             Tss.bValid = 0;
-            const HRESULT Hr = Rp9SetStageState(Device_, Stage, (unsigned long)State.Id,
+            const HRESULT Hr = Rp9SetStageState(Device_, Stage, (uint32_t)State.Id,
                                                 State.Default);
             Tss.bValid = Hr >= 0 ? 1 : 0;
             if (Tss.bValid != 0)
@@ -2843,7 +2843,7 @@ void FDirectX9::UnbindTextureHandle(void* Handle)
 
 // The D3D8 texture-stage numbers whose state D3D9 keeps per sampler (see
 // Rp9SamplerStateFromTss): the entries an Ex sampler binding can change behind the cache.
-const unsigned long FRp9ExStageSave::SamplerTypes[FRp9ExStageSave::SamplerTypeCount] = {
+const uint32_t FRp9ExStageSave::SamplerTypes[FRp9ExStageSave::SamplerTypeCount] = {
     kD3d8TssAddressU,  kD3d8TssAddressV,     kD3d8TssBorderColor, kD3d8TssMagFilter,
     kD3d8TssMinFilter, kD3d8TssMipFilter,    kD3d8TssMipMapLodBias, kD3d8TssMaxMipLevel,
     kD3d8TssMaxAnisotropy, kD3d8TssAddressW,
@@ -2860,7 +2860,7 @@ IDirect3DBaseTexture9* FDirectX9::PipelineTextureFromHandle(void* Handle)
 
 // Save stage Stage's cached texture binding and sampler-state entries, then mark them invalid:
 // while the pass owns the sampler, IRenderPipeline calls on the stage always reach the device.
-void FDirectX9::ExSaveStage(unsigned long Stage, FRp9ExStageSave* Out)
+void FDirectX9::ExSaveStage(uint32_t Stage, FRp9ExStageSave* Out)
 {
     FRp9TextureBinding& Binding = DeviceStates_.TextureBindings[Stage];
     Out->Binding = Binding;
@@ -2879,7 +2879,7 @@ void FDirectX9::ExSaveStage(unsigned long Stage, FRp9ExStageSave* Out)
 // was valid goes back to the device and the cache (invalid again if the device refuses it); an
 // entry that was unknown gets the Direct3D 9 default value and stays unknown (the next Set
 // re-sends, the next Get reads the device back, as RP8's caches do for unknown entries).
-void FDirectX9::ExRestoreStage(unsigned long Stage, const FRp9ExStageSave* Saved)
+void FDirectX9::ExRestoreStage(uint32_t Stage, const FRp9ExStageSave* Saved)
 {
     FRp9TextureBinding& Binding = DeviceStates_.TextureBindings[Stage];
     IDirect3DBaseTexture9* Texture = nullptr;
@@ -2896,7 +2896,7 @@ void FDirectX9::ExRestoreStage(unsigned long Stage, const FRp9ExStageSave* Saved
 
     for (unsigned int Index = 0; Index < FRp9ExStageSave::SamplerTypeCount; ++Index)
     {
-        const unsigned long Type = FRp9ExStageSave::SamplerTypes[Index];
+        const uint32_t Type = FRp9ExStageSave::SamplerTypes[Index];
         const FRp9TextureStageState& Old = Saved->Samplers[Index];
         FRp9TextureStageState& Entry = DeviceStates_.TextureStates[Stage][Type];
         if (Old.bValid != 0)
@@ -3044,7 +3044,7 @@ GENRESULT DACOM_API FDirectX9::Startup(const char* SectionName)
                           "{00000000-0000-0000-0000-000000000000}", DeviceId);
         char DeviceType[0x80];
         ReadProfileString(Dacom, Parser_, SectionName, "DeviceType", "Hardware", DeviceType);
-        unsigned long DeviceTypeFallback = 0;
+        uint32_t DeviceTypeFallback = 0;
         ReadProfileNumber(Dacom, Parser_, SectionName, "DeviceTypeFallback", 0,
                           &DeviceTypeFallback);
         strcpy(LastSection_, SectionName);
@@ -3204,9 +3204,9 @@ GENRESULT DACOM_API FDirectX9::ShutdownPipeline()
 // RP8: FDirectX8::SetPipelineState
 GENRESULT DACOM_API FDirectX9::SetPipelineState(int Id, int Value)
 {
-    unsigned long* SlotValue = nullptr;
-    unsigned long* SlotHasDefault = nullptr;
-    unsigned long* SlotOverridden = nullptr;
+    uint32_t* SlotValue = nullptr;
+    uint32_t* SlotHasDefault = nullptr;
+    uint32_t* SlotOverridden = nullptr;
     // RP9-GAP: ids outside 0..0xE write nothing (RP8 writes wherever the id points).
     if (!PipelineStateWords(Id, &SlotValue, &SlotHasDefault, &SlotOverridden))
         return GR_OK;
@@ -3214,7 +3214,7 @@ GENRESULT DACOM_API FDirectX9::SetPipelineState(int Id, int Value)
     if (bChanged && *SlotHasDefault != 0)
     {
         *SlotOverridden = 1;
-        *SlotValue = (unsigned long)(Value);
+        *SlotValue = (uint32_t)(Value);
     }
     return GR_OK;
 }
@@ -3230,9 +3230,9 @@ GENRESULT DACOM_API FDirectX9::GetPipelineState(int Id, int* Out)
         return Ready;
     if (Id >= 0 && Id <= 0xE)
     {
-        unsigned long* SlotValue = nullptr;
-        unsigned long* SlotHasDefault = nullptr;
-        unsigned long* SlotOverridden = nullptr;
+        uint32_t* SlotValue = nullptr;
+        uint32_t* SlotHasDefault = nullptr;
+        uint32_t* SlotOverridden = nullptr;
         PipelineStateWords(Id, &SlotValue, &SlotHasDefault, &SlotOverridden);
         *Out = (int)(*SlotValue);
     }
@@ -3249,7 +3249,7 @@ GENRESULT DACOM_API FDirectX9::GetDeviceInfo(void* Out520)
     if (Ready != GR_OK)
         return Ready;
     const std::vector<FRp9Adapter>& Adapters = Adapters_;
-    const unsigned long Count = (unsigned long)(Adapters.size());
+    const uint32_t Count = (uint32_t)(Adapters.size());
     if (AdapterIndex_ >= Count)
         return GR_GENERIC;
     memcpy(Out520, &Adapters[AdapterIndex_], 0x520);
@@ -3257,7 +3257,7 @@ GENRESULT DACOM_API FDirectX9::GetDeviceInfo(void* Out520)
 }
 
 // RP8: FDirectX8::QueryDeviceAbility
-GENRESULT DACOM_API FDirectX9::QueryDeviceAbility(unsigned int Index, unsigned long* Out)
+GENRESULT DACOM_API FDirectX9::QueryDeviceAbility(unsigned int Index, uint32_t* Out)
 {
     // FUN_06d083d2: startup check (line 0x6fc); Index > 0x14 (JA) or Out == 0 -> -2.
     const GENRESULT Ready =
@@ -3302,7 +3302,7 @@ GENRESULT DACOM_API FDirectX9::GetDisplayModeEnum(unsigned int Index, void* Out)
         FdumpHr("get_display_mode: %s", Hr, 1829);
         return (GENRESULT)(Hr);
     }
-    unsigned long* Record = (unsigned long*)(Out);
+    uint32_t* Record = (uint32_t*)(Out);
     Record[0] = Index;
     Record[1] = Display.Width;
     Record[2] = Display.Height;
@@ -3454,7 +3454,7 @@ GENRESULT DACOM_API FDirectX9::CreateBuffers(HWND Hwnd, int* Mode, int* OutMode)
 
     // SwapEffect and PresentInterval are computed exactly as RP8 does, in D3D8 values; the D3D9
     // present parameters are derived from them below. BltNotFlip_ is pipeline-state 0xD.
-    const unsigned long BltNotFlip = PipelineStates_[PipelineStateBrokenFlip].Value;
+    const uint32_t BltNotFlip = PipelineStates_[PipelineStateBrokenFlip].Value;
     BOOL Windowed = TRUE;
     UINT BackBufferCount = 1;
     UINT PresentInterval = 0;
@@ -3678,13 +3678,13 @@ GENRESULT DACOM_API FDirectX9::DestroyGpuResources()
 }
 
 // RP8: FDirectX8::ClearBuffers
-GENRESULT DACOM_API FDirectX9::ClearBuffers(unsigned long Flags, const void* Rects)
+GENRESULT DACOM_API FDirectX9::ClearBuffers(uint32_t Flags, const void* Rects)
 {
     const GENRESULT Ready = NeedBuffers(
         "clear_buffers() called outside of create_buffers/destroy_buffers", 2402);
     if (Ready != GR_OK)
         return Ready;
-    unsigned long D3dFlags = 0;
+    uint32_t D3dFlags = 0;
     int ZBits = 0x3F800000;
     if ((Flags & 1) != 0)
         D3dFlags |= D3DCLEAR_TARGET;
@@ -3697,8 +3697,8 @@ GENRESULT DACOM_API FDirectX9::ClearBuffers(unsigned long Flags, const void* Rec
         D3dFlags |= D3DCLEAR_STENCIL;
     float Z;
     memcpy(&Z, &ZBits, sizeof(Z));
-    const unsigned long Color = (unsigned long)(PipelineStateValue(8));
-    const unsigned long Stencil = (unsigned long)(PipelineStateValue(0xA));
+    const uint32_t Color = (uint32_t)(PipelineStateValue(8));
+    const uint32_t Stencil = (uint32_t)(PipelineStateValue(0xA));
     const DWORD Count = (Rects != nullptr) ? 1 : 0;
     const HRESULT Hr = Device_->Clear(Count, (const D3DRECT*)(Rects), D3dFlags,
                                       Color, Z, Stencil);
@@ -3778,7 +3778,7 @@ GENRESULT DACOM_API FDirectX9::EndScene()
 }
 
 // RP8: FDirectX8::DrawIndexedPrimitive (IRPDraw slot 3)
-GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitive(unsigned long Prim, unsigned int MinIndex,
+GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitive(uint32_t Prim, unsigned int MinIndex,
                                                     unsigned int NumVertices,
                                                     unsigned int StartIndex, unsigned int Count)
 {
@@ -3828,7 +3828,7 @@ GENRESULT DACOM_API FDirectX9::GetModeBlob(void* OutAdapter, void* OutMode)
         NeedStartup("create_buffers() called outside of startup/shutdown", 2357);
     if (Ready != GR_OK)
         return Ready;
-    *(unsigned long*)(OutAdapter) = AdapterIndex_;
+    *(uint32_t*)(OutAdapter) = AdapterIndex_;
     memcpy(OutMode, ModeBlob_, sizeof(ModeBlob_));
     return (GENRESULT)(AdapterIndex_);
 }
@@ -3937,7 +3937,7 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
     {
         // 06d0a515: NEG/SBB/AND 0xfffff800/ADD 0x800 -> USE_SYSLOCK (bit1) ? 0 : 0x800
         // (D3DLOCK_NOSYSLOCK); OR 0x10 (D3DLOCK_READONLY). LockRect(&Locked, NULL, flags) (+0x24).
-        unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
+        uint32_t LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
         LockFlags |= 0x10;
         D3DLOCKED_RECT Locked;
         Hr = LockBufferSurf_->LockRect(&Locked, nullptr, LockFlags);
@@ -3946,12 +3946,12 @@ GENRESULT DACOM_API FDirectX9::LockBuffer(void* Out)
         else
         {
             // 06d0a611: Out+8 pitch, +0xc bits, +0x10 FUN_06d5cc30(fmt), +0 w, +4 h.
-            unsigned long* OutDwords = (unsigned long*)(Out);
-            OutDwords[2] = (unsigned long)(Locked.Pitch);
-            OutDwords[3] = (unsigned long)(Locked.pBits);
+            uint32_t* OutDwords = (uint32_t*)(Out);
+            OutDwords[2] = (uint32_t)(Locked.Pitch);
+            OutDwords[3] = (uint32_t)(Locked.pBits);
             OutDwords[4] = PfIndex(D3dFormat);
-            OutDwords[0] = (unsigned long)(Width);
-            OutDwords[1] = (unsigned long)(Height);
+            OutDwords[0] = (uint32_t)(Width);
+            OutDwords[1] = (uint32_t)(Height);
         }
     }
 
@@ -4457,7 +4457,7 @@ GENRESULT DACOM_API FDirectX9::SetLight(void* Handle, const D3DLIGHT8* Light)
     if (Ready != GR_OK)
         return Ready;
     const int Index = LightManager_.FindOrCreate(
-                                        (unsigned long)(uintptr_t)Handle,
+                                        (uint32_t)(uintptr_t)Handle,
                                         nullptr);
     const HRESULT Hr =
         Device_->SetLight((DWORD)Index, Light);
@@ -4475,7 +4475,7 @@ GENRESULT DACOM_API FDirectX9::DestroyLight(void* Handle)
         "destroy_light() called outside of device lifetime", 0xb9e);
     if (Ready != GR_OK)
         return Ready;
-    const unsigned long Key = (unsigned long)(uintptr_t)Handle;
+    const uint32_t Key = (uint32_t)(uintptr_t)Handle;
     LightManager_.SetEnable(Key, 0);
     LightManager_.Flush(Device_);
     LightManager_.Remove(Key);
@@ -4503,7 +4503,7 @@ GENRESULT DACOM_API FDirectX9::SetLightEnable(void* Handle, int Enable)
         "set_light_enable() called outside of device lifetime", 0xbb8);
     if (Ready != GR_OK)
         return Ready;
-    LightManager_.SetEnable((unsigned long)(uintptr_t)Handle,
+    LightManager_.SetEnable((uint32_t)(uintptr_t)Handle,
                    Enable);
     return GR_OK;
 }
@@ -4517,7 +4517,7 @@ GENRESULT DACOM_API FDirectX9::GetLightEnable(void* Handle, int* OutEnable)
     if (Ready != GR_OK)
         return Ready;
     *OutEnable = LightManager_.GetEnable(
-                                (unsigned long)(uintptr_t)Handle);
+                                (uint32_t)(uintptr_t)Handle);
     return GR_OK;
 }
 // RP8: FDirectX8::SetMaterial (D3DMATERIAL8 = D3DMATERIAL9 layout)
@@ -4566,7 +4566,7 @@ GENRESULT DACOM_API FDirectX9::CreateTexture(int Width, int Height, unsigned int
     unsigned int WinningFormat = PfIndex(0);
     // 06d0d6e7: query_device_ability(5 = TEXTURE_SQUARE_ONLY) through the vtable (+0x20); the
     // result is not checked. Square-only and W != H -> both become the larger (signed JLE).
-    unsigned long bSquareOnly = 0;
+    uint32_t bSquareOnly = 0;
     QueryDeviceAbility(5, &bSquareOnly);
     if (Width != Height && bSquareOnly != 0)
     {
@@ -4668,7 +4668,7 @@ GENRESULT DACOM_API FDirectX9::IsTexture(void* A)
 GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
 {
     void* Handle = A;
-    unsigned long* Out = (unsigned long*)(C);
+    uint32_t* Out = (uint32_t*)(C);
     if (Device_ == nullptr)
     {
         Rp9Fdump(kFdumpWarning, 3244, "WARNING", "lock_texture() called outside of device lifetime");
@@ -4697,7 +4697,7 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
     }
     // 06d0e059: LockRect (+0x24)(&Locked, NULL, USE_SYSLOCK ? 0 : NOSYSLOCK 0x800); hr < 0 ->
     // 'lock_texture: %s' 0xcc8.
-    const unsigned long LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
+    const uint32_t LockFlags = ((SwapFlags_ >> 1) & 1) != 0 ? 0ul : 0x800ul;
     D3DLOCKED_RECT Locked;
     Hr = Surface->LockRect(&Locked, nullptr, LockFlags);
     if (Hr < 0)
@@ -4707,8 +4707,8 @@ GENRESULT DACOM_API FDirectX9::LockTexture(void* A, int Level, void* C)
     Out[4] = PfIndex((unsigned int)(Desc.Format));
     Out[0] = Desc.Width;
     Out[1] = Desc.Height;
-    Out[2] = (unsigned long)(Locked.Pitch);
-    Out[3] = (unsigned long)(Locked.pBits);
+    Out[2] = (uint32_t)(Locked.Pitch);
+    Out[3] = (uint32_t)(Locked.pBits);
     Surface->Release();
     Surface = nullptr;
     return (GENRESULT)(Hr);
@@ -5013,7 +5013,7 @@ GENRESULT DACOM_API FDirectX9::SetRenderState(D3DRENDERSTATETYPE State, int Valu
     if (Ready != GR_OK)
         return Ready;
     // Requests are deferred; device errors occur at the next draw-state flush.
-    const bool bDirtyThisGeneration = RenderStates_.MarkDirty(State, (unsigned long)Value);
+    const bool bDirtyThisGeneration = RenderStates_.MarkDirty(State, (uint32_t)Value);
     if (bDirtyThisGeneration && (unsigned int)(State) == kD3d8RsSoftwareVertexProcessing)
         StreamCache_.Reset();
     return GR_OK;
@@ -5039,13 +5039,13 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageState(int Stage, int Type, int Val
     // FUN_06d0fbcf 06d0fc40: entry {value, valid byte}; valid && value == Value -> nothing;
     // else Device+0xfc SetTextureStageState, valid = (hr >= 0), valid -> value = Value; 0.
     FRp9TextureStageState& Cache = DeviceStates_.TextureStates[Stage][Type];
-    if (Cache.bValid != 0 && Cache.Value == (unsigned long)Value)
+    if (Cache.bValid != 0 && Cache.Value == (uint32_t)Value)
         return GR_OK;
-    const HRESULT Hr = Rp9SetStageState(Device_, (DWORD)Stage, (unsigned long)Type,
+    const HRESULT Hr = Rp9SetStageState(Device_, (DWORD)Stage, (uint32_t)Type,
                                         (DWORD)Value);
     Cache.bValid = Hr >= 0 ? 1 : 0;
     if (Cache.bValid != 0)
-        Cache.Value = (unsigned long)Value;
+        Cache.Value = (uint32_t)Value;
     return GR_OK;
 }
 // RP8: FDirectX8::GetTextureStageState
@@ -5058,8 +5058,8 @@ GENRESULT DACOM_API FDirectX9::GetTextureStageState(int Stage, int Type, int* Ou
     // FUN_06d0fcd5 06d0fd46: cache entry +0x1854 + stage*0xE8 + type*8 {value, valid byte};
     // invalid -> Device+0xf8 GetTextureStageState(stage, type, &entry.value), valid = (hr >= 0),
     // still invalid -> value 0; *Out = value (Out is not tested); 0.
-    *Out = (int)DeviceStates_.ReadTextureStageState(Device_, (unsigned long)Stage,
-                                                  (unsigned long)Type);
+    *Out = (int)DeviceStates_.ReadTextureStageState(Device_, (uint32_t)Stage,
+                                                  (uint32_t)Type);
     return GR_OK;
 }
 // RP8: FDirectX8::SetTextureStageTransform
@@ -5074,7 +5074,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTransform(int Stage, const float* 
     // type stage + D3DTS_TEXTURE0; returns 0.
     FRp9TransformCache& Cache = DeviceStates_.TextureTransforms[(unsigned int)Stage];
     Cache.StoreTransposed(M16);
-    Cache.Commit(Device_, (D3DTRANSFORMSTATETYPE)((unsigned long)Stage + D3DTS_TEXTURE0));
+    Cache.Commit(Device_, (D3DTRANSFORMSTATETYPE)((uint32_t)Stage + D3DTS_TEXTURE0));
     return GR_OK;
 }
 // RP8: FDirectX8::GetTextureStageTransform
@@ -5113,7 +5113,7 @@ GENRESULT DACOM_API FDirectX9::SetTextureStageTexture(int Stage, void* Handle)
                      kSrcDx8Texture);
         Texture = Wrapper->Texture;
     }
-    const HRESULT Hr = Device_->SetTexture((unsigned long)Stage, Texture);
+    const HRESULT Hr = Device_->SetTexture((uint32_t)Stage, Texture);
     if (Hr >= 0)
     {
         Cache.Handle = Handle;
@@ -5154,7 +5154,7 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
         return GR_GENERIC;
     }
     // RP8 kOffStageCount 0x39C = pipeline-state 6's value.
-    const unsigned long StageCount = PipelineStates_[PipelineStateStageCount].Value;
+    const uint32_t StageCount = PipelineStates_[PipelineStateStageCount].Value;
     const unsigned int Fvf = (StageCount == 1) ? 0x152u : 0x252u;
     StreamCache_.SelectVertexStream(nullptr, Fvf);
     FlushDrawState(Device_);
@@ -5171,12 +5171,12 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
         if (DeviceStates_.ReadTextureStageState(Device_, StageCount, D3DTSS_ALPHAOP) != 1)
             return GR_GENERIC;
         // RP8 [+0x3E4] = pipeline-state 0xC (BROKEN_MOD2X) value.
-        const unsigned long Mod2xFlag = PipelineStates_[PipelineStateBrokenMod2x].Value;
+        const uint32_t Mod2xFlag = PipelineStates_[PipelineStateBrokenMod2x].Value;
         if (Mod2xFlag != 0)
         {
-            for (unsigned long S = 0; S <= StageCount; ++S)
+            for (uint32_t S = 0; S <= StageCount; ++S)
             {
-                const unsigned long ColorOp = DeviceStates_.ReadTextureStageState(Device_, S, D3DTSS_COLOROP);
+                const uint32_t ColorOp = DeviceStates_.ReadTextureStageState(Device_, S, D3DTSS_COLOROP);
                 if (ColorOp == 1)
                     break;
                 if (ColorOp == 5)
@@ -5188,7 +5188,7 @@ GENRESULT DACOM_API FDirectX9::VerifyState()
     return Result;
 }
 // RP8: FDirectX8::DrawPrimitive
-GENRESULT DACOM_API FDirectX9::DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
+GENRESULT DACOM_API FDirectX9::DrawPrimitive(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                             unsigned int Count, void* /*Unused*/)
 {
     // FUN_06d1067f RET 0x18. Device +0x120 DrawPrimitiveUP.
@@ -5211,10 +5211,10 @@ GENRESULT DACOM_API FDirectX9::DrawPrimitive(unsigned long Prim, unsigned int Fv
     return (GENRESULT)Result;
 }
 // RP8: FDirectX8::DrawIndexedPrimitiveUp
-GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(unsigned long Prim, unsigned int Fvf,
+GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(uint32_t Prim, unsigned int Fvf,
                                                      const void* Verts, unsigned int VertCount,
                                                      const void* Indices, unsigned int IndexCount,
-                                                     unsigned long Unused)
+                                                     uint32_t Unused)
 {
     // FUN_06d1097d RET 0x20 -- eight dwords, this plus seven arguments; the seventh is never
     // read here but the callee pops it and Freelancer.exe 0x004217b6 / 0x00421973 push it.
@@ -5240,7 +5240,7 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveUp(unsigned long Prim, unsign
     return (GENRESULT)Result;
 }
 // RP8: FDirectX8::DrawPrimitiveVb
-GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
+GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(uint32_t Prim, void* Vb, unsigned int StartVertex,
                                               unsigned int Count, void* /*Unused*/)
 {
     // FUN_06d10c89 RET 0x18. Device +0x118 DrawPrimitive(prim, start, primCount).
@@ -5261,10 +5261,10 @@ GENRESULT DACOM_API FDirectX9::DrawPrimitiveVb(unsigned long Prim, void* Vb, uns
     return (GENRESULT)Result;
 }
 // RP8: FDirectX8::DrawIndexedPrimitiveVb
-GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* Vb,
+GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(uint32_t Prim, void* Vb,
                                                      unsigned int BaseVertex, unsigned int NumVerts,
                                                      const void* Indices, unsigned int IndexCount,
-                                                     unsigned long Unused)
+                                                     uint32_t Unused)
 {
     (void)Unused;
     const GENRESULT Ready = NeedBuffers(
@@ -5319,7 +5319,7 @@ GENRESULT DACOM_API FDirectX9::AddLight(void* Handle)
         "add_light() called outside of device lifetime", 0xb60);
     if (Ready != GR_OK)
         return Ready;
-    LightManager_.FindOrCreate((unsigned long)(uintptr_t)Handle,
+    LightManager_.FindOrCreate((uint32_t)(uintptr_t)Handle,
                       (const D3DLIGHT8*)(Handle));
     return GR_OK;
 }
@@ -5334,7 +5334,7 @@ GENRESULT DACOM_API FDirectX9::RemoveLight(void* Handle)
         return Ready;
     SetLightEnable(Handle, 0);
     LightManager_.Flush(Device_);
-    LightManager_.Remove((unsigned long)(uintptr_t)Handle);
+    LightManager_.Remove((uint32_t)(uintptr_t)Handle);
     return GR_OK;
 }
 // RP8: FDirectX8::UpdateLight
@@ -5347,7 +5347,7 @@ GENRESULT DACOM_API FDirectX9::UpdateLight(void* Handle)
         "update_light() called outside of device lifetime", 0xb7b);
     if (Ready != GR_OK)
         return Ready;
-    LightManager_.Update((unsigned long)(uintptr_t)Handle);
+    LightManager_.Update((uint32_t)(uintptr_t)Handle);
     return GR_OK;
 }
 // RP8: FDirectX8::SetWorldN
@@ -5377,7 +5377,7 @@ GENRESULT DACOM_API FDirectX9::SetWorldN(int WorldIndex, const float* M12)
     Scratch[11] = 0.0f;
     Scratch[15] = 1.0f;
     const HRESULT Hr = Device_->SetTransform(
-        (D3DTRANSFORMSTATETYPE)((unsigned long)WorldIndex + D3DTS_WORLDMATRIX(0)),
+        (D3DTRANSFORMSTATETYPE)((uint32_t)WorldIndex + D3DTS_WORLDMATRIX(0)),
         (D3DMATRIX*)(Scratch));
     return (GENRESULT)Hr;
 }
@@ -5391,8 +5391,8 @@ GENRESULT DACOM_API FDirectX9::VbMgrReleaseAll()
     // 06d1139f..06d114ab: walk the pool map (this+0x16c = object+0x170, its head) in key
     // order; every node value's VB is released (FUN_06d1bc60 inlined: Gpu set -> Locked ->
     // 0 + Unlock, Release, 0). The nodes themselves stay.
-    std::map<unsigned long, FRp9Vb>& Pool = VbPool_;
-    for (std::map<unsigned long, FRp9Vb>::iterator It = Pool.begin(); It != Pool.end(); ++It)
+    std::map<uint32_t, FRp9Vb>& Pool = VbPool_;
+    for (std::map<uint32_t, FRp9Vb>::iterator It = Pool.begin(); It != Pool.end(); ++It)
         It->second.ReleaseGpu();
     // 06d114b0: this+0x17c (= object+0x180, pool byte total) = 0; return 0.
     VbPoolBytes_ = 0;
@@ -5508,8 +5508,8 @@ namespace
                                  unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d1f602 — dest stride 0x18 (pos+normal, exact fit, no gap).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x18u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x18, ++PosIdx, ++NormIdx)
         {
@@ -5523,8 +5523,8 @@ namespace
     {
         // FUN_06d1f818 — dest stride 0x28; only pos+normal (0x18 bytes) populated, bytes
         // [0x18,0x28) of every record are left untouched (matches retail exactly).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x28u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x28, ++PosIdx, ++NormIdx)
         {
@@ -5537,8 +5537,8 @@ namespace
                                  unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d1fa33 — dest stride 0x2C; pos+normal populated, rest left untouched.
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x2Cu;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x2C, ++PosIdx, ++NormIdx)
         {
@@ -5551,8 +5551,8 @@ namespace
                                  unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d1fc57 — dest stride 0x20; pos+normal populated, rest left untouched.
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x20u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x20, ++PosIdx, ++NormIdx)
         {
@@ -5565,9 +5565,9 @@ namespace
                                     unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d1fe6f — dest stride 0x28: pos[0x0], normal[0xC], tex0[0x18] (no gap).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* TexIdx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* TexIdx = Src->Tex[0].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x28u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x28, ++PosIdx, ++NormIdx, ++TexIdx)
         {
@@ -5582,9 +5582,9 @@ namespace
     {
         // FUN_06d20138 — dest stride 0x2C: pos[0x0], normal[0xC], 4-byte gap at [0x18,0x1C),
         // tex0[0x1C]. Bytes [0x24,0x2C) left untouched.
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* TexIdx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* TexIdx = Src->Tex[0].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x2Cu;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x2C, ++PosIdx, ++NormIdx, ++TexIdx)
         {
@@ -5599,10 +5599,10 @@ namespace
     {
         // FUN_06d20409 — dest stride 0x2C: pos[0x0], normal[0xC], diffuse[0x18] (1 dword),
         // tex0[0x1C]. Bytes [0x24,0x2C) left untouched.
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
-        const unsigned long* TexIdx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
+        const uint32_t* TexIdx = Src->Tex[0].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x2Cu;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x2C, ++PosIdx, ++NormIdx, ++DiffIdx, ++TexIdx)
         {
@@ -5618,10 +5618,10 @@ namespace
     {
         // FUN_06d20754 — dest stride 0x2C: pos[0x0], normal[0xC], 4-byte gap at [0x18,0x1C),
         // tex0[0x1C], tex1[0x24].
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* Tex0Idx = Src->Tex[0].IndexArray + StartVertex;
-        const unsigned long* Tex1Idx = Src->Tex[1].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* Tex0Idx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* Tex1Idx = Src->Tex[1].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x2Cu;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x2C, ++PosIdx, ++NormIdx, ++Tex0Idx, ++Tex1Idx)
         {
@@ -5636,9 +5636,9 @@ namespace
                                     unsigned int StartVertex, unsigned int Count)
     {
         // FUN_06d20ad2 — dest stride 0x20: pos[0x0], normal[0xC], tex0[0x18] (exact fit).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* TexIdx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* TexIdx = Src->Tex[0].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x20u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x20, ++PosIdx, ++NormIdx, ++TexIdx)
         {
@@ -5653,10 +5653,10 @@ namespace
     {
         // FUN_06d20d92 — dest stride 0x24: pos[0x0], normal[0xC], diffuse[0x18], tex0[0x1C]
         // (exact fit, no gap).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
-        const unsigned long* TexIdx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
+        const uint32_t* TexIdx = Src->Tex[0].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x24u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x24, ++PosIdx, ++NormIdx, ++DiffIdx, ++TexIdx)
         {
@@ -5672,10 +5672,10 @@ namespace
     {
         // FUN_06d210dd — dest stride 0x28: pos[0x0], normal[0xC], tex0[0x18], tex1[0x20]
         // (exact fit, no gap).
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
-        const unsigned long* Tex0Idx = Src->Tex[0].IndexArray + StartVertex;
-        const unsigned long* Tex1Idx = Src->Tex[1].IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* Tex0Idx = Src->Tex[0].IndexArray + StartVertex;
+        const uint32_t* Tex1Idx = Src->Tex[1].IndexArray + StartVertex;
         unsigned char* Out = Dst + StartVertex * 0x28u;
         for (unsigned int i = 0; i < Count; ++i, Out += 0x28, ++PosIdx, ++NormIdx, ++Tex0Idx, ++Tex1Idx)
         {
@@ -5765,21 +5765,21 @@ namespace
         const unsigned int SrcFvf = Src->SrcFvf;
 
         const unsigned int PosStride = Src->Position.Stride;
-        const unsigned long* PosIdx = Src->Position.IndexArray + StartVertex;
+        const uint32_t* PosIdx = Src->Position.IndexArray + StartVertex;
 
         const bool bSrcHasNormal = (SrcFvf & 0x10) != 0;
         const unsigned int NormStride = Src->Normal.Stride;
-        const unsigned long* NormIdx = Src->Normal.IndexArray + StartVertex;
+        const uint32_t* NormIdx = Src->Normal.IndexArray + StartVertex;
 
         const bool bSrcHasDiffuse = (SrcFvf & 0x40) != 0;
         const unsigned int DiffStride = Src->Diffuse.Stride;
-        const unsigned long* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
+        const uint32_t* DiffIdx = Src->Diffuse.IndexArray + StartVertex;
 
         const unsigned int SrcTexCount = (SrcFvf & 0xF00) >> 8;
         const unsigned char* TexBase[8] = {};
         unsigned int TexStride[8] = {};
         unsigned int TexByteSize[8] = {};
-        const unsigned long* TexIdx[8] = {};
+        const uint32_t* TexIdx[8] = {};
         for (unsigned int Index = 0; Index < SrcTexCount && Index < 8; ++Index)
         {
             const FRpVertexStream* Set = (const FRpVertexStream*)(Base + 0x40 + Index * 0x14);
@@ -6096,7 +6096,7 @@ GENRESULT DACOM_API FDirectX9::CreateIb(unsigned int Count, unsigned int** Out,
         return GR_GENERIC;
     }
     // 06d12dca: usage = (flags&1 ? D3DUSAGE_DYNAMIC 0x200 : 0) | (flags&2 ? 0x10 : 0).
-    unsigned long Usage = 0;
+    uint32_t Usage = 0;
     if ((Flags & 1) != 0)
         Usage |= 0x200;
     if ((Flags & 2) != 0)
@@ -6282,7 +6282,7 @@ GENRESULT DACOM_API FDirectX9::SelectIb(void* Handle, unsigned int BaseVertexInd
     // FUN_06d13bce RET 0x14. Handle==-1 → ADDRESS this+0x140 (inline scratch). Retail only
     // marks the stream block (flags bit1); FUN_06d04138 calls SetIndices at the next draw.
     // RP8 [IbThis+0x178] = DeviceReady_.
-    const unsigned long Ready = DeviceReady_;
+    const uint32_t Ready = DeviceReady_;
     // 06d13bd7: MOV CL,byte [this+0x178]; AND 1 -- the device pointer is not read at all.
     if ((Ready & 1) == 0)
     {
@@ -6366,7 +6366,7 @@ GENRESULT DACOM_API FDirectX9::CreateVb(unsigned int Fvf, unsigned int Count, un
     // 06d11bfc: usage = (flags&2 ? 0x10 : 0); operator new(0x24); Flags = usage|8
     // (WRITEONLY); +4,+8,+0xc,+0x10,+0x14,+0x18,+0x20 = 0 (+0x1c left as allocated; ResizeVb
     // zeroes it before use).
-    unsigned long Usage = 0;
+    uint32_t Usage = 0;
     if ((Flags & 2) != 0)
         Usage |= 0x10;
     FRp9Vb* Wrapper = new FRp9Vb;
@@ -6576,7 +6576,7 @@ GENRESULT DACOM_API FDirectX9::LockVb(void* Handle, unsigned int* Offset, void**
         const unsigned int Stride = FvfStride(Wrapper->Fvf);
         const unsigned int CapacityBytes = Stride * Wrapper->Count;
         const unsigned int RequestBytes = Count * Stride;
-        unsigned long LockFlags = bSysLock ? 0ul : 0x800ul;
+        uint32_t LockFlags = bSysLock ? 0ul : 0x800ul;
         // 06d128ec: dynamic (usage 0x200): [+0xc] + size > total (JBE keeps) -> [+0xc] = 0,
         // [+0x1c] = 0, DISCARD 0x2000, offset 0; else NOOVERWRITE 0x1000, offset = [+0xc].
         if ((Wrapper->Flags & 0x200) != 0)
@@ -6643,7 +6643,7 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
 {
     // IRPVertexBuffer this = object+0x10. FUN_06d12b9d RET 0x8 (this, handle).
     // RP8 [VbThis+0x174] = DeviceReady_.
-    const unsigned long Ready = DeviceReady_;
+    const uint32_t Ready = DeviceReady_;
     // 06d12ba6: MOV CL,byte [this+0x174]; AND 1 -- the device pointer is not read at all.
     if ((Ready & 1) == 0)
     {
@@ -6675,7 +6675,7 @@ GENRESULT DACOM_API FDirectX9::SelectVb(void* Handle)
         return (GENRESULT)0x80004005;
 
     FRp9Vb* Current = Cache.VertexBuffer;
-    const unsigned long OverrideFvf = Cache.Fvf;
+    const uint32_t OverrideFvf = Cache.Fvf;
     if (Wrapper != Current || OverrideFvf != 0)
     {
         Cache.Flags.Dirty = (unsigned char)(Cache.Flags.Dirty | StreamDirtyVertexSource);
@@ -6723,7 +6723,7 @@ GENRESULT DACOM_API FDirectX9::SetGammaEnable(unsigned char Enable)
     // (byte & 0xfd) | ((Enable & 1) << 1); 0.
     if (Ability_[1] == 0 || Ability_[2] == 0)
         return (GENRESULT)(0xFFFFFFFD);
-    DeviceReady_ = (DeviceReady_ & ~2ul) | ((unsigned long)(Enable & 1) << 1);
+    DeviceReady_ = (DeviceReady_ & ~2ul) | ((uint32_t)(Enable & 1) << 1);
     return GR_OK;
 }
 // RP8: FDirectX8::GetGammaEnable
@@ -6763,7 +6763,7 @@ GENRESULT DACOM_API FDirectX9::SetGammaFunction(unsigned int ChannelMask, float 
             Value = 0.0f;
         if (Value > 1.0f)
             Value = 1.0f;
-        const long Word = (long)((double)(Value) * (double)(Scale));
+        const int32_t Word = (int32_t)((double)(Value) * (double)(Scale));
         if ((ChannelMask & 1) != 0)
             Ramp.red[Index] = (WORD)(Word);
         if ((ChannelMask & 2) != 0)
@@ -6870,7 +6870,7 @@ GENRESULT DACOM_API FDirectX9::PrintScreen(void* ParentFileSystem, const char* F
     struct FPrintScreenFormat
     {
         const char* Extension;
-        unsigned long Format;
+        uint32_t Format;
     };
     const FPrintScreenFormat Formats[7] = {{".BMP", 0}, {".JPG", 1}, {".TGA", 2}, {".PNG", 3},
                                            {".DDS", 4}, {".PPM", 5}, {".DIB", 6}};
@@ -6999,7 +6999,7 @@ namespace
         IFileSystem* FileSystem;
         int Handle;
         int Mapping;
-        unsigned long Size;
+        uint32_t Size;
         int View;
     };
 
@@ -7017,11 +7017,11 @@ namespace
         Map->Handle = Map->FileSystem->OpenByDesc(&Desc);
         if (Map->Handle == -1)
             return (HRESULT)(-8);
-        Map->Size = Map->FileSystem->GetSize((unsigned long)(Map->Handle), 0);
-        Map->Mapping = Map->FileSystem->CreateMapping((unsigned long)(Map->Handle), 0, 2, 0, 0, 0);
+        Map->Size = Map->FileSystem->GetSize((uint32_t)(Map->Handle), 0);
+        Map->Mapping = Map->FileSystem->CreateMapping((uint32_t)(Map->Handle), 0, 2, 0, 0, 0);
         if (Map->Mapping == -1)
             return (HRESULT)(-6);
-        Map->View = Map->FileSystem->MapFileView((unsigned long)(Map->Mapping), 4, 0, 0, 0);
+        Map->View = Map->FileSystem->MapFileView((uint32_t)(Map->Mapping), 4, 0, 0, 0);
         if (Map->View != 0)
             Hr = 0;
         return Hr;
@@ -7037,12 +7037,12 @@ namespace
         {
             if (Map->View != 0)
             {
-                Map->FileSystem->UnmapFileView((unsigned long)(Map->View));
+                Map->FileSystem->UnmapFileView((uint32_t)(Map->View));
                 Map->View = 0;
             }
-            Map->FileSystem->CloseFile((unsigned long)(Map->Mapping));
+            Map->FileSystem->CloseFile((uint32_t)(Map->Mapping));
         }
-        Map->FileSystem->CloseFile((unsigned long)(Map->Handle));
+        Map->FileSystem->CloseFile((uint32_t)(Map->Handle));
         Map->Handle = -1;
     }
 

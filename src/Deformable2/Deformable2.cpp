@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "Deformable2.h"
+#include "fl/handles.h"
 #include "EyeMaterial.h"     // RegisterEyeMaterialFactory (FUN_065fdfd0)
 #include "common_misc.h"   // ICamera (GetViewTransform +0x40, ClassifySphere +0x3C)
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
@@ -105,7 +106,7 @@ static const char* const G_RateCharset = "0123456789truefalsynoxTRUEFALSYNOX+-";
 static const float G_RandToUnit = 3.051851e-05f;
 static const int G_PartDescStride = 0x18;
 static const int G_MaxLodCount = 8;
-static const unsigned long G_ParseTagUtf = 0x112;
+static const uint32_t G_ParseTagUtf = 0x112;
 // Return to the parent UTF node after loading a child.
 static const char* const G_ParentNode = "..";
 
@@ -113,7 +114,7 @@ static const char* const G_ParentNode = "..";
 // DAT_06603158: the mesh cache -- an STL map from CRC32(name) to the mesh (FUN_065f2a40 find,
 // FUN_065f2ab0 insert, FUN_065f3440/3320 + FUN_065f2cc0 erase). Both kinds of FDeformMesh
 // live in it. The port uses the current std::map; no VC6 layout is kept.
-static std::map<unsigned long, FDeformMesh*> G_MeshCache;
+static std::map<uint32_t, FDeformMesh*> G_MeshCache;
 
 static int MeshTotalIndexCount(FMeshArchetype* Arch);
 static int MeshVertexCapacity(FMeshArchetype* Arch);
@@ -318,16 +319,16 @@ static int FsFindFirst(IFileSystem* Fs, const char* Pattern, WIN32_FIND_DATAA* F
 
 static int FsFindNext(IFileSystem* Fs, int Finder, WIN32_FIND_DATAA* FindData)
 {
-    return Fs->FindNext((unsigned long)Finder, FindData);
+    return Fs->FindNext((uint32_t)Finder, FindData);
 }
 
 static void FsFindClose(IFileSystem* Fs, int Finder)
 {
-    Fs->FindClose((unsigned long)Finder);
+    Fs->FindClose((uint32_t)Finder);
 }
 
 // FUN_065f71c0: texcoord extra from FVF bits 8–11 count, sizes at bit 16+.
-static int FvfTexcoordBytes(unsigned long Fvf)
+static int FvfTexcoordBytes(uint32_t Fvf)
 {
     int Bytes = 0;
     unsigned int SetCount = (Fvf >> 8) & 0xF;
@@ -356,7 +357,7 @@ static int FvfTexcoordBytes(unsigned long Fvf)
 }
 
 // FUN_065f7220: D3DFVF_DIFFUSE (0x40) / D3DFVF_SPECULAR (0x80).
-static int FvfColorBytes(unsigned long Fvf)
+static int FvfColorBytes(uint32_t Fvf)
 {
     int Bytes = 0;
     if ((Fvf & 0x40) != 0)
@@ -367,7 +368,7 @@ static int FvfColorBytes(unsigned long Fvf)
 }
 
 // LAB_065f6bf0 FVF stride. ParseTag 0x112 → xyz 0xC + nrm 0xC + uv0 8 = 0x20.
-static int ComputeFvfStride(unsigned long Fvf)
+static int ComputeFvfStride(uint32_t Fvf)
 {
     int Position = 0;
     if ((Fvf & 0xC) == 0xC)
@@ -489,7 +490,7 @@ static void BuildVertexRemap(FMeshArchetype* Arch)
     Arch->RemapFinish = Lists + VertexCount;
     Arch->RemapCapacity = Arch->RemapFinish;
 
-    const unsigned long* Indices = Arch->PointIndices;
+    const uint32_t* Indices = Arch->PointIndices;
     const unsigned int Count = (unsigned int)Arch->PointIndexCount;
     for (unsigned int Index = 0; Index < Count; ++Index)
     {
@@ -762,7 +763,7 @@ static I3DMathEngine* AcquireMathEngine();
 
 // Reuse a valid VB or recreate it at the descriptor capacity.
 static unsigned char EnsurePartVertexBuffer(FDeformVbDesc* Vb, IRPVertexBuffer* VertexBuffer,
-                                            unsigned long Fvf, int /*Count*/)
+                                            uint32_t Fvf, int /*Count*/)
 {
     Vb->Listing.Fvf = Fvf;
     Vb->Listing.BaseVertex = 0;
@@ -933,8 +934,8 @@ static int DrawFaceGroup(FFaceGroup* Group, FMaterialSubmitContext* Context, int
     Context->Field20 = Group->UvBinding;
     IMaterial* Material = Group->Material;
     Material->Bind(Context);
-    Material->Submit(Context, Group->Kind, Group->IndexMin, (unsigned long)NumVerts,
-                     (unsigned long)StartIndex, Group->IndexCount, 0x100ul);
+    Material->Submit(Context, Group->Kind, Group->IndexMin, (uint32_t)NumVerts,
+                     (uint32_t)StartIndex, Group->IndexCount, 0x100ul);
     Material->Teardown(Context);
     return NumVerts;
 }
@@ -993,12 +994,12 @@ unsigned char FMeshArchetype::Draw(ICamera* Camera, FDeformPart* Part)
     Binding.Record = nullptr;
     Binding.Bone = nullptr;
     Binding.EyeUvTransformCount = 0;
-    unsigned long Start = 0;
+    uint32_t Start = 0;
     int GroupIndex = 0;
     while (GroupIndex < FaceGroupCount)
     {
         FFaceGroup* const Group = &FaceGroups[GroupIndex];
-        if (UvDeformCount != 0 && (long)Group->UvBoneIndex >= 0)
+        if (UvDeformCount != 0 && (int32_t)Group->UvBoneIndex >= 0)
         {
             FUvDeformRecord* const Record = &UvDeform[Group->UvBoneIndex];
             Binding.Record = Record;
@@ -1037,7 +1038,7 @@ unsigned char FMeshArchetype::FillIndexBuffer(FDeformIbDesc* Ib)
     while (GroupIndex < FaceGroupCount)
     {
         const FFaceGroup* const Group = &FaceGroups[GroupIndex];
-        unsigned long Index = 0;
+        uint32_t Index = 0;
         while (Index < Group->IndexCount)
         {
             *Locked = (unsigned short)(Group->Indices[Index] +
@@ -1147,21 +1148,21 @@ static void ExpandTristrip(const unsigned short* Strip, int StripCount, unsigned
 static void RebaseFaceIndices(FFaceGroup* Group)
 {
     unsigned short* Indices = Group->Indices;
-    const unsigned long Count = Group->IndexCount;
+    const uint32_t Count = Group->IndexCount;
     const unsigned short Last = Indices[Count - 1];
     const unsigned short First = Indices[0];
     Group->IndexMin = (First < Last) ? First : Last;
     Group->IndexMax = (First >= Last) ? First : Last;
-    for (unsigned long Index = 0; Index < Count; ++Index)
+    for (uint32_t Index = 0; Index < Count; ++Index)
     {
-        const unsigned long Value = Indices[Index];
+        const uint32_t Value = Indices[Index];
         if (Value < Group->IndexMin)
             Group->IndexMin = Value;
         else if (Value > Group->IndexMax)
             Group->IndexMax = Value;
     }
     const unsigned short Base = (unsigned short)Group->IndexMin;
-    for (unsigned long Index = 0; Index < Count; ++Index)
+    for (uint32_t Index = 0; Index < Count; ++Index)
         Indices[Index] = (unsigned short)(Indices[Index] - Base);
 }
 
@@ -1179,7 +1180,7 @@ FMeshArchetype::FMeshArchetype(const char* Name)
 struct FMappedFileNode
 {
     int Handle;         // +0x00 IFileSystem +0x7C, -1 none
-    unsigned long Size; // +0x04 IFileSystem +0x28
+    uint32_t Size; // +0x04 IFileSystem +0x28
     int Mapping;        // +0x08 IFileSystem +0x3C (h, 0, PAGE_READONLY, 0, 0, 0), -1 none
     void* View;         // +0x0C IFileSystem +0x40 (mapping, FILE_MAP_READ, 0, 0, 0)
     IFileSystem* Fs;    // +0x10
@@ -1214,12 +1215,12 @@ static void CloseMappedFileNode(FMappedFileNode* Node)
         {
             if (Node->View != nullptr)
             {
-                Node->Fs->UnmapFileView((unsigned long)((uintptr_t)Node->View));
+                Node->Fs->UnmapFileView((uint32_t)((uintptr_t)Node->View));
                 Node->View = nullptr;
             }
-            Node->Fs->CloseFile((unsigned long)Node->Mapping);
+            Node->Fs->CloseFile((uint32_t)Node->Mapping);
         }
-        Node->Fs->CloseFile((unsigned long)Node->Handle);
+        Node->Fs->CloseFile((uint32_t)Node->Handle);
         Node->Handle = -1;
     }
     DropFileSystem(&Node->Fs);
@@ -1235,12 +1236,12 @@ static void OpenMappedFileNode(FMappedFileNode* Node, const char* NodeName)
     Node->Handle = Node->Fs->OpenByDesc(&Desc);
     if (Node->Handle == -1)
         return;
-    Node->Size = Node->Fs->GetSize((unsigned long)Node->Handle, 0);
-    Node->Mapping = Node->Fs->CreateMapping((unsigned long)Node->Handle, 0, 2, 0, 0, 0);
+    Node->Size = Node->Fs->GetSize((uint32_t)Node->Handle, 0);
+    Node->Mapping = Node->Fs->CreateMapping((uint32_t)Node->Handle, 0, 2, 0, 0, 0);
     if (Node->Mapping == -1)
         return;
     Node->View = (void*)((uintptr_t)((unsigned int)(
-        Node->Fs->MapFileView((unsigned long)Node->Mapping, 4, 0, 0, 0))));
+        Node->Fs->MapFileView((uint32_t)Node->Mapping, 4, 0, 0, 0))));
 }
 
 // FUN_065f8360 (thiscall RET 4: Fs): +0x10 = Fs, AddRef when non-null; Handle = -1, Size = 0,
@@ -1254,7 +1255,7 @@ static void InitMappedFileNode(FMappedFileNode* Node, IFileSystem* Fs)
 }
 
 // FUN_065f8390 (thiscall RET 8: name, find handle), 065f8390..846d: the 0x34 desc of
-static int MapFileNode(FMappedFileNode* Node, const char* NodeName, unsigned long FindHandle)
+static int MapFileNode(FMappedFileNode* Node, const char* NodeName, uint32_t FindHandle)
 {
     FFileSystemDesc Desc;
     FillFileDesc(&Desc, NodeName);
@@ -1262,12 +1263,12 @@ static int MapFileNode(FMappedFileNode* Node, const char* NodeName, unsigned lon
     Node->Handle = Node->Fs->OpenByDesc(&Desc);
     if (Node->Handle == -1)
         return -8;
-    Node->Size = Node->Fs->GetSize((unsigned long)Node->Handle, 0);
-    Node->Mapping = Node->Fs->CreateMapping((unsigned long)Node->Handle, 0, 2, 0, 0, 0);
+    Node->Size = Node->Fs->GetSize((uint32_t)Node->Handle, 0);
+    Node->Mapping = Node->Fs->CreateMapping((uint32_t)Node->Handle, 0, 2, 0, 0, 0);
     if (Node->Mapping == -1)
         return -6;
     Node->View = (void*)((uintptr_t)((unsigned int)(
-        Node->Fs->MapFileView((unsigned long)Node->Mapping, 4, 0, 0, 0))));
+        Node->Fs->MapFileView((uint32_t)Node->Mapping, 4, 0, 0, 0))));
     if (Node->View != nullptr)
         return 0;
     return -1;
@@ -1286,10 +1287,10 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
     if (CountHandle != -1)
     {
         int Value = 0;
-        unsigned long Got = 0;
-        if (Fs->Read((unsigned long)CountHandle, &Value, 4, &Got, 0) != 0 && Got == 4)
+        uint32_t Got = 0;
+        if (Fs->Read((uint32_t)CountHandle, &Value, 4, &Got, 0) != 0 && Got == 4)
             Count = Value;
-        Fs->CloseFile((unsigned long)CountHandle);
+        Fs->CloseFile((uint32_t)CountHandle);
     }
     int* Block = (int*)new unsigned char[(size_t)Count * sizeof(FFaceGroup) + 4];
     *Block = Count;
@@ -1313,7 +1314,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
             DropFileSystem(&Child);
             FFileSystemDesc ChildDesc;
             FillFileDesc(&ChildDesc, FindData.cFileName);
-            ChildDesc.Field30 = (unsigned long)Finder;
+            ChildDesc.Field30 = (uint32_t)Finder;
             if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
                                    (void**)(&Child)) < 0)
             {
@@ -1378,12 +1379,12 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                             const int FaceHandle = Child->OpenByDesc(&FaceDesc);
                             if (FaceHandle != -1)
                             {
-                                const unsigned long FaceBytes =
-                                    Child->GetSize((unsigned long)FaceHandle, 0);
-                                const unsigned long FaceCount = FaceBytes >> 1;
+                                const uint32_t FaceBytes =
+                                    Child->GetSize((uint32_t)FaceHandle, 0);
+                                const uint32_t FaceCount = FaceBytes >> 1;
                                 unsigned short* Buffer = (unsigned short*)new unsigned char[(size_t)FaceCount * 2];
-                                unsigned long Got = 0;
-                                if (Child->Read((unsigned long)FaceHandle, Buffer,
+                                uint32_t Got = 0;
+                                if (Child->Read((uint32_t)FaceHandle, Buffer,
                                                 FaceBytes, &Got, 0) != 0)
                                 {
                                     Group->IndexCount = FaceCount;
@@ -1393,7 +1394,7 @@ static bool LoadFaceGroups(FMeshArchetype* Arch, IFileSystem* Fs)
                                 {
                                     delete[] (unsigned char*)Buffer;
                                 }
-                                Child->CloseFile((unsigned long)FaceHandle);
+                                Child->CloseFile((uint32_t)FaceHandle);
                             }
                         }
                         Group->Kind = 4;
@@ -1428,20 +1429,20 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     const int IndexHandle = Fs->OpenByDesc(&Desc);
     if (IndexHandle != -1)
     {
-        const unsigned long IndexBytes = Fs->GetSize((unsigned long)IndexHandle, 0);
-        const unsigned long IndexCount = IndexBytes >> 2;
+        const uint32_t IndexBytes = Fs->GetSize((uint32_t)IndexHandle, 0);
+        const uint32_t IndexCount = IndexBytes >> 2;
         unsigned char* Indices = new unsigned char[(size_t)IndexCount * 4];
-        unsigned long Got = 0;
-        if (Fs->Read((unsigned long)IndexHandle, Indices, IndexBytes, &Got, 0) != 0)
+        uint32_t Got = 0;
+        if (Fs->Read((uint32_t)IndexHandle, Indices, IndexBytes, &Got, 0) != 0)
         {
             Arch->PointIndexCount = (int)IndexCount;
-            Arch->PointIndices = (unsigned long*)Indices;
+            Arch->PointIndices = (uint32_t*)Indices;
         }
         else
         {
             delete[] Indices;
         }
-        Fs->CloseFile((unsigned long)IndexHandle);
+        Fs->CloseFile((uint32_t)IndexHandle);
     }
 
     FMappedFileNode PointNode;
@@ -1450,7 +1451,7 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     PointNode.Size = 0;
     PointNode.View = nullptr;
     OpenMappedFileNode(&PointNode, "Points");
-    const unsigned long* PointView = (const unsigned long*)PointNode.View;
+    const uint32_t* PointView = (const uint32_t*)PointNode.View;
 
     FMappedFileNode NormalNode;
     HoldFileSystem(&NormalNode.Fs, Fs);
@@ -1458,16 +1459,16 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     NormalNode.Size = 0;
     NormalNode.View = nullptr;
     OpenMappedFileNode(&NormalNode, "Vertex_normals");
-    const unsigned long* NormalView = (const unsigned long*)NormalNode.View;
+    const uint32_t* NormalView = (const uint32_t*)NormalNode.View;
 
     const unsigned int VertexCount = (unsigned int)(PointNode.Size / 12);
     Arch->VertexCount = (int)VertexCount;
-    unsigned long* Vertices =
-        (unsigned long*)new unsigned char[(size_t)VertexCount * 0x18];
+    uint32_t* Vertices =
+        (uint32_t*)new unsigned char[(size_t)VertexCount * 0x18];
     Arch->Vertices = Vertices;
     for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
     {
-        unsigned long* Out = Vertices + Index * 6;
+        uint32_t* Out = Vertices + Index * 6;
         Out[0] = PointView[Index * 3 + 0];
         Out[1] = PointView[Index * 3 + 1];
         Out[2] = PointView[Index * 3 + 2];
@@ -1484,27 +1485,27 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     const int UvIndexHandle = Fs->OpenByDesc(&Desc);
     if (UvIndexHandle != -1)
     {
-        const unsigned long UvIndexBytes =
-            Fs->GetSize((unsigned long)UvIndexHandle, 0);
+        const uint32_t UvIndexBytes =
+            Fs->GetSize((uint32_t)UvIndexHandle, 0);
         unsigned char* UvIndices = new unsigned char[(size_t)((UvIndexBytes >> 2) << 2)];
-        unsigned long Got = 0;
-        if (Fs->Read((unsigned long)UvIndexHandle, UvIndices, UvIndexBytes, &Got,
+        uint32_t Got = 0;
+        if (Fs->Read((uint32_t)UvIndexHandle, UvIndices, UvIndexBytes, &Got,
                      0) != 0)
-            Arch->UvIndices = (unsigned long*)UvIndices;
+            Arch->UvIndices = (uint32_t*)UvIndices;
         else
             delete[] UvIndices;
-        Fs->CloseFile((unsigned long)UvIndexHandle);
+        Fs->CloseFile((uint32_t)UvIndexHandle);
     }
 
     FillFileDesc(&Desc, "UV0");
     const int UvHandle = Fs->OpenByDesc(&Desc);
     if (UvHandle != -1)
     {
-        const unsigned long UvBytes = Fs->GetSize((unsigned long)UvHandle, 0);
-        const unsigned long UvCount = UvBytes >> 3;
+        const uint32_t UvBytes = Fs->GetSize((uint32_t)UvHandle, 0);
+        const uint32_t UvCount = UvBytes >> 3;
         unsigned char* UvData = new unsigned char[(size_t)UvCount * 8];
-        unsigned long Got = 0;
-        if (Fs->Read((unsigned long)UvHandle, UvData, UvBytes, &Got, 0) != 0)
+        uint32_t Got = 0;
+        if (Fs->Read((uint32_t)UvHandle, UvData, UvBytes, &Got, 0) != 0)
         {
             Arch->UvCount = (int)UvCount;
             Arch->UvData = UvData;
@@ -1513,29 +1514,29 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
         {
             delete[] UvData;
         }
-        Fs->CloseFile((unsigned long)UvHandle);
+        Fs->CloseFile((uint32_t)UvHandle);
     }
 
     FMappedFileNode CountNode;
     InitMappedFileNode(&CountNode, Fs);
     MapFileNode(&CountNode, "Point_bone_count", 0xFFFFFFFF);
-    const unsigned long* BoneCounts = (const unsigned long*)CountNode.View;
+    const uint32_t* BoneCounts = (const uint32_t*)CountNode.View;
 
     FMappedFileNode IdNode;
     InitMappedFileNode(&IdNode, Fs);
     MapFileNode(&IdNode, "Bone_id_chain", 0xFFFFFFFF);
-    const unsigned long* BoneIds = (const unsigned long*)IdNode.View;
+    const uint32_t* BoneIds = (const uint32_t*)IdNode.View;
 
     FMappedFileNode WeightNode;
     InitMappedFileNode(&WeightNode, Fs);
     MapFileNode(&WeightNode, "Bone_weight_chain", 0xFFFFFFFF);
-    const unsigned long* Weights = (const unsigned long*)WeightNode.View;
+    const uint32_t* Weights = (const uint32_t*)WeightNode.View;
 
     const unsigned int PairCount = (unsigned int)(IdNode.Size >> 2);
     Arch->SkinPairs = (FSkinPair*)new unsigned char[(size_t)PairCount * 8];
     for (unsigned int Index = 0; Index < PairCount; ++Index)
     {
-        unsigned long* Pair = (unsigned long*)(&Arch->SkinPairs[Index]);
+        uint32_t* Pair = (uint32_t*)(&Arch->SkinPairs[Index]);
         Pair[0] = BoneIds[Index];
         Pair[1] = Weights[Index];
     }
@@ -1544,7 +1545,7 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount * 8];
     for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
     {
-        const unsigned long Influence = BoneCounts[Index];
+        const uint32_t Influence = BoneCounts[Index];
         Arch->SkinTable[Index].BoneCount = (int)Influence;
         Arch->SkinTable[Index].Pairs = Cursor;
         Cursor += Influence;
@@ -1622,16 +1623,16 @@ static bool LoadUvDeformTables(FMeshArchetype* Arch, IFileSystem* Fs)
     InitMappedFileNode(&MaxDvNode, Fs);
     MapFileNode(&MaxDvNode, "Max_dv", 0xFFFFFFFF);
 
-    const unsigned long* const Columns[9] = {
-        (const unsigned long*)BoneIdNode.View,
-        (const unsigned long*)VertexCountNode.View,
-        (const unsigned long*)PlaneNode.View,
-        (const unsigned long*)XToUNode.View,
-        (const unsigned long*)YToVNode.View,
-        (const unsigned long*)MinDuNode.View,
-        (const unsigned long*)MaxDuNode.View,
-        (const unsigned long*)MinDvNode.View,
-        (const unsigned long*)MaxDvNode.View,
+    const uint32_t* const Columns[9] = {
+        (const uint32_t*)BoneIdNode.View,
+        (const uint32_t*)VertexCountNode.View,
+        (const uint32_t*)PlaneNode.View,
+        (const uint32_t*)XToUNode.View,
+        (const uint32_t*)YToVNode.View,
+        (const uint32_t*)MinDuNode.View,
+        (const uint32_t*)MaxDuNode.View,
+        (const uint32_t*)MinDvNode.View,
+        (const uint32_t*)MaxDvNode.View,
     };
     Arch->UvDeformCount = (int)(BoneIdNode.Size >> 2);
     if (Arch->UvDeformCount != 0)
@@ -1639,7 +1640,7 @@ static bool LoadUvDeformTables(FMeshArchetype* Arch, IFileSystem* Fs)
         Arch->UvDeform = (FUvDeformRecord*)new unsigned char[(size_t)(unsigned int)Arch->UvDeformCount * 0x24];
         for (unsigned int Index = 0; Index < (unsigned int)Arch->UvDeformCount; ++Index)
         {
-            unsigned long* Row = (unsigned long*)(&Arch->UvDeform[Index]);
+            uint32_t* Row = (uint32_t*)(&Arch->UvDeform[Index]);
             for (int Column = 0; Column < 9; ++Column)
                 Row[Column] = Columns[Column][Index];
         }
@@ -1724,8 +1725,8 @@ char* FormatDeformMessage(char* Buffer, const char* Format, ...)
 static FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, const char* Name,
                                    unsigned char bFlag70)
 {
-    const unsigned long Key = DACOM_CRC::GetCRC32(Name);
-    std::map<unsigned long, FDeformMesh*>::iterator Found = G_MeshCache.find(Key);
+    const uint32_t Key = DACOM_CRC::GetCRC32(Name);
+    std::map<uint32_t, FDeformMesh*>::iterator Found = G_MeshCache.find(Key);
     if (Found != G_MeshCache.end())
     {
         FDeformMesh* Cached = Found->second;
@@ -1749,7 +1750,7 @@ static FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, cons
         void* Handle = G_Engine->CreateArchetypeHandle(&ArchName, MeshFs);
         IVMeshPart* Library = nullptr;
         // This query ABI accepts the const IID as an opaque mutable token.
-        if (G_Engine->QueryEngineComponent((int)((intptr_t)Handle),
+        if (G_Engine->QueryEngineComponent((int)fl::PtrToHandle(Handle),
                                            const_cast<char*>(Iids::VMeshLibrary),
                                            (void**)(&Library)) < 0)
         {
@@ -1891,7 +1892,7 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
         {
             FFileSystemDesc ChildDesc;
             FillFileDesc(&ChildDesc, FindData.cFileName);
-            ChildDesc.Field30 = (unsigned long)Finder;
+            ChildDesc.Field30 = (uint32_t)Finder;
             IFileSystem* Child = nullptr;
             if (Fs->CreateInstance((AGGDESC*)(&ChildDesc),
                                    (void**)(&Child)) >= 0)
@@ -1906,14 +1907,14 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
                 const int Handle = Child->OpenByDesc(&BoneDesc);
                 if (Handle != -1)
                 {
-                    unsigned long Got = 0;
-                    if (Child->Read((unsigned long)Handle, Buffer, 0x30, &Got, 0) != 0 &&
+                    uint32_t Got = 0;
+                    if (Child->Read((uint32_t)Handle, Buffer, 0x30, &Got, 0) != 0 &&
                         Got == 0x30)
                     {
                         std::memcpy(Bone->BoneToRoot, Buffer, 0x30);
                         bRead = true;
                     }
-                    Child->CloseFile((unsigned long)Handle);
+                    Child->CloseFile((uint32_t)Handle);
                 }
                 const GENRESULT Result = bRead ? 0 : (GENRESULT)0x80004005;
                 if (bSkeletonNode != 0)
@@ -1952,7 +1953,7 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
 
 // FUN_065f16a0 (1 instruction, RET 8): slots 1 and 2, and the ICF-shared empty body of
 // several IEngineComponent slots. EAX is not set; the port answers 0.
-static unsigned long DACOM_API BoneRuntimeRet8(void* /*This*/, void* /*A*/)
+static uint32_t DACOM_API BoneRuntimeRet8(void* /*This*/, void* /*A*/)
 {
     return 0;
 }
@@ -2054,10 +2055,10 @@ float* DACOM_API FBoneRuntime::GetMatrix(void* /*InInstance*/)
 // the second and third arguments; the instance is not read.
 GENRESULT DACOM_API FBoneRuntime::GetExtra(void* /*InInstance*/, float* OutExtra, float* OutVec)
 {
-    *(unsigned long*)OutExtra = 0;
-    ((unsigned long*)OutVec)[0] = 0;
-    ((unsigned long*)OutVec)[1] = 0;
-    ((unsigned long*)OutVec)[2] = 0;
+    *(uint32_t*)OutExtra = 0;
+    ((uint32_t*)OutVec)[0] = 0;
+    ((uint32_t*)OutVec)[1] = 0;
+    ((uint32_t*)OutVec)[2] = 0;
     return GR_OK; // EAX = OutVec (065f1768); nobody reads it
 }
 
@@ -2069,28 +2070,28 @@ GENRESULT DACOM_API FBoneRuntime::SetExtra(void* /*InInstance*/, float /*Extra*/
 }
 
 // LAB_065f1790 (RET 0xC), slot 11.
-GENRESULT DACOM_API FBoneRuntime::SetUser(void* InInstance, unsigned long User)
+GENRESULT DACOM_API FBoneRuntime::SetUser(void* InInstance, uint32_t User)
 {
     BoneRuntimeRetC(this, InInstance, (void*)((ptrdiff_t)User));
     return GR_OK;
 }
 
 // LAB_065f17a0 (RET 8), slot 12: XOR EAX,EAX.
-unsigned long DACOM_API FBoneRuntime::GetUser(void* /*InInstance*/)
+uint32_t DACOM_API FBoneRuntime::GetUser(void* /*InInstance*/)
 {
     return 0;
 }
 
 // LAB_065f17b0 (RET 8), slot 13: bit 1 of +0x3c set -> AL = 0; else |= 2 and EAX =
 // (~byte) & 1 (NOT AL; AND EAX,1 -- the AND clears EAX's upper bytes).
-unsigned long DACOM_API FBoneRuntime::MarkWorldDirty(void* /*InInstance*/) // formerly Slot13
+uint32_t DACOM_API FBoneRuntime::MarkWorldDirty(void* /*InInstance*/) // formerly Slot13
 {
     unsigned char Flags = this->Flags;
     if ((Flags & 2u) != 0)
         return 0;
     Flags = (unsigned char)(Flags | 2u);
     this->Flags = Flags;
-    return (unsigned long)((~Flags) & 1u);
+    return (uint32_t)((~Flags) & 1u);
 }
 
 static I3DMathEngine* AcquireMathEngine();
@@ -2997,7 +2998,7 @@ static void StopAimNode(FIkListNode* Node)
     int Cursor = Node->Event->EndJoint;
     while (Cursor != Node->Event->StartJoint)
     {
-        G_Animation->HasAnyHandle((unsigned long)Cursor);
+        G_Animation->HasAnyHandle((uint32_t)Cursor);
         Cursor = (int)((ptrdiff_t)(
             G_Engine->GetInstanceParent((void*)((ptrdiff_t)Cursor))));
     }
@@ -3366,7 +3367,7 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
 
 // LAB_065fb540, the IK event's only table slot (06601340): EngBase's FUN_0661b420 calls it on
 // the channel owner with (sampled value, channel key, bind descriptor, time).
-int DACOM_API FIkEvent::Apply(float* Sampled, unsigned long ChannelKey, void* BindDesc, float Time)
+int DACOM_API FIkEvent::Apply(float* Sampled, uint32_t ChannelKey, void* BindDesc, float Time)
 {
     return IkApply(this, Sampled, (int)ChannelKey,
                    (FIkApplyGate*)BindDesc, Time);
@@ -3379,7 +3380,7 @@ FIkEvent::~FIkEvent()
     while (Index < JointCount)
     {
         G_Channel->Destroy(
-            (unsigned long)((ptrdiff_t)Channels[Index]));
+            (uint32_t)((ptrdiff_t)Channels[Index]));
         Index += 1;
     }
     JointCount = 0;
@@ -3490,7 +3491,7 @@ static void SweepExpiredList(FDeformInstance* Instance)
         {
             FIkEvent* Event = Node->Event;
             if ((Event->Flags34 & 1) != 0 &&
-                (unsigned char)(G_Channel->InMixer((unsigned long)(
+                (unsigned char)(G_Channel->InMixer((uint32_t)(
                     (ptrdiff_t)Event->Channels[0]))) == 0)
                 bDrop = true;
         }
@@ -3622,8 +3623,8 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
             // 065f42af..42dc: the pushes, last first, are 1.0f, ArgF, ArgD, ArgE, ArgC, ArgG,
             // &Vec, Handle.
             const unsigned char bTouched = Root->Eval(
-                (unsigned long)Handle, Vec,
-                (unsigned long)((ptrdiff_t)ArgG), ArgCFloat,
+                (uint32_t)Handle, Vec,
+                (uint32_t)((ptrdiff_t)ArgG), ArgCFloat,
                 FloatFromOpaqueDword(ArgE), ArgD, ArgF, 1.0f);
             if (bTouched != 0)
             {
@@ -3673,9 +3674,9 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
     Xform[9] = Pos[0];
     Xform[10] = Pos[1];
     Xform[11] = Pos[2];
-    const long Applied = (long)(G_Animation->EvalPlayback(
-        (unsigned long)Handle,
-        (unsigned long)((ptrdiff_t)ArgG), ArgCFloat,
+    const int32_t Applied = (int32_t)(G_Animation->EvalPlayback(
+        (uint32_t)Handle,
+        (uint32_t)((ptrdiff_t)ArgG), ArgCFloat,
         FloatFromOpaqueDword(ArgE), ArgD, ArgF, AsOpaqueDword(1.0f), (void*)Xform));
     if (Applied < 0)
     {
@@ -3728,13 +3729,13 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
 
     const int PlayHandle =
         PlayInstanceAnim(Instance, Name, Extra, ArgC, ArgD, ArgE, ArgF, ArgG, ArgH, nullptr);
-    const unsigned long Play = (unsigned long)PlayHandle;
+    const uint32_t Play = (uint32_t)PlayHandle;
     const float Time = FloatFromOpaqueDword(ArgC);
 
     void* const Stop = (void*)((ptrdiff_t)(FirstBoneInstance(Instance)));
 
     // EngBase FAnimBindOut {Kind, Extra, Typed, Instance}; +0x10 of the frame is outside it.
-    unsigned long Query[4];
+    uint32_t Query[4];
     Query[0] = 0;
     Query[1] = 0;
     Query[2] = 0;
@@ -3748,11 +3749,11 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
         void* const Parent = G_Engine->GetInstanceParent(Cursor);
         Relatives.push_back(
             (const unsigned char*)(G_Engine->GetInstanceRelative(Cursor)));
-        Query[3] = (unsigned long)((ptrdiff_t)Cursor);
-        const unsigned long Channel = G_Animation->FindObject(Play, Query);
+        Query[3] = (uint32_t)((ptrdiff_t)Cursor);
+        const uint32_t Channel = G_Animation->FindObject(Play, Query);
         IChannelArchetype* Archetype = nullptr;
         G_Channel->GetObject(Channel, (void**)(&Archetype));
-        unsigned long Flags = 0;
+        uint32_t Flags = 0;
         Archetype->GetFlags(&Flags);
         const unsigned char* KeyA = nullptr;
         const unsigned char* KeyB = nullptr;
@@ -3767,12 +3768,12 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
     }
     const int ChainCount = (int)(ChainQuats.size());
 
-    Query[3] = (unsigned long)((ptrdiff_t)Stop);
+    Query[3] = (uint32_t)((ptrdiff_t)Stop);
     Query[0] = 1;
-    const unsigned long RootChannel = G_Animation->FindObject(Play, Query);
+    const uint32_t RootChannel = G_Animation->FindObject(Play, Query);
     IChannelArchetype* RootArchetype = nullptr;
     G_Channel->GetObject(RootChannel, (void**)(&RootArchetype));
-    unsigned long RootFlags = 0;
+    uint32_t RootFlags = 0;
     RootArchetype->GetFlags(&RootFlags);
     const unsigned char* RootA = nullptr;
     const unsigned char* RootB = nullptr;
@@ -4027,7 +4028,7 @@ static bool IkDlsRound(FIkDlsFrame* Frame, FIkEvent* Event)
 static void IkSolveDls(FIkEvent* Event)
 {
     FIkDlsFrame Frame;
-    const unsigned long Flags = Event->Flags28;
+    const uint32_t Flags = Event->Flags28;
     Frame.bPos = ((Flags >> 5) & 1u) != 0;
     Frame.bOri = ((Flags >> 6) & 1u) != 0;
     const int Count = Event->JointCount;
@@ -4126,7 +4127,7 @@ static void IkSolveDls(FIkEvent* Event)
 static void IkSolveDlsAlt(FIkEvent* Event)
 {
     FIkDlsFrame Frame;
-    const unsigned long Flags = Event->Flags28;
+    const uint32_t Flags = Event->Flags28;
     Frame.bPos = ((Flags >> 5) & 1u) != 0;
     Frame.bOri = ((Flags >> 6) & 1u) != 0;
     Frame.Dof = Event->JointCount * 3;
@@ -4291,7 +4292,7 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
     {
         for (int Index = 0; Index < Event->JointCount; ++Index)
         {
-            if ((int)Event->Channels[Index] == MatchId)
+            if ((int)fl::PtrToHandle(Event->Channels[Index]) == MatchId)
             {
                 G_Engine->GetJointParams(
                     (void*)((ptrdiff_t)Event->JointIds[Index]), 0,
@@ -4321,7 +4322,7 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
 
     for (int Index = 0; Index < Event->JointCount; ++Index)
     {
-        if ((int)Event->Channels[Index] == MatchId)
+        if ((int)fl::PtrToHandle(Event->Channels[Index]) == MatchId)
         {
             IkCopy4(OutQuat, Event->Quats + Index * 4);
             return 0;
@@ -4349,13 +4350,13 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
             if (G_Animation != nullptr)
             {
                 unsigned char bBlocked = 0;
-                G_Animation->HasHandle((unsigned long)Cursor, &bBlocked);
+                G_Animation->HasHandle((uint32_t)Cursor, &bBlocked);
                 if (bBlocked != 0)
                 {
                     int WalkBack = *(const int*)(Desc + 8);
                     while (WalkBack != Cursor)
                     {
-                        G_Animation->HasAnyHandle((unsigned long)WalkBack);
+                        G_Animation->HasAnyHandle((uint32_t)WalkBack);
                         WalkBack = (int)((ptrdiff_t)(
                             G_Engine->GetInstanceParent((void*)((ptrdiff_t)WalkBack))));
                     }
@@ -4363,12 +4364,12 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
                           G_StartAimBlocked);
                     return (FIkListNode*)((ptrdiff_t)-1);
                 }
-                G_Animation->RegisterHandle((unsigned long)Cursor);
+                G_Animation->RegisterHandle((uint32_t)Cursor);
             }
             Chain.push_back(Cursor);
             void* const CursorInstance = (void*)((ptrdiff_t)Cursor);
             Parent = (int)((ptrdiff_t)(G_Engine->GetInstanceParent(CursorInstance)));
-            const unsigned long* Relative = G_Engine->GetInstanceRelative(CursorInstance);
+            const uint32_t* Relative = G_Engine->GetInstanceRelative(CursorInstance);
             if (Relative[0] == 4)
             {
                 const float* Axis = (const float*)(Relative + 4);
@@ -4411,7 +4412,7 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
         std::memcpy(Event->JointIds, &JointIds[0], Count4);
     Event->Channels = (void**)new unsigned char[Count4];
     Event->Quats = (float*)new unsigned char[(size_t)Count * 0x10];
-    Event->Flags28 = *(const unsigned long*)(Desc + 0x0C);
+    Event->Flags28 = *(const uint32_t*)(Desc + 0x0C);
     Event->StartJoint = *(const int*)(Desc + 4);
     Event->EndJoint = *(const int*)(Desc + 8);
     Event->BindMats = (float*)new unsigned char[(size_t)Count * 0x24];
@@ -4426,26 +4427,26 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
         return (FIkListNode*)((ptrdiff_t)-1);
     }
 
-    unsigned long PlayBlob[7];
+    uint32_t PlayBlob[7];
     PlayBlob[0] = 0;
-    PlayBlob[1] = (*(const unsigned long*)(Desc + 0x0C) >> 1) & 0x80u;
+    PlayBlob[1] = (*(const uint32_t*)(Desc + 0x0C) >> 1) & 0x80u;
     const float One = 1.0f;
     std::memcpy(&PlayBlob[2], &One, sizeof(One));
-    PlayBlob[3] = (unsigned long)((ptrdiff_t)PlayExtra);
+    PlayBlob[3] = (uint32_t)((ptrdiff_t)PlayExtra);
     std::memcpy(&PlayBlob[4], &One, sizeof(One));
     std::memcpy(&PlayBlob[5], &One, sizeof(One));
     PlayBlob[6] = 0;
-    unsigned long CreateCookie[4];
+    uint32_t CreateCookie[4];
     CreateCookie[0] = 0;
     CreateCookie[1] = 0;
     CreateCookie[2] = 0;
-    CreateCookie[3] = (unsigned long)-1;
+    CreateCookie[3] = (uint32_t)-1;
     for (int Index = 0; Index < Count; ++Index)
     {
         const int JointId = JointIds[Index];
         void* const JointInstance = (void*)((ptrdiff_t)JointId);
-        CreateCookie[3] = (unsigned long)JointId;
-        const unsigned long Key = G_Channel->CreateTyped(
+        CreateCookie[3] = (uint32_t)JointId;
+        const uint32_t Key = G_Channel->CreateTyped(
             (IChannelOwner*)Event, 4, CreateCookie, (void*)((ptrdiff_t)BindB));
         Event->Channels[Index] = (void*)((ptrdiff_t)Key);
         G_Channel->Play(Key, (float*)PlayBlob);
@@ -4661,7 +4662,7 @@ static void ReleaseComponentCaches()
 static char G_DeformRateValue[0x400];
 
 // FUN_065f1900's value parse, 065f19cd..1b11: the 36-character charset (.data:06602138) is
-static unsigned long ParseDeformRateValue(char* Text)
+static uint32_t ParseDeformRateValue(char* Text)
 {
     const size_t Span = strspn(Text, G_RateCharset);
     if (Span != 0)
@@ -4680,11 +4681,11 @@ static unsigned long ParseDeformRateValue(char* Text)
         return strtoul(Text, nullptr, 16);
 
     strspn(Text, "0123456789+-");
-    return (unsigned long)(MsvcrtAtoi(Text));
+    return (uint32_t)(MsvcrtAtoi(Text));
 }
 
 // Widen the unsigned rate before dividing, then round the result to float.
-static void ApplyParsedRate(unsigned long Rate)
+static void ApplyParsedRate(uint32_t Rate)
 {
     if (Rate == 0)
         G_DeformRate = 0.0f;
@@ -4710,12 +4711,12 @@ static GENRESULT ApplyCreateInstanceInit(FDeformableObject* Object, FAggDesc18* 
             Parser = First;
             Parser->AddRef();
         }
-        unsigned long Rate = 0;
+        uint32_t Rate = 0;
         bool bParse = true;
         if (Parser == nullptr &&
             Dacom->QueryInterface(Iids::ProfileParser, (void**)(&Parser)) != 0)
         {
-            Rate = (unsigned long)((ptrdiff_t)Parser); // 065f1b23
+            Rate = (uint32_t)((ptrdiff_t)Parser); // 065f1b23
             bParse = false;
         }
         if (bParse)
@@ -4774,20 +4775,20 @@ static void ConstructPart(FDeformPart* Part)
 static GENRESULT DACOM_API StubRet8(void* /*This*/, void* /*A*/);
 
 // IChannelSink slot 0 (EngBase FUN_0661b420 OnKeys).
-void DACOM_API FDeformInstance::OnKeys(unsigned long ChannelKey, void* Context,
+void DACOM_API FDeformInstance::OnKeys(uint32_t ChannelKey, void* Context,
                                        FChannelKeyBatch* Batch)
 {
     // FUN_065f5210 (RET 0x10), 065f5210..5281: +0x18 null -> return (EAX = that 0). Cookie (the
     if (UserAt18 == nullptr)
         return;
-    unsigned long Cookie = 0;
+    uint32_t Cookie = 0;
     FIkListNode* Node = ListHead;
     while (Node != nullptr)
     {
         if (Node->Active == 0)
         {
-            const unsigned long Handle =
-                (unsigned long)((ptrdiff_t)Node->Event);
+            const uint32_t Handle =
+                (uint32_t)((ptrdiff_t)Node->Event);
             if (G_Animation->HasObject(Handle, AsOpaqueDword(ChannelKey)) != 0)
             {
                 G_Animation->GetFirstInstanceField(Handle, &Cookie);
@@ -4810,7 +4811,7 @@ void DACOM_API FDeformInstance::OnOpaqueNotification(void* A, void* B) // former
 
 // IChannelSink slot 2 (EngBase FUN_0661b420 OnLoop): match anim, +0x60 duration, half-angle
 // quat, Math+0x54, UserAt18 slot 2.
-void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transform, void* Context)
+void DACOM_API FDeformInstance::OnLoop(uint32_t ChannelKey, float* Transform, void* Context)
 {
     // LAB_065f52b0 (RET 0x10), 065f52b0..53f5. First node with Active == 0 and IAnimation2
     float* const Xform = Transform;
@@ -4820,8 +4821,8 @@ void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transfor
     {
         if (Node->Active == 0)
         {
-            const unsigned long Stored =
-                (unsigned long)((ptrdiff_t)Node->Event);
+            const uint32_t Stored =
+                (uint32_t)((ptrdiff_t)Node->Event);
             if (G_Animation->HasObject(Stored, AsOpaqueDword(ChannelKey)) != 0)
             {
                 Handle = (int)Stored;
@@ -4835,7 +4836,7 @@ void DACOM_API FDeformInstance::OnLoop(unsigned long ChannelKey, float* Transfor
 
     float Duration = 0.0f;
     float Height = 0.0f;
-    if (G_Animation->GetDurationIfNamed((unsigned long)Handle, &Duration) != 0)
+    if (G_Animation->GetDurationIfNamed((uint32_t)Handle, &Duration) != 0)
         Height = Duration + Offset20;
     else
         Height = Offset24 + Offset20;
@@ -4901,7 +4902,7 @@ struct FHardpointInstancePair
 
 struct FHardpointConnectContext
 {
-    std::map<unsigned long, FHardpointInstancePair> Pairs;
+    std::map<uint32_t, FHardpointInstancePair> Pairs;
     IHardpoint* Hardpoint;
 };
 
@@ -4912,7 +4913,7 @@ static void __cdecl HardpointConnectCallback(void* BoneInst, char const* Name, v
     FHardpointInstancePair Unset;
     Unset.First = G_InvalidEngineHandle;
     Unset.Second = G_InvalidEngineHandle;
-    std::pair<std::map<unsigned long, FHardpointInstancePair>::iterator, bool> Inserted =
+    std::pair<std::map<uint32_t, FHardpointInstancePair>::iterator, bool> Inserted =
         Ctx->Pairs.insert(std::make_pair(DACOM_CRC::GetCRC32(Name), Unset));
     FHardpointInstancePair* Pair = &Inserted.first->second;
     if (Pair->First == G_InvalidEngineHandle)
@@ -5063,14 +5064,14 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
                     if (Handle != -1)
                     {
                         const unsigned int Available =
-                            RootFs->GetSize((unsigned long)Handle, 0) >> 2;
+                            RootFs->GetSize((uint32_t)Handle, 0) >> 2;
                         if (Available < Wanted)
                             Wanted = Available;
-                        unsigned long Got = 0;
-                        RootFs->Read((unsigned long)Handle, Fractions, Wanted * 4, &Got,
+                        uint32_t Got = 0;
+                        RootFs->Read((uint32_t)Handle, Fractions, Wanted * 4, &Got,
                                      0);
                         LodCap = (int)Wanted;
-                        RootFs->CloseFile((unsigned long)Handle);
+                        RootFs->CloseFile((uint32_t)Handle);
                     }
                 }
                 else
@@ -5107,7 +5108,7 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
                             {
                                 FFileSystemDesc MeshDesc;
                                 FillFileDesc(&MeshDesc, FindData.cFileName);
-                                MeshDesc.Field30 = (unsigned long)Finder;
+                                MeshDesc.Field30 = (uint32_t)Finder;
                                 IFileSystem* MeshFs = nullptr;
                                 bool bFull = false;
                                 if (RootFs->CreateInstance((AGGDESC*)(&MeshDesc),
@@ -5238,50 +5239,28 @@ static void TeardownInstance(FDeformInstance* Instance)
 
 // --- inner IDAComponent @ +0x0C (FDeformableInner: LAB_065f2400 / 065fe060 / 065f24c0) ---
 
-// .rdata:066012d0 (PE bytes): {IID string, offset from the owner}, null-terminated. An offset
-// with bit 31 set would name a pointer member instead of an embedded facet; none here does.
-struct FInnerIidEntry
-{
-    const char* Iid;
-    int Offset;
-};
-
-static const FInnerIidEntry G_InnerIidTable[] = {
-    {G_IidDeformableShort, 0},
-    {G_IidEngineComponentShort, 4},
-    {Iids::Deformable, 0},
-    {Iids::EngineComponent, 4},
-    {Iids::AggregateComponent, 4},
-    {nullptr, 0},
-};
-
-// LAB_065f2400 (RET 0xC), 065f2400..24af: walk the table with an inlined strcmp; hit ->
+// .rdata:066012d0 held {IID, byte offset from the owner}: {Deformable, 0}, {EngineComponent, 4} (also by
+// the short ids) and {AggregateComponent, 4}. Offsets are 32-bit-ABI layout; here the facet is chosen by type.
 GENRESULT DACOM_API FDeformableInner::QueryInterface(const char* Iid, void** Out)
 {
-    int Index = 0;
-    while (G_InnerIidTable[Index].Iid != nullptr)
+    IDAComponent* Facet = nullptr;
+    if (std::strcmp(Iid, G_IidDeformableShort) == 0 || std::strcmp(Iid, Iids::Deformable) == 0)
+        Facet = static_cast<IDeformable*>(Owner);
+    else if (std::strcmp(Iid, G_IidEngineComponentShort) == 0 || std::strcmp(Iid, Iids::EngineComponent) == 0 ||
+             std::strcmp(Iid, Iids::AggregateComponent) == 0)
+        Facet = static_cast<IEngineComponent*>(Owner);
+    if (Facet == nullptr)
     {
-        if (std::strcmp(G_InnerIidTable[Index].Iid, Iid) == 0)
-        {
-            unsigned char* OwnerBytes = (unsigned char*)Owner;
-            const int Offset = G_InnerIidTable[Index].Offset;
-            IDAComponent* Facet = nullptr;
-            if (Offset < 0)
-                Facet = *(IDAComponent**)(OwnerBytes + (Offset & 0x7fffffff));
-            else
-                Facet = (IDAComponent*)(OwnerBytes + Offset);
-            Facet->AddRef();
-            *Out = Facet;
-            return GR_OK;
-        }
-        Index += 1;
+        *Out = nullptr;
+        return GR_INTERFACE_UNSUPPORTED;
     }
-    *Out = nullptr;
-    return GR_INTERFACE_UNSUPPORTED;
+    Facet->AddRef();
+    *Out = Facet;
+    return GR_OK;
 }
 
 // LAB_065fe060 (ICF-shared): ++[this+4], EAX = the new count.
-unsigned long DACOM_API FDeformableInner::AddRef()
+uint32_t DACOM_API FDeformableInner::AddRef()
 {
     RefCount += 1;
     return RefCount;
@@ -5290,7 +5269,7 @@ unsigned long DACOM_API FDeformableInner::AddRef()
 // LAB_065f24c0 (RET 4), 065f24c0..24f8: [this+4] > 0 (unsigned, JBE) -> decrement; still
 // non-zero -> return it. Zero -> [this+4] = 1; owner [this+8] non-null -> FUN_065f18d0 on it
 // + operator delete; return 0.
-unsigned long DACOM_API FDeformableInner::Release()
+uint32_t DACOM_API FDeformableInner::Release()
 {
     if (RefCount > 0)
         RefCount -= 1;
@@ -5315,12 +5294,12 @@ static GENRESULT DACOM_API DeformableQueryInterface(FDeformableObject* This, con
     return Controlling->QueryInterface(Iid, Out);
 }
 
-static unsigned long DACOM_API DeformableAddRef(FDeformableObject* This)
+static uint32_t DACOM_API DeformableAddRef(FDeformableObject* This)
 {
     return This->Controlling->AddRef();
 }
 
-static unsigned long DACOM_API DeformableRelease(FDeformableObject* This)
+static uint32_t DACOM_API DeformableRelease(FDeformableObject* This)
 {
     return This->Controlling->Release();
 }
@@ -5421,7 +5400,7 @@ static unsigned char PartBoundSphere(FDeformPart* Part, float* OutRadius, float*
 
 // FUN_065f4070 (thiscall on the instance, RET 0x14: Unused, Camera, OutLod, RenderArg,
 static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICamera* Camera,
-                              int* OutLod, void* RenderArg, unsigned long Flags)
+                              int* OutLod, void* RenderArg, uint32_t Flags)
 {
     *OutLod = 0;
     if (Instance->PartCount <= 0)
@@ -5582,12 +5561,12 @@ GENRESULT DACOM_API FDeformableObject::QueryInterface(const char* Iid, void** Ou
     return DeformableQueryInterface(this, Iid, Out);
 }
 
-unsigned long DACOM_API FDeformableObject::AddRef()
+uint32_t DACOM_API FDeformableObject::AddRef()
 {
     return DeformableAddRef(this);
 }
 
-unsigned long DACOM_API FDeformableObject::Release()
+uint32_t DACOM_API FDeformableObject::Release()
 {
     return DeformableRelease(this);
 }
@@ -5809,8 +5788,8 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3) // form
     {
         if (Node->Active == 0)
         {
-            const unsigned long Handle =
-                (unsigned long)((ptrdiff_t)Node->Event);
+            const uint32_t Handle =
+                (uint32_t)((ptrdiff_t)Node->Event);
             float Duration;
             float MappedA[3];
             float MappedB[3];
@@ -5858,7 +5837,7 @@ GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, void* Ori) // former
     {
         if (Node->Active == 0)
             G_Animation->SetOverlayExtra(
-                (unsigned long)((ptrdiff_t)Node->Event),
+                (uint32_t)((ptrdiff_t)Node->Event),
                 (float*)Ori);
         Node = Node->Next;
     }
@@ -5895,8 +5874,8 @@ GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height) // form
     {
         if (Node->Active == 0)
         {
-            const unsigned long Handle =
-                (unsigned long)((ptrdiff_t)Node->Event);
+            const uint32_t Handle =
+                (uint32_t)((ptrdiff_t)Node->Event);
             float Duration = 0.0f;
             float Base = 0.0f;
             float Add = 0.0f;
@@ -6189,17 +6168,17 @@ GENRESULT DACOM_API FDeformableFactory::QueryInterface(const char* Iid, void** O
     return GR_OK;
 }
 
-unsigned long DACOM_API FDeformableFactory::AddRef()
+uint32_t DACOM_API FDeformableFactory::AddRef()
 {
     RefCount += 1;
     return RefCount;
 }
 
-unsigned long DACOM_API FDeformableFactory::Release()
+uint32_t DACOM_API FDeformableFactory::Release()
 {
     if (RefCount != 0)
         RefCount -= 1;
-    const unsigned long Remaining = RefCount;
+    const uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         RefCount = 1;
@@ -6296,7 +6275,7 @@ struct FSavedRenderState
 // DAT_06602a60: 1 in .data and never written (four reads, all in LAB_065fdd10). It gates the
 // bone palette and feeds D3DRS_SOFTWAREVERTEXPROCESSING / D3DRS_INDEXEDVERTEXBLENDENABLE and,
 // as 3 or 0, D3DRS_VERTEXBLEND.
-static unsigned long G_VmeshPaletteSkinning = 1;
+static uint32_t G_VmeshPaletteSkinning = 1;
 
 // LAB_065fdd10, the VMesh wrapper's slot 5 (thiscall RET 8: Camera, Part), 065fdd10..df7a.
 unsigned char FVmeshWrapper::Draw(ICamera* Camera, FDeformPart* Part)

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "list_box.h"
+#include "fl/handles.h"
 
 #include "font_atlas.h"
 #include "font_imp.h"
@@ -170,14 +171,14 @@ void ListBox::Draw()
     {
         // 0x005a2415: the selected row in DAT_00679ba4, the +0x80 row in the UI pulse
         // (FUN_00561da0), every other row in the HUD chrome colour DAT_00679bb4.
-        unsigned long Color = 0;
+        uint32_t Color = 0;
         if (SelectedIndex == Index)
         {
             Color = G_NnPaletteArgb_679ba4; // DAT_00679ba4
         }
         else if (Field80 == Index)
         {
-            unsigned long Pulsed = 0;
+            uint32_t Pulsed = 0;
             NnUiPulseBlendArgb(&Pulsed);
             Color = Pulsed;
         }
@@ -302,7 +303,7 @@ bool ListBox::MouseEvent(FWin3DMouseEvent const* Event)
     if (Selected >= 0 && Selected < ItemCount && Selected < 0x100 && Items[Selected] != nullptr)
         Text = Items[Selected]->Text_; // slot 4 (+0x10)
 
-    unsigned const TextArg = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Text));
+    unsigned const TextArg = static_cast<unsigned>(fl::PtrToHandle(Text));
     if (Event->Field1 == 2)
     {
         Parent->Slot23(0xf001, TextArg, static_cast<unsigned>(SelectedIndex));

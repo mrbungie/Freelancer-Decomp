@@ -13,9 +13,11 @@
 #include <string.h>
 #include <stdarg.h>
 #include <locale.h>
+#include <math.h>
 
 /* Selected VC6 numeric contracts used by Lua and NumberStringChild.
  * Keep options local: changing the module-wide UCRT policy affects other users. */
+#if defined(_MSC_VER)
 static int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format, va_list Args)
 {
     return __stdio_common_vsprintf(
@@ -24,6 +26,34 @@ static int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format,
         _CRT_INTERNAL_PRINTF_LEGACY_THREE_DIGIT_EXPONENTS,
         Buffer, Count, Format, NULL, Args);
 }
+#else
+/* Portable build: C99 vsnprintf (exponents use at least two digits, unlike
+ * the three-digit legacy MSVCRT form), and an _ecvt_s replacement. */
+static int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format, va_list Args)
+{
+    return vsnprintf(Buffer, Count, Format, Args);
+}
+
+/* Emits `Ndigits` significant digits, sets *Dec to the decimal point position
+ * and *Sign to the sign, like MSVC _ecvt_s. */
+static int _ecvt_s(char* Buf, size_t Size, double Value, int Ndigits, int* Dec, int* Sign)
+{
+    char Tmp[64];
+    int Exp = 0, I, J = 0;
+    *Sign = Value < 0.0 || (Value == 0.0 && signbit(Value));
+    if (Value < 0.0) Value = -Value;
+    if (Ndigits < 1) Ndigits = 1;
+    if (Ndigits > 40) Ndigits = 40;
+    if (Size < (size_t)Ndigits + 1) return 22;
+    snprintf(Tmp, sizeof(Tmp), "%.*e", Ndigits - 1, Value);
+    for (I = 0; Tmp[I] && Tmp[I] != 'e'; ++I)
+        if (Tmp[I] >= '0' && Tmp[I] <= '9') Buf[J++] = Tmp[I];
+    Buf[J] = 0;
+    if (Tmp[I] == 'e') Exp = atoi(Tmp + I + 1);
+    *Dec = Value == 0.0 ? 0 : Exp + 1;
+    return 0;
+}
+#endif
 
 static int MsvcrtLegacySnprintf(char* Buffer, size_t Count, char const* Format, ...)
 {

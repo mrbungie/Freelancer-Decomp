@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "swapped_material.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "common_misc.h"   // malloc_strcpy / malloc_strfree, DAEngine_create_filesystem / DAEngine_release_filesystem
@@ -23,8 +24,8 @@ namespace
     // the stack held (0x0042ce9e / 0x0042d5ae / 0x0042d5ea); it is zero here.
     struct FTextureQuery
     {
-        unsigned long Field_0x00; // TODO: never written by these callers
-        unsigned long Crc;        // +0x04
+        uint32_t Field_0x00; // TODO: never written by these callers
+        uint32_t Crc;        // +0x04
     };
 
     // Slot 12 writes straight into the member (retail passes its address), so a miss leaves the
@@ -53,7 +54,7 @@ namespace
     {
         int Count = 0;
         DALib::MaterialLib->GetGroupMaterialCount(0, &Count);
-        for (unsigned long Index = 0; Index < static_cast<unsigned long>(Count); ++Index)
+        for (uint32_t Index = 0; Index < static_cast<uint32_t>(Count); ++Index)
         {
             IMaterial* Material = nullptr;
             DALib::MaterialLib->EnumGroupMaterial(0, Index, &Material);
@@ -140,10 +141,10 @@ bool FSwappedMaterial::CaptureOriginal()
         return false; // 0x0042cda9
 
     // 0x0042cdc4..0x0042cf7e: every parameter; the string Dt_name is kept.
-    unsigned long ParameterCount = 0;
+    uint32_t ParameterCount = 0;
     Material->GetParameterCount(&ParameterCount); // slot 16 (+0x40)
     bool bFound = false;
-    for (unsigned long Parameter = 0; Parameter < ParameterCount; ++Parameter)
+    for (uint32_t Parameter = 0; Parameter < ParameterCount; ++Parameter)
     {
         FShadingPropertyRecord Descriptor = {};
         Material->GetParameterDescriptor(Parameter, &Descriptor); // slot 17 (+0x44)
@@ -182,10 +183,10 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
 
     // 0x0042d2be..0x0042d472: every string Dt_name parameter becomes a ProcessHeap copy of
     // TextureName (none when TextureName is null) and is written back through slot 19.
-    unsigned long ParameterCount = 0;
+    uint32_t ParameterCount = 0;
     Material->GetParameterCount(&ParameterCount);
     bool bFound = false;
-    for (unsigned long Parameter = 0; Parameter < ParameterCount; ++Parameter)
+    for (uint32_t Parameter = 0; Parameter < ParameterCount; ++Parameter)
     {
         FShadingPropertyRecord Descriptor = {};
         Material->GetParameterDescriptor(Parameter, &Descriptor);
@@ -206,7 +207,7 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
                     size_t const Size = strlen(TextureName) + 1;
                     char* const Copy = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, Size));
                     memcpy(Copy, TextureName, Size);
-                    Value.Payload0 = reinterpret_cast<unsigned long>(Copy);
+                    Value.Payload0 = fl::PtrToHandle(Copy);
                 }
                 Material->SetParameterValue(Parameter, &Value); // slot 19 (+0x4c)
                 bFound = true;

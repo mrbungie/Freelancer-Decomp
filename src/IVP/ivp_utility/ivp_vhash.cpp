@@ -429,7 +429,7 @@ void IVP_VHash_Store::Rehash(int param_1) // formerly extern "C" FUN_06352650
 // insert (key, value), tagging the hash as "generated" (top bit set).
 void IVP_VHash_Store::AddElem(void* param_1, void* param_2) // formerly extern "C" FUN_063526d0
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash = HashKey_063edcdc((unsigned)(intptr_t)(param_1)) | 0x80000000;
     AddElem(param_1, param_2, hash);
 }
 
@@ -485,7 +485,7 @@ void IVP_VHash_Store::AddElem(void* param_1, void* param_2, unsigned param_3) //
 // ABI level, so this is typed to return it too rather than discard it.
 void* IVP_VHash_Store::RemoveElem(void* param_1) // formerly extern "C" FUN_063527e0
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash = HashKey_063edcdc((unsigned)(intptr_t)(param_1)) | 0x80000000;
     return RemoveElem(param_1, hash);
 }
 
@@ -568,7 +568,7 @@ void* IVP_VHash_Store::RemoveElem(void* param_1, unsigned param_2) // formerly e
 // the retail ABI level -- typed accordingly.
 void* IVP_VHash_Store::FindElem(void* param_1) // formerly extern "C" FUN_06352930
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash = HashKey_063edcdc((unsigned)(intptr_t)(param_1)) | 0x80000000;
     return FindElem(param_1, hash);
 }
 
@@ -606,7 +606,7 @@ void* IVP_VHash_Store::FindElem(void* param_1, unsigned param_2) // formerly ext
 // reference count once the pair is already registered.
 void IVP_VHash_Store::ChangeElem(void* param_1, void* param_2) // formerly extern "C" FUN_063529e0
 {
-    unsigned crc = HashKey_063edcdc((unsigned)param_1);
+    unsigned crc = HashKey_063edcdc((unsigned)(intptr_t)(param_1));
     if (Size > 0)
     {
         unsigned hash = crc | 0x80000000;

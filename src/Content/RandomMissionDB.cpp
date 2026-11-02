@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "RandomMissionDB.h"
+#include "fl/handles.h"
 
 #include "RandomMission.h"
 #include "RandomMissionObject.h"
@@ -126,7 +127,7 @@ void __cdecl LoadRankDifficulties(INI_Reader* Reader)
     // 06f4aa89 writes the matched value into the stack slot of param_1 and 06f4aa90 reads
     // it back for every line: a name missing from the table therefore reuses the previous
     // line's stage, and the very first line reuses the INI_Reader pointer bits.
-    int LastStage = static_cast<int>(reinterpret_cast<intptr_t>(Reader));
+    int LastStage = static_cast<int>(fl::PtrToHandle(Reader));
 
     while (Reader->read_header())
     {

@@ -13,6 +13,7 @@
 // run shows the press arriving.
 
 #include "hud_target.h"
+#include "fl/handles.h"
 
 #include "character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830)
 #include "chat_init.h"              // ChatFindPlayerName (FUN_0046b400), ChatAcquireEntry, ...
@@ -142,14 +143,14 @@ namespace
         return Gameobj->bWatchListed;
     }
 
-    void* InstanceFromIndex(long Index)
+    void* InstanceFromIndex(int32_t Index)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Index)));
     }
 
     void* NoInstance()
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     void SetFlagBits(WinControl* Control)
@@ -1032,7 +1033,7 @@ void HudTarget::Slot16()
         if (WatchedObjRw(HUDItem::Target) != nullptr && WatchedObjRw(ViewObject) != nullptr &&
             ShipName != nullptr && SubtargetName != nullptr)
         {
-            unsigned long Colour = 0;
+            uint32_t Colour = 0;
             HudReputationColor(&Colour, WatchedObjRw(HUDItem::Target), WatchedObjRw(ViewObject));
             ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
             SubtargetName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
@@ -1854,7 +1855,7 @@ void HudTarget::UpdateButtons(bool bFull)
         {
             // 0x004e2352..0x004e23a8: FUN_0045a4e0(&colour, player, view), then
             // SetProperty(0x33, &colour, 1) on both labels.
-            unsigned long Colour = 0;
+            uint32_t Colour = 0;
             HudReputationColor(&Colour, WatchedObjRw(HUDItem::Target), WatchedObjRw(ViewObject));
             ShipName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
             SubtargetName->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), 1);
@@ -2073,7 +2074,7 @@ void HudTarget::SelectNextSubTarget()
     RebuildSubTargets(&SubTargets); // 0x004e4c20: rebuilt once more before the walk
     unsigned short Key = SUBOBJ_ID_NONE;
     int Index = 0;
-    for (std::map<unsigned short, long>::const_iterator It = SubTargets.begin();
+    for (std::map<unsigned short, int32_t>::const_iterator It = SubTargets.begin();
          It != SubTargets.end(); ++It)
     {
         if (Index == Wanted)
@@ -2116,7 +2117,7 @@ void HudTarget::SelectPreviousSubTarget()
     RebuildSubTargets(&SubTargets);
     unsigned short Key = SUBOBJ_ID_NONE;
     int Index = 0;
-    for (std::map<unsigned short, long>::const_iterator It = SubTargets.begin();
+    for (std::map<unsigned short, int32_t>::const_iterator It = SubTargets.begin();
          It != SubTargets.end(); ++It)
     {
         if (Index == Wanted)
@@ -2138,7 +2139,7 @@ void HudTarget::SelectPreviousSubTarget()
     SpaceSendCommand(&Command);
 }
 
-int HudTarget::RebuildSubTargets(std::map<unsigned short, long>* Map)
+int HudTarget::RebuildSubTargets(std::map<unsigned short, int32_t>* Map)
 {
     // FUN_004e4dd0: erase all, then for a CEqObj view every collision group (key = the group's
     // CollisionGroup id -- the inlined [+4]+4 of CArchGroup::GetID -- value = GetRootIndex) and
@@ -2228,7 +2229,7 @@ void HudTarget::NextHardpointScreenPos(float* OutScreen)
     char const* const Name = HardpointNames[static_cast<size_t>(Index)].c_str();
 
     IObjRW* const View = WatchedObjRw(ViewObject);
-    long Instance = -1;
+    int32_t Instance = -1;
     HardpointInfo Info;
     if (!FindHardpoint_OS(View->get_index(), Name, Instance, Info))
     {

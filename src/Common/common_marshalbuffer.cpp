@@ -9,6 +9,7 @@
 // EquipDescList / GoodDescList members (formerly common_goods.cpp).
 
 #include "common_net.h"
+#include "wire_wchar.h"
 #include "common_text.h"  // FmtStr -- complete type for put_FmtStr / get_FmtStr
 #include "common_goods.h" // EquipDescList, GoodDescList, GoodDesc
 #include "common_ini.h"   // StringAlloc -- get_EquipDescList's hardpoint names
@@ -186,14 +187,14 @@ unsigned short MarshalBuffer::get_U16()
     return V;
 }
 
-void MarshalBuffer::put_U32(unsigned long Value)
+void MarshalBuffer::put_U32(uint32_t Value)
 {
     put_void(&Value, 4);
 }
 
-unsigned long MarshalBuffer::get_U32()
+uint32_t MarshalBuffer::get_U32()
 {
-    unsigned long V = (unsigned long)(std::uintptr_t)this;
+    uint32_t V = (uint32_t)(std::uintptr_t)this;
     get_void(&V, 4);
     return V;
 }
@@ -217,7 +218,7 @@ void MarshalBuffer::put_float(float Value)
 
 float MarshalBuffer::get_float()
 {
-    unsigned long Bits = (unsigned long)(std::uintptr_t)this;
+    uint32_t Bits = (uint32_t)(std::uintptr_t)this;
     get_void(&Bits, 4);
     float V;
     memcpy(&V, &Bits, sizeof(V));
@@ -379,8 +380,12 @@ wchar_t* MarshalBuffer::get_wstring()
     if (CharLen == 0xFFFFFFFF || CharLen >= 0x4000)
         return nullptr;
 
-    wchar_t* Result = (wchar_t*)malloc(CharLen * 2 + 2);
-    get_void(Result, (int)(CharLen * 2));
+    wchar_t* Result = (wchar_t*)malloc(((size_t)CharLen + 1) * sizeof(wchar_t));
+    {   // wire format: 16-bit characters
+        std::vector<uint16_t> Wire((size_t)CharLen + 1, 0);
+        get_void(Wire.data(), (int)(CharLen * 2));
+        for (unsigned int I = 0; I < CharLen; ++I) Result[I] = (wchar_t)Wire[I];
+    }
     Result[CharLen] = 0;
     return Result;
 }
@@ -393,8 +398,8 @@ void MarshalBuffer::put_image(const unsigned short& V) { put_void(&V, 2); }
 void MarshalBuffer::get_image(unsigned short* V)       { get_void(V, 2); }
 void MarshalBuffer::put_image(const int& V)            { put_void(&V, 4); }
 void MarshalBuffer::get_image(int* V)                  { get_void(V, 4); }
-void MarshalBuffer::put_image(const unsigned long& V)  { put_void(&V, 4); }
-void MarshalBuffer::get_image(unsigned long* V)        { get_void(V, 4); }
+void MarshalBuffer::put_image(const uint32_t& V)  { put_void(&V, 4); }
+void MarshalBuffer::get_image(uint32_t* V)        { get_void(V, 4); }
 void MarshalBuffer::put_image(const float& V)          { put_void(&V, 4); }
 void MarshalBuffer::get_image(float* V)                { get_void(V, 4); }
 
@@ -508,7 +513,7 @@ void MarshalBuffer::put_EquipDescList(const EquipDescList& List)
         put_string(Item.Hardpoint);
         put_int(Item.Count);
         put_float(Item.Health);
-        put_U32((unsigned long)Item.Id);
+        put_U32((uint32_t)Item.Id);
         put_U8(Item.bEquipped ? 1 : 0);
         put_U8(Item.bMission ? 1 : 0);
     }

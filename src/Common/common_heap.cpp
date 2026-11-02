@@ -29,7 +29,8 @@ void* Heap::Malloc()
         --CurrentFreeCount;
         return Block;
     }
-    return malloc(ElementSize);
+    // Retail element sizes are 32-bit object sizes; the host objects built in these blocks are wider (8-byte pointers).
+    return malloc(static_cast<size_t>(ElementSize) * 2u + 0x40u);
 }
 
 void Heap::Free(void* Ptr)

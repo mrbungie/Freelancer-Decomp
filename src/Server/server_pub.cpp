@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "../include/common_server.h"
+#include "fl/handles.h"
 #include "../include/common_pathfind.h" // PathfindManager (pub::AI::SubmitState)
 #include "../include/common_id.h"
 #include "../include/common_goods.h"
@@ -2258,7 +2259,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Entered.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffdf7
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffdf3
+            Event[1] = static_cast<unsigned int>(fl::PtrToHandle(Ph)); // .text:06cffdf3
             Event[2] = Ph->SystemId;                                     // .text:06cffe05
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomEnter, Event); // .text:06cffe09
         }
@@ -2267,7 +2268,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Left.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffe47
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffe43
+            Event[1] = static_cast<unsigned int>(fl::PtrToHandle(Ph)); // .text:06cffe43
             Event[2] = Ph->SystemId;                                     // .text:06cffe55
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomExit, Event); // .text:06cffe59
         }
@@ -3186,8 +3187,8 @@ SERVER_API int __cdecl GetScannerRange(unsigned int obj_id, int& radar_range, in
         cargo_scan_range = 0;
         return -3;
     }
-    radar_range = (int)(long)Scanner->GetRadarRange();
-    cargo_scan_range = (int)(long)Scanner->GetCargoScanRange();
+    radar_range = (int)(int32_t)Scanner->GetRadarRange();
+    cargo_scan_range = (int)(int32_t)Scanner->GetCargoScanRange();
     return 0;
 }
 
@@ -5521,7 +5522,7 @@ SERVER_API void __cdecl CharacterDestroy(unsigned int* handle) {
 
 // pub::GF::CharacterSetBehavior -- retail .text:06d17fe0 .. .text:06d17ff6: an
 // unconditional FUN_06d14ac0(BaseDB, param_1, param_2).
-SERVER_API void __cdecl CharacterSetBehavior(unsigned int character_id, unsigned long behavior_handle) {
+SERVER_API void __cdecl CharacterSetBehavior(unsigned int character_id, uint32_t behavior_handle) {
     GetBaseDB()->set_character_behavior(character_id, behavior_handle);
 }
 
@@ -5530,7 +5531,7 @@ SERVER_API void __cdecl CharacterSetBehavior(unsigned int character_id, unsigned
 // pub::GF::CharacterBehaviorCreate -- retail .text:06d18000 .. .text:06d18089: a
 // local ScriptBehavior, init(description), FUN_06d14b70(BaseDB, &sb,
 // description+0x25c = the session filter), the destructor, the handle.
-SERVER_API unsigned long __cdecl CharacterBehaviorCreate(const CharacterBehaviorDescription& description) {
+SERVER_API uint32_t __cdecl CharacterBehaviorCreate(const CharacterBehaviorDescription& description) {
     ScriptBehavior Behavior;
     Behavior.init(description);
     return GetBaseDB()->create_behavior(Behavior, description.Filter);
@@ -5538,7 +5539,7 @@ SERVER_API unsigned long __cdecl CharacterBehaviorCreate(const CharacterBehavior
 
 // pub::GF::CharacterBehaviorDestroy -- retail .text:06d18090 .. .text:06d180b0:
 // `CMP [param_1],-1 / JZ out`, FUN_06d14cc0(BaseDB, *param_1), *param_1 = -1.
-SERVER_API void __cdecl CharacterBehaviorDestroy(unsigned long* handle) {
+SERVER_API void __cdecl CharacterBehaviorDestroy(uint32_t* handle) {
     if (*handle != 0xFFFFFFFF) {
         GetBaseDB()->destroy_behavior(*handle);
         *handle = 0xFFFFFFFF;
@@ -5606,7 +5607,7 @@ SERVER_API const char* __cdecl GetCharacterPlacementName(unsigned int location_i
 // FUN_06d127b0 + offset 0x34: reads occupancy from placement struct
 // CharPlaceInfo+0x34 is CharType (-1=none, 0=npc, 1=pc, 2=rpc; see common_goods.h and
 // RoomData::read_set_script's Setpoints->CharacterPlacements derivation in common_roomdata.cpp).
-SERVER_API unsigned long __cdecl GetCharacterPlacementOccupancy(unsigned int location_id, int index) {
+SERVER_API uint32_t __cdecl GetCharacterPlacementOccupancy(unsigned int location_id, int index) {
     // .text:06d1818c FUN_06d127b0 (unchecked `placements[index]`) then
     // .text:06d18191 `MOV EAX,[EAX+0x34]`. Bounds/null guards removed 2026-09-24.
     // FUN_06d14170 (find_location; a miss FDUMPs 'Location %u is invalid'),
@@ -5614,13 +5615,13 @@ SERVER_API unsigned long __cdecl GetCharacterPlacementOccupancy(unsigned int loc
     FRoomEntry* Entry = GetBaseDB()->find_location(location_id);
     if (!Entry) return 0;
     RoomData* room = Entry->Data;
-    return (unsigned long)room->CharacterPlacements[index]->CharType;
+    return (uint32_t)room->CharacterPlacements[index]->CharType;
 }
 
 // pub::GF::GetCharacterPlacementPosture — retail 0x381a0
 // FUN_06d127b0 + offset 0x38: reads posture from placement struct
 // CharPlaceInfo+0x38 is Posture (0=stand, 1=sitlow, 2=sithigh, 3=special, -1=unset).
-SERVER_API int __cdecl GetCharacterPlacementPosture(unsigned int location_id, int index, unsigned long& out_posture) {
+SERVER_API int __cdecl GetCharacterPlacementPosture(unsigned int location_id, int index, uint32_t& out_posture) {
     // Retail 0x06d181a0-0x06d181d5 has no guard on param_3; the port's
     // `if (!out_posture) return -2;` tested the REFERENCE'S VALUE (same defect as
     // GetCharacterPlacementByName above) and short-circuited every zero-initialised
@@ -5632,7 +5633,7 @@ SERVER_API int __cdecl GetCharacterPlacementPosture(unsigned int location_id, in
     FRoomEntry* Entry = GetBaseDB()->find_location(location_id);
     if (!Entry) return -2;
     RoomData* room = Entry->Data;
-    out_posture = (unsigned long)room->CharacterPlacements[index]->Posture;
+    out_posture = (uint32_t)room->CharacterPlacements[index]->Posture;
     return 0;
 }
 
@@ -5717,7 +5718,7 @@ SERVER_API const char* __cdecl FormCharacterPlacementName(SetpointProperties con
 // pub::GF::MissionVendorOfferCreate -- retail .text:06d18310 .. .text:06d18384:
 // local MissionVendorProperties, init(description), FUN_06d14dc0(BaseDB, &props,
 // description+0x5c = the session filter), the destructor, the handle.
-SERVER_API unsigned long __cdecl MissionVendorOfferCreate(const MissionVendorOfferDescription& description) {
+SERVER_API uint32_t __cdecl MissionVendorOfferCreate(const MissionVendorOfferDescription& description) {
     MissionVendorProperties Props;
     Props.init(description);
     return GetBaseDB()->create_mission_vendor(Props, description.Filter);
@@ -5725,7 +5726,7 @@ SERVER_API unsigned long __cdecl MissionVendorOfferCreate(const MissionVendorOff
 
 // pub::GF::MissionVendorOfferDestroy -- retail .text:06d18390: `CMP [p],-1`,
 // FUN_06d14f10(BaseDB, *p), *p = -1.
-SERVER_API void __cdecl MissionVendorOfferDestroy(unsigned long* handle) {
+SERVER_API void __cdecl MissionVendorOfferDestroy(uint32_t* handle) {
     if (*handle != 0xFFFFFFFF) {
         GetBaseDB()->destroy_mission_vendor(*handle);
         *handle = 0xFFFFFFFF;
@@ -5740,7 +5741,7 @@ SERVER_API int __cdecl GetMissionVendorOfferCount(unsigned int base_id, unsigned
 
 // pub::GF::MissionVendorAcceptance -- retail .text:06d183e0 .. .text:06d18400: an
 // unconditional FUN_06d150a0(BaseDB, param_1, param_2, param_3, param_4).
-SERVER_API void __cdecl MissionVendorAcceptance(unsigned long handle, bool accepted, const FmtStr& reason_fmtstr, unsigned int session_id) {
+SERVER_API void __cdecl MissionVendorAcceptance(uint32_t handle, bool accepted, const FmtStr& reason_fmtstr, unsigned int session_id) {
     GetBaseDB()->mission_vendor_acceptance(handle, accepted, reason_fmtstr, session_id);
 }
 
@@ -5766,7 +5767,7 @@ SERVER_API int __cdecl ReportWhyMissionVendorEmpty(unsigned int client_id, MVEmp
 // pub::GF::NewsBroadcastCreate -- retail .text:06d18430: local
 // NewsBroadcastProperties, init(description), FUN_06d15140(BaseDB, &props,
 // description+0x5c = the session filter), the destructor, the handle.
-SERVER_API unsigned long __cdecl NewsBroadcastCreate(const NewsBroadcastDescription& description) {
+SERVER_API uint32_t __cdecl NewsBroadcastCreate(const NewsBroadcastDescription& description) {
     NewsBroadcastProperties Props;
     Props.init(description);
     return GetBaseDB()->create_news_broadcast(Props, description.Filter);
@@ -5774,7 +5775,7 @@ SERVER_API unsigned long __cdecl NewsBroadcastCreate(const NewsBroadcastDescript
 
 // pub::GF::NewsBroadcastDestroy -- retail .text:06d184b0: `CMP [p],-1`,
 // FUN_06d15290(BaseDB, *p), *p = -1.
-SERVER_API void __cdecl NewsBroadcastDestroy(unsigned long* handle) {
+SERVER_API void __cdecl NewsBroadcastDestroy(uint32_t* handle) {
     if (*handle != 0xFFFFFFFF) {
         GetBaseDB()->destroy_news_broadcast(*handle);
         *handle = 0xFFFFFFFF;
@@ -5786,7 +5787,7 @@ SERVER_API void __cdecl NewsBroadcastDestroy(unsigned long* handle) {
 // pub::GF::AmbientScriptCreate -- retail .text:06d184e0 .. .text:06d18554: local
 // AmbientScriptProperties, init(description), FUN_06d15390(BaseDB, &props,
 // description+0x10 = the session filter), the destructor, the handle.
-SERVER_API unsigned long __cdecl AmbientScriptCreate(const AmbientScriptDescription& description) {
+SERVER_API uint32_t __cdecl AmbientScriptCreate(const AmbientScriptDescription& description) {
     AmbientScriptProperties Props;
     Props.init(description);
     return GetBaseDB()->create_ambient_script(Props, description.Filter);
@@ -5794,7 +5795,7 @@ SERVER_API unsigned long __cdecl AmbientScriptCreate(const AmbientScriptDescript
 
 // pub::GF::AmbientScriptDestroy -- retail .text:06d18560 .. .text:06d18580:
 // `CMP [p],-1`, FUN_06d15510(BaseDB, *p), *p = -1.
-SERVER_API void __cdecl AmbientScriptDestroy(unsigned long* handle) {
+SERVER_API void __cdecl AmbientScriptDestroy(uint32_t* handle) {
     if (*handle != 0xFFFFFFFF) {
         GetBaseDB()->destroy_ambient_script(*handle);
         *handle = 0xFFFFFFFF;
@@ -6572,7 +6573,7 @@ SERVER_API bool __cdecl Intersect(unsigned int zone_id, const Vector& start, con
 
 // pub::Zone::GetProperties — retail 0x1bbe0
 // get_zone(id) → vtable+0x1c → ulong flags
-SERVER_API int __cdecl GetProperties(unsigned int zone_id, unsigned long& out_props) {
+SERVER_API int __cdecl GetProperties(unsigned int zone_id, uint32_t& out_props) {
     // Retail 0x06cfbbe0 has no guard on the out-param at all; an earlier port carried
     // `if (!out_props) return -2;`, which -- out_props being a REFERENCE -- tested the
     // caller's current *value* and bailed out whenever it happened to be 0. Removed.
@@ -6580,7 +6581,7 @@ SERVER_API int __cdecl GetProperties(unsigned int zone_id, unsigned long& out_pr
     Universe::IZone const* zone = Universe::get_zone(zone_id);
     if (zone != nullptr) {
         // Line 21647: vtable+0x1c → PropertyFlags
-        out_props = (unsigned long)zone->PropertyFlags;
+        out_props = (uint32_t)zone->PropertyFlags;
         return 0;
     }
     // Line 21651: return -2
@@ -6730,7 +6731,7 @@ SERVER_API int __cdecl GetName(unsigned int system_id, unsigned int& out_name_id
 //   06cfb88b .. 06cfb89b  sys = Universe::get_system(system_id); null -> -2
 //   06cfb89d .. 06cfb8be  a 16-byte stack sphere {position, radius 0}
 //   06cfb8c6 .. 06cfb8cd  out_props = ISystem slot 9 (vt+0x24)(&sphere); return 0
-SERVER_API int __cdecl GetNestedProperties(const unsigned int& system_id, const Vector& position, unsigned long& out_props) {
+SERVER_API int __cdecl GetNestedProperties(const unsigned int& system_id, const Vector& position, uint32_t& out_props) {
     Universe::ISystem const* sys = Universe::get_system(system_id);
     if (!sys) return -2;
     Geometry::Sphere Query;
@@ -7994,7 +7995,7 @@ SERVER_API int __cdecl FindHardpoint(char const* Name, unsigned int ShipArchId,
 {
     Archetype::Ship* ShipArch = Archetype::GetShip(ShipArchId);
     char const* DaPath = ShipArch->DaArchetype.Value;
-    long EngineIndex = static_cast<long>(ShipArchId);
+    int32_t EngineIndex = static_cast<int32_t>(ShipArchId);
     bool bLoaded = Archetype::Load(DaPath, &EngineIndex, nullptr);
     if (!bLoaded)
         return -2;

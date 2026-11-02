@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "font_atlas.h"
+#include "fl/text.h"
 
 #include "font.h"
 #include "font_imp.h"
@@ -24,11 +25,7 @@ namespace
 {
 
 // Retail DAT_00616654..6c — shared GDI scratch for glyph upload.
-HBITMAP G_AtlasBitmap = nullptr;   // DAT_00616654
-HGDIOBJ G_AtlasPrevObj = nullptr;  // DAT_00616658
 unsigned short* G_AtlasBits = nullptr; // DAT_0061665c
-BITMAPINFO* G_AtlasBmi = nullptr;  // DAT_00616660
-HDC G_AtlasDc = nullptr;           // DAT_00616664
 // DAT_00616668 / DAT_0061666c are 0 in the PE; FUN_00412670 (the scratch object's +0x14 / +0x18,
 // thiscall on DAT_00616654) is their only writer and sets both to 0x100.
 unsigned G_AtlasMaxW = 0;          // DAT_00616668
@@ -92,7 +89,7 @@ FFontAtlasPage* CreateAtlasPage(unsigned NeedW, unsigned NeedH)
     memset(Page, 0, sizeof(*Page));
 
     // 0x00412d1f..0x00412d3c: FUN_005b7050 -- the id of a 16-bit 5/5/5/1 format.
-    unsigned long Format = 0;
+    uint32_t Format = 0;
     PixelFormatFind(&Format, 0x10, 5, 5, 5, 1);
 
     // 0x00412d41..0x00412dcb: both sizes to a power of two (x > 0x40 ? 0x80 : 1, doubled until
@@ -121,67 +118,15 @@ FFontAtlasPage* CreateAtlasPage(unsigned NeedW, unsigned NeedH)
     return Page;
 }
 
-// FUN_00412cb0 -- the font selection FUN_004127d0 holds over its draw loop ([ESP+0x40] = DC,
-// [ESP+0x44] = the previously selected object, built at 00412a0f..00412a21). Its destructor
-// runs inline on the normal exit (00412c86..00412c90) and as the EH unwind funclet
-// (005b87f0: LEA ECX,[EBP-0x38]; JMP FUN_00412cb0).
-struct FAtlasFontSelection
-{
-    HDC Dc;
-    HGDIOBJ Previous;
-
-    FAtlasFontSelection(HDC InDc, HGDIOBJ Font)
-        : Dc(InDc)
-        , Previous(SelectObject(InDc, Font))
-    {
-    }
-
-    ~FAtlasFontSelection()
-    {
-        SelectObject(Dc, Previous);
-    }
-
-    FAtlasFontSelection(FAtlasFontSelection const&) = delete;
-    FAtlasFontSelection& operator=(FAtlasFontSelection const&) = delete;
-};
-
 } // namespace
 
 void FontAtlasEnsureScratch()
 {
-    // FUN_00412670 (thiscall on DAT_00616654, RET 4 with DALib::Pipeline, which it never reads).
-    // Its only caller is FUN_004180c0, which deletes the previous objects first: there is no
-    // lazy latch and no allocation check. Only the 0x28-byte header is zeroed (STOSD x 0xa at
-    // 0041269c); the pixel area is left as malloc returns it.
+    // FUN_00412670. The scratch image text is rasterized into before it is copied to the page textures: 256 x 256
+    // 16-bit pixels (retail: a GDI memory DC with a compatible bitmap and a 16-bit DIB block).
     G_AtlasMaxW = 256;
     G_AtlasMaxH = 256;
-
-    void* Block = std::malloc(0x20028u);
-    memset(Block, 0, 0x28u);
-    G_AtlasBmi = static_cast<BITMAPINFO*>(Block);
-    G_AtlasBits = reinterpret_cast<unsigned short*>(static_cast<unsigned char*>(Block) + 0x28);
-
-    BITMAPINFOHEADER& Hdr = G_AtlasBmi->bmiHeader;
-    Hdr.biSize = sizeof(BITMAPINFOHEADER);
-    Hdr.biWidth = static_cast<LONG>(G_AtlasMaxW);
-    Hdr.biHeight = -static_cast<LONG>(G_AtlasMaxH);
-    Hdr.biPlanes = 1;
-    Hdr.biBitCount = 16;
-    Hdr.biCompression = BI_RGB;
-    Hdr.biSizeImage = 0x20000;
-
-    HDC Screen = GetDC(nullptr);
-    G_AtlasDc = CreateCompatibleDC(Screen);
-    G_AtlasBitmap = CreateCompatibleBitmap(Screen, static_cast<int>(G_AtlasMaxW),
-                                           static_cast<int>(G_AtlasMaxH));
-    GetDIBits(G_AtlasDc, G_AtlasBitmap, 0, 1, nullptr, G_AtlasBmi, DIB_RGB_COLORS);
-    ReleaseDC(nullptr, Screen);
-
-    G_AtlasPrevObj = SelectObject(G_AtlasDc, G_AtlasBitmap);
-    SetTextAlign(G_AtlasDc, TA_LEFT | TA_TOP);
-    SetBkColor(G_AtlasDc, RGB(0, 0, 0));
-    SetBkMode(G_AtlasDc, TRANSPARENT);
-    SetTextColor(G_AtlasDc, RGB(255, 255, 255));
+    G_AtlasBits = static_cast<unsigned short*>(std::calloc(static_cast<size_t>(G_AtlasMaxW) * G_AtlasMaxH, 2));
 }
 
 void FontDeviceReset()
@@ -204,11 +149,8 @@ void FontDeviceReset()
 void FontAtlasReleaseScratch()
 {
     // 00418119..0041815a (FUN_004180c0) / 004174a0..004174e6 (FUN_004174a0).
-    std::free(G_AtlasBmi);
-    G_AtlasBmi = nullptr;
-    SelectObject(G_AtlasDc, G_AtlasPrevObj);
-    DeleteObject(G_AtlasBitmap);
-    DeleteDC(G_AtlasDc);
+    std::free(G_AtlasBits);
+    G_AtlasBits = nullptr;
 }
 
 void FontAtlasReleasePagePool()
@@ -282,6 +224,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     // 004127ec..004127fb: no font (+0x0c) -> 0.
     if (This->Font_ == nullptr)
     {
+        if (getenv("FL_TRACE_FONT")) fprintf(stderr, "[fl] font: rasterize with NO font\n");
         return 0;
     }
 
@@ -293,6 +236,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     This->GetSize(Size);
     int const RawW = Size[0];
     int const RawH = Size[1];
+    if (getenv("FL_TRACE_FONT")) fprintf(stderr, "[fl] font: rasterize size=%dx%d text='%ls'\n", RawW, RawH, This->Text_ ? This->Text_ : L"(null)");
     unsigned CheckW = static_cast<unsigned>(RawW);
     unsigned CheckH = static_cast<unsigned>(RawH);
 
@@ -404,8 +348,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
     // the RAII selection until the end.
     unsigned char bOk = 1;
     FFontAtlasPage* Row = This->GlyphHead_; // [ESP+0x20]
-    HFONT const Font = This->Font_->Slot03();
-    FAtlasFontSelection const Selection(G_AtlasDc, Font);
+    fl::text::IFont* const Font = static_cast<fl::text::IFont*>(This->Font_->Slot03());
 
     // 00412a44..00412c6a: the raw extents walk the grid -- row count and column count follow
     // the extents alone (no null test on the page links).
@@ -424,25 +367,16 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
             {
                 TileW = static_cast<unsigned>(LeftW);
             }
-            // 00412a82..00412aa9: the used size (+0x18 / +0x1c) and the clip rect {0,0,w,h}.
+            // 00412a82..00412aa9: the used size (+0x18 / +0x1c).
             int const SrcX = Page->SrcX;
             int const SrcY = Page->SrcY;
             Page->UsedW = TileW;
             Page->UsedH = TileH;
-            RECT Clip;
-            Clip.left = 0;
-            Clip.top = 0;
-            Clip.right = static_cast<LONG>(TileW);
-            Clip.bottom = static_cast<LONG>(TileH);
 
-            // 00412a98..00412ad4: ExtTextOutW (through the unicows thunk FUN_005b7420) at the
-            // negated offset, option 2 (ETO_OPAQUE), the text (+4) with its wcslen (0 for null).
-            UINT const Length =
-                This->Text_ != nullptr ? static_cast<UINT>(wcslen(This->Text_)) : 0u;
-            if (ExtTextOutW(G_AtlasDc, -SrcX, -SrcY, ETO_OPAQUE, &Clip, This->Text_, Length,
-                            nullptr) == FALSE)
+            // 00412a98..00412ad4: rasterize the text at the negated offset into the scratch image (retail: ExtTextOutW
+            // on the scratch DC followed by GetDIBits).
+            if (Font == nullptr || G_AtlasBits == nullptr)
             {
-                // 00412ade..00412c2a
                 FDUMP(0x100002, "%s(%d) : *** WARNING: %s",
                       "E:\\FL\\Scratch\\Source\\Client\\cmn\\Font.cpp", 0x329,
                       "FontString - ExtTextOutW failed.\n");
@@ -450,18 +384,16 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
             }
             else if (bOk != 0)
             {
-                // 00412af9..00412b47: the scratch bitmap is deselected for GetDIBits over the
-                // full scratch height (DAT_0061666c) into the DIB block, then selected again.
-                SelectObject(G_AtlasDc, G_AtlasPrevObj);
-                GetDIBits(G_AtlasDc, G_AtlasBitmap, 0, G_AtlasMaxH, G_AtlasBits, G_AtlasBmi,
-                          DIB_RGB_COLORS);
-                SelectObject(G_AtlasDc, G_AtlasBitmap);
+                if (getenv("FL_TRACE_FONT")) fprintf(stderr, "[fl] font: draw text '%ls' tile %ux%u src(%d,%d)\n", This->Text_ ? This->Text_ : L"", TileW, TileH, SrcX, SrcY);
+                Font->DrawGlyphs16(This->Text_, This->Text_ != nullptr ? static_cast<int>(wcslen(This->Text_)) : 0,
+                                   -SrcX, -SrcY, G_AtlasBits, static_cast<int>(G_AtlasMaxW),
+                                   static_cast<int>(G_AtlasMaxH), static_cast<int>(G_AtlasMaxW));
                 unsigned short const* Source = G_AtlasBits;
 
                 // 00412b4f..00412b72: DALib::Pipeline vt+0xc0 LockTexture(page +0, 0, &out);
                 // only out+0x10 is seeded, with FUN_005b7010(0). out+8 = pitch, out+0xc = bits.
-                unsigned long LockOut[5];
-                LockOut[4] = static_cast<unsigned long>(PixelFormatFromD3D(0));
+                uint32_t LockOut[5];
+                LockOut[4] = static_cast<uint32_t>(PixelFormatFromD3D(0));
                 IRenderPipeline* const Pipeline =
                     DALib::Pipeline;
                 if (Pipeline->LockTexture(Page->Texture, 0, LockOut) != GR_OK)
@@ -476,7 +408,7 @@ unsigned char FontAtlasRasterize(FontStringChild* This, unsigned char bSkipSizeC
                 {
                     // 00412b80..00412beb: every pixel of the tile with bit 15 set when non-zero;
                     // the source row advances by DAT_00616668 pixels, the destination by pitch.
-                    unsigned long const Pitch = LockOut[2];
+                    uint32_t const Pitch = LockOut[2];
                     unsigned char* DestRow = reinterpret_cast<unsigned char*>(LockOut[3]);
                     for (unsigned RowsLeft = TileH; RowsLeft != 0u; --RowsLeft)
                     {

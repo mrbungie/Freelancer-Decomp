@@ -735,8 +735,8 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_GENERIC;
     }
 
-    unsigned long DACOM_API AddRef() override { return 1; }
-    unsigned long DACOM_API Release() override { return 1; }
+    uint32_t DACOM_API AddRef() override { return 1; }
+    uint32_t DACOM_API Release() override { return 1; }
 
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
     {
@@ -748,7 +748,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         if (Info == nullptr || Info->InterfaceName == nullptr)
             return GR_INVALID_PARMS;
 
-        if (Info->Size != sizeof(FMathDesc) ||
+        if (Info->Size != kRetailMathDescSize ||
             std::memcmp(Info->InterfaceName, G_ComponentName, G_ComponentNameBytes) != 0)
             return GR_INTERFACE_UNSUPPORTED;
 

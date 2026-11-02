@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "RandomMissionGen.h"
+#include "fl/handles.h"
 
 #include "ContentInternal.h"
 #include "ContentStaticIds.h"
@@ -826,7 +827,7 @@ char FRmObjectiveText::Parse(INI_Reader* Reader, unsigned int Index)
     else if (_stricmp(Name, "jettison_loot") == 0)
         Objective = 0xd;
     else
-        Objective = static_cast<int>(reinterpret_cast<intptr_t>(this));
+        Objective = static_cast<int>(fl::PtrToHandle(this));
 
     std::pair<std::map<int, FRmParamText>::iterator, bool> Inserted =
         Texts.insert(std::make_pair(Objective, FRmParamText()));
@@ -2394,7 +2395,7 @@ bool FRmDestroySolarsFilter::FillSolarSpawns(FRmOfferQuery const* Query,
     if (Formation == nullptr)
         return false;
 
-    unsigned long NestedProps = 0;
+    uint32_t NestedProps = 0;
     pub::System::GetNestedProperties(Query->DestSys, Query->ObjectivePos, NestedProps);
 
     std::vector<std::pair<FRmKillableSolar*, float>> Entries;
@@ -2946,7 +2947,7 @@ bool FRmAssassinateFilter::FillDefensiveSolars(FRmOfferQuery const* Query,
     if (Formation == nullptr)
         return false;
 
-    unsigned long NestedProps = 0;
+    uint32_t NestedProps = 0;
     pub::System::GetNestedProperties(Query->DestSys, Query->ObjectivePos, NestedProps);
 
     std::vector<std::pair<FRmKillableSolar*, float>> Entries;

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_sound.h"
+#include "fl/handles.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
 #include "common_id.h"   // CreateID
@@ -206,7 +207,7 @@ void FThornSound::ResolveVoice(void* VoiceId, void* Actor)
     }
 
     unsigned int const MessageId = CreateID(MessageName);
-    unsigned int const Voice = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(VoiceId));
+    unsigned int const Voice = static_cast<unsigned int>(fl::PtrToHandle(VoiceId));
     FVoiceProfile* const Profile = LookupClientVoice(Voice);
     if (Profile == nullptr)
     {
@@ -454,7 +455,7 @@ void FThornSound::SetSpawnTable(FThornComponent** Table, int Count)
 // FUN_00450870.
 void* FThornSound::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // LAB_00457630 (identity). Fade = FUN_0042adf0 (DAT_0066d2d0 +0x10), zero for a background
@@ -559,7 +560,7 @@ void FThornPlayerEngineSound::Stop()
 // FUN_00450870.
 void* FThornPlayerEngineSound::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // ---------------------------------------------------------------------------------------

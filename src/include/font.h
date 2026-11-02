@@ -32,7 +32,7 @@ public:
     virtual float GetFixedHeight() = 0;
     // +0x0c LAB_00416570 -- the autoscale prelude, then the realized HFONT (+0x118). The glyph
     // atlas rasterizer selects it into its scratch DC (FUN_004127d0, 0x00412a0c).
-    virtual HFONT__* Slot03() = 0;
+    virtual void* Slot03() = 0;   // the realized fl::text::IFont*
     // +0x10 LAB_00416820 -- the autoscale prelude, then &this+0xdc, the LOGFONTA the face was
     // built from (`LEA EAX,[EBP+0xdc]` at 0x00416abe). FLImeInputBox (FUN_00564280, 0x005642bc)
     // hands it to IMEInputBox's constructor.

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "readfile.h"
+#include "fl/handles.h"
 
 #include <cctype>
 #include <cstdarg>
@@ -23,27 +24,27 @@ int CallDacomStricmp(const char* Left, const char* Right);
 namespace
 {
 
-    const unsigned long kGenericRead = 0x80000000u;
-    const unsigned long kGenericWrite = 0x40000000u;
-    const unsigned long kOpenExisting = 3;
+    const uint32_t kGenericRead = 0x80000000u;
+    const uint32_t kGenericWrite = 0x40000000u;
+    const uint32_t kOpenExisting = 3;
 
     class FDosFileSystem;
     FDosFileSystem* G_DosFactory = nullptr; // DAT_06b7a224
     CRITICAL_SECTION* G_DosRootLock = nullptr;
     ICOManager* G_Dacom = nullptr;          // DAT_06b7a220
 
-    int InvokeDosRootLockedCall(unsigned long Arg0, unsigned long Callback, unsigned long Arg1)
+    int InvokeDosRootLockedCall(uint32_t Arg0, uint32_t Callback, uint32_t Arg1)
     {
         // FUN_06b76410: lock DAT_06b7a224+0x154, stdcall Callback(Arg0, Arg1)
         // unconditionally, unlock, return its result.
-        typedef int(__stdcall* FLockedCall)(unsigned long, unsigned long);
+        typedef int(__stdcall* FLockedCall)(uint32_t, uint32_t);
         EnterCriticalSection(G_DosRootLock);
-        const int Result = ((FLockedCall)(Callback))(Arg0, Arg1);
+        const int Result = ((FLockedCall)fl::HandleToPtr((Callback)))(Arg0, Arg1);
         LeaveCriticalSection(G_DosRootLock);
         return Result;
     }
 
-    void CopyPath(char* Dest, unsigned long DestChars, const char* Source)
+    void CopyPath(char* Dest, uint32_t DestChars, const char* Source)
     {
         if (Dest == nullptr || DestChars == 0)
             return;
@@ -54,9 +55,9 @@ namespace
         Dest[DestChars - 1] = '\0';
     }
 
-    int CopyClampedPathSuffix(char* Out, unsigned long MaxChars, const char* Source)
+    int CopyClampedPathSuffix(char* Out, uint32_t MaxChars, const char* Source)
     {
-        unsigned long Count = (unsigned long)(std::strlen(Source));
+        uint32_t Count = (uint32_t)(std::strlen(Source));
         if (Count <= 2)
             Count = 2;
         if (Count >= MaxChars)
@@ -70,11 +71,11 @@ namespace
 
     // Retail DOS directory CreateInstance (LAB_06b746bf): cache strlen, drop one
     // trailing slash, write '\' there.
-    unsigned long SealDirectoryPathPrefix(char* Path, unsigned long PathChars)
+    uint32_t SealDirectoryPathPrefix(char* Path, uint32_t PathChars)
     {
         if (Path == nullptr || PathChars < 2)
             return 0;
-        unsigned long Len = (unsigned long)(std::strlen(Path));
+        uint32_t Len = (uint32_t)(std::strlen(Path));
         if (Len + 1 >= PathChars)
             Len = PathChars - 2;
         if (Len > 0 && (Path[Len - 1] == '\\' || Path[Len - 1] == '/'))
@@ -89,7 +90,7 @@ namespace
         return Value == '\\' || Value == '/';
     }
 
-    int JoinRoot(const char* Root, const char* Rel, char* Out, long OutChars)
+    int JoinRoot(const char* Root, const char* Rel, char* Out, int32_t OutChars)
     {
         // 06b75427: CMP EBP,2 / JG.
         if (OutChars <= 2)
@@ -104,7 +105,7 @@ namespace
         }
 
         // 06b7546b..06b75490: copy Root, failing once OutChars - 1 characters are used.
-        long Length = 0;
+        int32_t Length = 0;
         char Value = Root[0];
         while (Value != '\0')
         {
@@ -151,7 +152,7 @@ namespace
         }
 
         // 06b7552d..06b7555f: strncpy the tail into what is left, or terminate here.
-        const long Remaining = (long)((Out + OutChars) - Cursor);
+        const int32_t Remaining = (int32_t)((Out + OutChars) - Cursor);
         if (Remaining > 1)
         {
             std::strncpy(Cursor, Rel, (size_t)(Remaining));
@@ -238,7 +239,7 @@ namespace
         if (PatternDot == nullptr)
         {
             CopyPath(PreparedPattern, 264, Pattern);
-            const unsigned long Len = (unsigned long)(std::strlen(PreparedPattern));
+            const uint32_t Len = (uint32_t)(std::strlen(PreparedPattern));
             if (Len + 2 < 264)
             {
                 PreparedPattern[Len] = '.';
@@ -257,7 +258,7 @@ namespace
         CopyPath(PreparedName, 264, Name);
         if (std::strchr(Name, '.') == nullptr)
         {
-            const unsigned long Len = (unsigned long)(std::strlen(PreparedName));
+            const uint32_t Len = (uint32_t)(std::strlen(PreparedName));
             if (Len + 1 < 264)
             {
                 PreparedName[Len] = '.';
@@ -267,30 +268,30 @@ namespace
         return MatchUtfStarQuestion(PreparedName, PreparedPattern);
     }
 
-    const unsigned long kUtfMagic = 0x20465455u; // "UTF "
-    const unsigned long kUtfVersion = 0x101u;
-    const unsigned long kUtfHeaderSize = 0x38;
-    const unsigned long kUtfNode12 = 0x0C;
-    const unsigned long kUtfNode2C = 0x2C;
+    const uint32_t kUtfMagic = 0x20465455u; // "UTF "
+    const uint32_t kUtfVersion = 0x101u;
+    const uint32_t kUtfHeaderSize = 0x38;
+    const uint32_t kUtfNode12 = 0x0C;
+    const uint32_t kUtfNode2C = 0x2C;
 
     // On-disk UTF header (FUN_06b71190 / FUN_06b714f0 / LAB_06b71f50).
     // Only named fields have Ghidra evidence. Others stay unnamed.
     struct FUtfHeader
     {
-        unsigned long Magic;          // +0x00  0x20465455
-        unsigned long Version;        // +0x04  0x101
-        unsigned long TreeOffset;     // +0x08
-        unsigned long Unk0C;
-        unsigned long Unk10;
-        unsigned long NodeSize;       // +0x14  0x0C or 0x2C
-        unsigned long StringOffset;   // +0x18
-        unsigned long Unk1C;
-        unsigned long Unk20;
-        unsigned long DataOffset;     // +0x24  IDataBuffer+4 → view; Read uses view[+0x24]
-        unsigned long Unk28;
-        unsigned long Unk2C;
-        unsigned long Unk30;
-        unsigned long Unk34;
+        uint32_t Magic;          // +0x00  0x20465455
+        uint32_t Version;        // +0x04  0x101
+        uint32_t TreeOffset;     // +0x08
+        uint32_t Unk0C;
+        uint32_t Unk10;
+        uint32_t NodeSize;       // +0x14  0x0C or 0x2C
+        uint32_t StringOffset;   // +0x18
+        uint32_t Unk1C;
+        uint32_t Unk20;
+        uint32_t DataOffset;     // +0x24  IDataBuffer+4 → view; Read uses view[+0x24]
+        uint32_t Unk28;
+        uint32_t Unk2C;
+        uint32_t Unk30;
+        uint32_t Unk34;
     };
 
     // The UTF archive map: the local at [ESP+0x14..0x24] of LAB_06b72990 and the object's
@@ -300,8 +301,8 @@ namespace
         HANDLE File;           // +0x00  -1 when none
         HANDLE Mapping;        // +0x04
         void* View;            // +0x08
-        unsigned long Size;    // +0x0C
-        unsigned long Pos;     // +0x10
+        uint32_t Size;    // +0x0C
+        uint32_t Pos;     // +0x10
     };
 
     // FUN_06b72dd0 (thiscall on &Map->Mapping): with a mapping, unmap the view (if any,
@@ -324,9 +325,9 @@ namespace
         Map->Size = 0;
     }
 
-    unsigned long ReadUtfDword(const unsigned char* Base, unsigned long Offset)
+    uint32_t ReadUtfDword(const unsigned char* Base, uint32_t Offset)
     {
-        unsigned long Value = 0;
+        uint32_t Value = 0;
         std::memcpy(&Value, Base + Offset, sizeof(Value));
         return Value;
     }
@@ -336,7 +337,7 @@ namespace
     {
         bool bNode2C;
         const unsigned char* Node;   // +0x04
-        unsigned long Position;      // +0x08
+        uint32_t Position;      // +0x08
 
         // Slot 1: 06b73e50 (byte [node+8] >> 4 & 1) / 06b73e90 (node[0] >> 31).
         bool IsDirectory() const
@@ -347,13 +348,13 @@ namespace
         }
 
         // Slot 2: 06b73e30 (node +0x1c) / 06b73e70 (node +8).
-        unsigned long Size() const
+        uint32_t Size() const
         {
             return ReadUtfDword(Node, bNode2C ? 0x1Cu : 0x08u);
         }
 
         // Slot 3: 06b73e40 (node +0x10) / 06b73e80 (node +4).
-        unsigned long DataOffset() const
+        uint32_t DataOffset() const
         {
             return ReadUtfDword(Node, bNode2C ? 0x10u : 0x04u);
         }
@@ -365,7 +366,7 @@ namespace
         const unsigned char* Next;
         const unsigned char* Last;
         char Pattern[0x108];
-        unsigned long Remaining;
+        uint32_t Remaining;
     };
 
     // The first block is embedded; the walker owns and zero-initializes appended blocks.
@@ -385,8 +386,8 @@ namespace
         HANDLE File;
         HANDLE Mapping;
         void* View;
-        unsigned long Size;
-        unsigned long Pos;
+        uint32_t Size;
+        uint32_t Pos;
     };
 
     struct FDosMapToken
@@ -396,7 +397,7 @@ namespace
 
     // A packed UTF time (low word = DOS date, high word = DOS time) through
     // DosDateTimeToFileTime, as LAB_06b71e30 and LAB_06b71c70 do; the BOOL result is ignored.
-    void UtfPackedToFileTime(unsigned long Packed, FILETIME* Out)
+    void UtfPackedToFileTime(uint32_t Packed, FILETIME* Out)
     {
         DosDateTimeToFileTime((WORD)(Packed), (WORD)(Packed >> 16), Out);
     }
@@ -448,13 +449,13 @@ namespace
         }
 
         // Slot 2: LAB_06b714e0: +0x474.
-        unsigned long GetLastError() const
+        uint32_t GetLastError() const
         {
             return LastError;
         }
 
         // formerly Init
-        bool InitializeArchiveView(HANDLE File, const void* MapView, unsigned long MapSize)
+        bool InitializeArchiveView(HANDLE File, const void* MapView, uint32_t MapSize)
         {
             if (!bNode2C &&
                 ::GetFileTime(File, &ArchiveTimes[0], &ArchiveTimes[1], &ArchiveTimes[2]) == 0)
@@ -465,8 +466,8 @@ namespace
             View = Header;
             if (ReadUtfDword(Header, 0x14) != (bNode2C ? 0x2Cu : 0x0Cu))
                 return false;
-            const unsigned long TreeOffset = ReadUtfDword(Header, 0x08);
-            const unsigned long StringOffset = ReadUtfDword(Header, 0x18);
+            const uint32_t TreeOffset = ReadUtfDword(Header, 0x08);
+            const uint32_t StringOffset = ReadUtfDword(Header, 0x18);
             if (TreeOffset >= MapSize || StringOffset >= MapSize)
                 return false;
             const unsigned char* Tree = Header + TreeOffset;
@@ -477,7 +478,7 @@ namespace
 
         // Slot 6: LAB_06b71640 / LAB_06b720f0 (Path, Handle). Directory bit of the record the
         // path names (0x2C: byte [rec+8] & 0x10; 0x0C: bit 31 << 4), -1 when it is missing.
-        int GetAttributes(const char* Path, unsigned long BaseValue) const
+        int GetAttributes(const char* Path, uint32_t BaseValue) const
         {
             const unsigned char* Node = ResolveBase(BaseValue);
             if (Node == nullptr)
@@ -490,14 +491,14 @@ namespace
 
         // Slot 7: LAB_06b717a0: -1 -> false; true when Value is the address of a handle in the
         // list (released handles included).
-        bool IsValidHandle(unsigned long Value) const
+        bool IsValidHandle(uint32_t Value) const
         {
             if (Value == 0xFFFFFFFFu)
                 return false;
             std::list<FUtfHandle>::const_iterator It = Handles.begin();
             while (It != Handles.end())
             {
-                if ((unsigned long)(&*It) == Value)
+                if ((uint32_t)fl::PtrToHandle((&*It)) == Value)
                     return true;
                 ++It;
             }
@@ -505,14 +506,14 @@ namespace
         }
 
         // Slot 8: LAB_06b71790: -1 -> 0, anything else is taken as a handle address as is.
-        static FUtfHandle* HandleFromValue(unsigned long Value)
+        static FUtfHandle* HandleFromValue(uint32_t Value)
         {
             if (Value == 0xFFFFFFFFu)
                 return nullptr;
-            return (FUtfHandle*)(Value);
+            return (FUtfHandle*)fl::HandleToPtr((Value));
         }
 
-        FUtfHandle* Open(const char* Path, unsigned long BaseValue, unsigned long Extra)
+        FUtfHandle* Open(const char* Path, uint32_t BaseValue, uint32_t Extra)
         {
             const unsigned char* Node = nullptr;
             if (Extra != 0xFFFFFFFFu)
@@ -545,13 +546,13 @@ namespace
             return true;
         }
 
-        int FindFirst(const char* Pattern, WIN32_FIND_DATAA* Out, unsigned long BaseValue)
+        int FindFirst(const char* Pattern, WIN32_FIND_DATAA* Out, uint32_t BaseValue)
         {
             const unsigned char* Node = nullptr;
             if (BaseValue == 0)
                 Node = RootHandle->Node;
             else if (BaseValue != 0xFFFFFFFFu)
-                Node = ((const FUtfHandle*)(BaseValue))->Node;
+                Node = ((const FUtfHandle*)fl::HandleToPtr((BaseValue)))->Node;
 
             const char* LastSeparator = nullptr;
             const char* Scan = Pattern;
@@ -589,21 +590,21 @@ namespace
 
             const unsigned char* Root = RootHandle->Node;
             const unsigned char* First = nullptr;
-            unsigned long Remaining = 0;
+            uint32_t Remaining = 0;
             if (bNode2C)
                 First = Root + ReadUtfDword(Node, 0x10);
             else
             {
                 // 06b725d4..06b725e3: ADD sets ZF on a zero sum -> -1, no LastError.
-                if ((unsigned long)(Root) + ReadUtfDword(Node, 0x04) == 0)
+                if ((uint32_t)fl::PtrToHandle((Root)) + ReadUtfDword(Node, 0x04) == 0)
                     return -1;
                 First = Root + ReadUtfDword(Node, 0x04);
                 Remaining = ReadUtfDword(Node, 0x08);
             }
 
             FUtfFindBlock* Block = &FirstBlock;
-            unsigned long Index = 0;
-            unsigned long SlotIndex = 0;
+            uint32_t Index = 0;
+            uint32_t SlotIndex = 0;
             for (;;)
             {
                 SlotIndex = 0;
@@ -633,7 +634,7 @@ namespace
             Slot->Last = nullptr;
             std::strncpy(Slot->Pattern, Mask, 0x104);
             Slot->Remaining = Remaining;
-            const unsigned long Id = Index + 1;
+            const uint32_t Id = Index + 1;
             if (FindNext(Id, Out) == 0)
             {
                 FindClose(Id);
@@ -642,7 +643,7 @@ namespace
             return (int)(Id);
         }
 
-        int FindNext(unsigned long Id, WIN32_FIND_DATAA* Out)
+        int FindNext(uint32_t Id, WIN32_FIND_DATAA* Out)
         {
             FUtfFindSlot* Slot = SlotFromId(Id);
             if (Slot == nullptr || Slot->Next == nullptr)
@@ -704,7 +705,7 @@ namespace
             }
             // Named UB: retail strcpy's the name without a bound; the port stops at MAX_PATH.
             const char* Name = RecordName(Record);
-            unsigned long Length = 0;
+            uint32_t Length = 0;
             while (Name[Length] != '\0' && Length < MAX_PATH - 1)
             {
                 Out->cFileName[Length] = Name[Length];
@@ -718,7 +719,7 @@ namespace
         }
 
         // Slot 13: LAB_06b71dd0 (both walkers): no slot or a free one -> 6, 0; else free it, 1.
-        int FindClose(unsigned long Id)
+        int FindClose(uint32_t Id)
         {
             FUtfFindSlot* Slot = SlotFromId(Id);
             if (Slot == nullptr || Slot->Next == nullptr)
@@ -730,7 +731,7 @@ namespace
             return 1;
         }
 
-        bool GetFileTimes(unsigned long HandleValue, FILETIME* Creation, FILETIME* Access,
+        bool GetFileTimes(uint32_t HandleValue, FILETIME* Creation, FILETIME* Access,
                           FILETIME* Write) const
         {
             if (HandleValue == 0)
@@ -747,7 +748,7 @@ namespace
             }
             if (HandleValue == 0xFFFFFFFFu)
                 return false;
-            const unsigned char* Node = ((const FUtfHandle*)(HandleValue))->Node;
+            const unsigned char* Node = ((const FUtfHandle*)fl::HandleToPtr((HandleValue)))->Node;
             if (Node == nullptr)
                 return false;
             if (Creation != nullptr)
@@ -777,11 +778,11 @@ namespace
 
         // The start record of slots 6 and 9: handle 0 and -1 mean the root record, a handle
         // whose record is null (released) falls back to the root record too.
-        const unsigned char* ResolveBase(unsigned long BaseValue) const
+        const unsigned char* ResolveBase(uint32_t BaseValue) const
         {
             const unsigned char* Node = nullptr;
             if (BaseValue != 0 && BaseValue != 0xFFFFFFFFu)
-                Node = ((const FUtfHandle*)(BaseValue))->Node;
+                Node = ((const FUtfHandle*)fl::HandleToPtr((BaseValue)))->Node;
             if (Node == nullptr)
                 Node = RootHandle->Node;
             return Node;
@@ -801,8 +802,8 @@ namespace
                 }
                 return nullptr;
             }
-            unsigned long Offset = ReadUtfDword(Directory, 0x04);
-            const unsigned long End = Offset + ReadUtfDword(Directory, 0x08) * 0x0C;
+            uint32_t Offset = ReadUtfDword(Directory, 0x04);
+            const uint32_t End = Offset + ReadUtfDword(Directory, 0x08) * 0x0C;
             while (Offset < End)
             {
                 const unsigned char* Record = RootHandle->Node + Offset;
@@ -869,9 +870,9 @@ namespace
 
         // FUN_06b73ea0 and its inline copies: id - 1 (unsigned) walks one block per 4; a chain
         // that ends first gives null (id 0 runs off the chain).
-        FUtfFindSlot* SlotFromId(unsigned long Id)
+        FUtfFindSlot* SlotFromId(uint32_t Id)
         {
-            unsigned long Index = Id - 1;
+            uint32_t Index = Id - 1;
             FUtfFindBlock* Block = &FirstBlock;
             while (Index >= 4)
             {
@@ -904,9 +905,9 @@ namespace
         FUtfHandle* RootHandle;           // +0x08 (0x2C) / +0x0C (0x0C)
         const char* Strings;              // +0x0C (0x2C) / +0x08 (0x0C)
         std::list<FUtfHandle> Handles;    // +0x10 (list, count +0x18)
-        unsigned long FreeCount;          // +0x1C
+        uint32_t FreeCount;          // +0x1C
         FUtfFindBlock FirstBlock;         // +0x20
-        unsigned long LastError;          // +0x474
+        uint32_t LastError;          // +0x474
         FILETIME ArchiveTimes[3];         // +0x478 / +0x480 / +0x488 (0x0C walker only)
     };
 
@@ -929,17 +930,17 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount = RefCount + 1;
             return RefCount;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount != 0)
                 RefCount = RefCount - 1;
-            const unsigned long Remaining = RefCount;
+            const uint32_t Remaining = RefCount;
             if (Remaining == 0)
             {
                 RefCount = 1;
@@ -952,7 +953,7 @@ namespace
         virtual ~FNamedFactory() {}
 
         const char* Name;
-        unsigned long RefCount;
+        uint32_t RefCount;
     };
 
     class FFileSystemBase : public IFileSystem
@@ -992,17 +993,17 @@ namespace
                 NestedChild->AddRef();
         }
 
-        unsigned long NestedHandle(unsigned long Handle) const
+        uint32_t NestedHandle(uint32_t Handle) const
         {
             if (Handle != 0)
                 return Handle;
-            return (unsigned long)(FileHandle);
+            return (uint32_t)fl::PtrToHandle((FileHandle));
         }
 
         void CopyNestedLastError()
         {
             if (NestedChild != nullptr)
-                LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                LastError = (uint32_t)(NestedChild->GetFileSystemError());
             else
                 LastError = GetLastError();
         }
@@ -1022,17 +1023,17 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount = RefCount + 1;
             return RefCount;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount != 0)
                 RefCount = RefCount - 1;
-            const unsigned long Remaining = RefCount;
+            const uint32_t Remaining = RefCount;
             if (Remaining == 0)
             {
                 RefCount = 1;
@@ -1042,9 +1043,9 @@ namespace
             return Remaining;
         }
 
-        int DACOM_API CloseFile(unsigned long Handle) override
+        int DACOM_API CloseFile(uint32_t Handle) override
         {
-            const unsigned long Current = (unsigned long)(FileHandle);
+            const uint32_t Current = (uint32_t)fl::PtrToHandle((FileHandle));
             if (Handle == 0 || Handle == Current)
             {
                 LastError = 6;
@@ -1054,7 +1055,7 @@ namespace
             {
                 const int Result = NestedChild->CloseFile(Handle);
                 if (Result == 0)
-                    LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                    LastError = (uint32_t)(NestedChild->GetFileSystemError());
                 return Result;
             }
             if (DropMapToken(Handle) != 0)
@@ -1069,21 +1070,21 @@ namespace
             return 1;
         }
 
-        int DACOM_API Read(unsigned long Handle, void* Buffer, unsigned long Size,
-                           unsigned long* BytesRead, unsigned long Extra) override
+        int DACOM_API Read(uint32_t Handle, void* Buffer, uint32_t Size,
+                           uint32_t* BytesRead, uint32_t Extra) override
         {
             if (NestedChild != nullptr)
             {
                 const int Result =
                     NestedChild->Read(NestedHandle(Handle), Buffer, Size, BytesRead, Extra);
                 if (Result == 0)
-                    LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                    LastError = (uint32_t)(NestedChild->GetFileSystemError());
                 return Result;
             }
             FDosOpenFile* Open = FindOpenFile(Handle);
             if (Open == nullptr)
                 return (int)(Size);
-            unsigned long Got = 0;
+            uint32_t Got = 0;
             if (Open->View != nullptr)
             {
                 if (Open->Pos < Open->Size)
@@ -1112,7 +1113,7 @@ namespace
 
         // DOS LAB_06b75e70 / UTF LAB_06b73d50: LastError=5, return 0.
         // formerly Slot18
-        int DACOM_API Write(unsigned long, const void*, unsigned long, unsigned long*,
+        int DACOM_API Write(uint32_t, const void*, uint32_t, uint32_t*,
                              const void*) override
         {
             LastError = 5;
@@ -1120,33 +1121,33 @@ namespace
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
         // formerly Slot1C
-        int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation1C(uint32_t, uint32_t, uint32_t, uint32_t) override
         {
             LastError = 5;
             return 0;
         }
         // formerly Slot20
-        int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
-                             unsigned long Origin) override
+        int DACOM_API SeekFile(uint32_t Handle, uint32_t OffLow, uint32_t* OffHighOut,
+                             uint32_t Origin) override
         {
             if (NestedChild != nullptr)
             {
                 const int Result = NestedChild->SeekFile(NestedHandle(Handle), OffLow, OffHighOut, Origin);
                 if (Result == -1)
-                    LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                    LastError = (uint32_t)(NestedChild->GetFileSystemError());
                 return Result;
             }
-            unsigned long* HighPtr = OffHighOut;
-            unsigned long High = 0;
+            uint32_t* HighPtr = OffHighOut;
+            uint32_t High = 0;
             if (HighPtr != nullptr)
                 High = *HighPtr;
-            else if ((long)(OffLow) < 0)
+            else if ((int32_t)(OffLow) < 0)
                 High = 0xFFFFFFFFu;
             unsigned long long Target = ((unsigned long long)(High) << 32) | OffLow;
             if (Origin == FILE_CURRENT)
             {
-                unsigned long CurrentHigh = 0;
-                const unsigned long CurrentLow = (unsigned long)(
+                uint32_t CurrentHigh = 0;
+                const uint32_t CurrentLow = (uint32_t)(
                     GetFilePosition(Handle, &CurrentHigh));
                 Target = Target + (((unsigned long long)(CurrentHigh) << 32) | CurrentLow);
             }
@@ -1154,13 +1155,13 @@ namespace
             {
                 // Retail reads the high dword from an uninitialised stack slot that only a
                 // successful GetFileSize writes; the port starts it at 0.
-                unsigned long SizeHigh = 0;
-                const unsigned long SizeLow =
+                uint32_t SizeHigh = 0;
+                const uint32_t SizeLow =
                     GetSize(Handle, &SizeHigh);
                 Target = (((unsigned long long)(SizeHigh) << 32) | SizeLow) - Target;
             }
-            const unsigned long NewLow = (unsigned long)(Target);
-            const unsigned long NewHigh = (unsigned long)(Target >> 32);
+            const uint32_t NewLow = (uint32_t)(Target);
+            const uint32_t NewHigh = (uint32_t)(Target >> 32);
 
             FDosOpenFile* Open = FindOpenFile(Handle);
             if (Open == nullptr || Open->View == nullptr)
@@ -1180,19 +1181,19 @@ namespace
         }
         // DOS LAB_06b75e50: LastError=5, return 0 (UTF and MEM override).
         // formerly Slot24
-        int DACOM_API SetEndOfFile(unsigned long) override
+        int DACOM_API SetEndOfFile(uint32_t) override
         {
             LastError = 5;
             return 0;
         }
 
-        unsigned long DACOM_API GetSize(unsigned long Handle, unsigned long* HighOut) override
+        uint32_t DACOM_API GetSize(uint32_t Handle, uint32_t* HighOut) override
         {
-            unsigned long Result = 0;
+            uint32_t Result = 0;
             if (NestedChild != nullptr)
                 Result = NestedChild->GetSize(NestedHandle(Handle), HighOut);
             else
-                Result = GetFileSize((HANDLE)(NestedHandle(Handle)),
+                Result = GetFileSize((HANDLE)fl::HandleToPtr((NestedHandle(Handle))),
                                      HighOut);
             if (Result == 0xFFFFFFFFu)
                 CopyNestedLastError();
@@ -1200,28 +1201,28 @@ namespace
         }
 
         // formerly Slot2C
-        int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API ReturnOne2C(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             LastError = 5;
             return 1;
         }
         // formerly Slot30
-        int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API ReturnOne30(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             LastError = 5;
             return 1;
         }
         // formerly Slot34
-        int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
+        int DACOM_API GetFileTimes(uint32_t Handle, FILETIME* CreationOut, FILETIME* AccessOut,
                              FILETIME* WriteOut) override
         {
             int Result = 0;
             if (NestedChild != nullptr)
                 Result = NestedChild->GetFileTimes(NestedHandle(Handle), CreationOut, AccessOut, WriteOut);
             else
-                Result = GetFileTime((HANDLE)(NestedHandle(Handle)),
+                Result = GetFileTime((HANDLE)fl::HandleToPtr((NestedHandle(Handle))),
                                      CreationOut,
                                      AccessOut,
                                      WriteOut);
@@ -1231,20 +1232,20 @@ namespace
         }
         // DOS LAB_06b75e90 / UTF LAB_06b73d40: LastError=5, return 0.
         // formerly Slot38
-        int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation38(uint32_t, uint32_t, uint32_t, uint32_t) override
         {
             LastError = 5;
             return 0;
         }
         // formerly Slot3C
-        int DACOM_API CreateMapping(unsigned long FileKey, unsigned long A2, unsigned long A3, unsigned long A4,
-                             unsigned long A5, unsigned long A6) override
+        int DACOM_API CreateMapping(uint32_t FileKey, uint32_t A2, uint32_t A3, uint32_t A4,
+                             uint32_t A5, uint32_t A6) override
         {
             if (NestedChild != nullptr)
             {
                 const int Result = NestedChild->CreateMapping(NestedHandle(FileKey), A2, A3, A4, A5, A6);
                 if (Result == 0)
-                    LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                    LastError = (uint32_t)(NestedChild->GetFileSystemError());
                 return Result;
             }
             if ((AccessFlags & 0x40000000u) != 0)
@@ -1261,12 +1262,12 @@ namespace
             FDosMapToken* Token = new FDosMapToken();
             Token->Open = Open;
             MapTokens.push_back(Token);
-            return (int)(Token);
+            return (int)fl::PtrToHandle((Token));
         }
 
         // formerly Slot40
-        int DACOM_API MapFileView(unsigned long Token, unsigned long Access, unsigned long A3,
-                             unsigned long OffLow, unsigned long ByteCount) override
+        int DACOM_API MapFileView(uint32_t Token, uint32_t Access, uint32_t A3,
+                             uint32_t OffLow, uint32_t ByteCount) override
         {
             if (NestedChild != nullptr)
             {
@@ -1281,10 +1282,10 @@ namespace
                 return 0;
             }
             FDosMapToken* Found = nullptr;
-            const unsigned long Count = (unsigned long)(MapTokens.size());
-            for (unsigned long Index = 0; Index < Count; ++Index)
+            const uint32_t Count = (uint32_t)(MapTokens.size());
+            for (uint32_t Index = 0; Index < Count; ++Index)
             {
-                if ((unsigned long)(MapTokens[Index]) == Token)
+                if ((uint32_t)fl::PtrToHandle((MapTokens[Index])) == Token)
                 {
                     Found = MapTokens[Index];
                     break;
@@ -1311,12 +1312,12 @@ namespace
                 LastError = 5;
                 return 0;
             }
-            return (int)((char*)(Open->View) + OffLow);
+            return (int)fl::PtrToHandle(((char*)(Open->View) + OffLow));
         }
 
         // DOS LAB_06b75350: always 1. Does not UnmapViewOfFile.
         // formerly Slot44
-        int DACOM_API UnmapFileView(unsigned long) override
+        int DACOM_API UnmapFileView(uint32_t) override
         {
             return 1;
         }
@@ -1326,31 +1327,31 @@ namespace
             return -1;
         }
         // formerly Slot4C
-        int DACOM_API FindNext(unsigned long, WIN32_FIND_DATAA*) override
+        int DACOM_API FindNext(uint32_t, WIN32_FIND_DATAA*) override
         {
             return 0;
         }
         // formerly Slot50
-        int DACOM_API FindClose(unsigned long) override
+        int DACOM_API FindClose(uint32_t) override
         {
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         // formerly Slot54
-        int DACOM_API RejectOperation54(const char*, unsigned long) override
+        int DACOM_API RejectOperation54(const char*, uint32_t) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
         // formerly Slot58
-        int DACOM_API RejectOperation58(unsigned long) override
+        int DACOM_API RejectOperation58(uint32_t) override
         {
             LastError = 5;
             return 0;
         }
 
-        int DACOM_API GetCurrentPath(unsigned long MaxChars, char* Out) override
+        int DACOM_API GetCurrentPath(uint32_t MaxChars, char* Out) override
         {
             if (bFileInstance != 0)
             {
@@ -1362,7 +1363,7 @@ namespace
                 return Copied;
             if (NestedChild != nullptr)
             {
-                LastError = (unsigned long)(NestedChild->GetFileSystemError());
+                LastError = (uint32_t)(NestedChild->GetFileSystemError());
                 return 0;
             }
             LastError = GetLastError();
@@ -1402,21 +1403,21 @@ namespace
 
         // DOS LAB_06b75e50 / UTF LAB_06b73d10: LastError=5, return 0.
         // formerly Slot64
-        int DACOM_API RejectOperation64(unsigned long) override
+        int DACOM_API RejectOperation64(uint32_t) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ed0 / UTF LAB_06b73d30: LastError=5, return 0.
         // formerly Slot68
-        int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation68(uint32_t, uint32_t, uint32_t) override
         {
             LastError = 5;
             return 0;
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         // formerly Slot6C
-        int DACOM_API RejectOperation6C(unsigned long, unsigned long) override
+        int DACOM_API RejectOperation6C(uint32_t, uint32_t) override
         {
             LastError = 5;
             return 0;
@@ -1443,7 +1444,7 @@ namespace
         }
         // DOS LAB_06b75ef0 / UTF LAB_06b73d20: LastError=5, return 0.
         // formerly Slot74
-        int DACOM_API RejectOperation74(unsigned long, unsigned long) override
+        int DACOM_API RejectOperation74(uint32_t, uint32_t) override
         {
             LastError = 5;
             return 0;
@@ -1456,7 +1457,7 @@ namespace
         int DACOM_API OpenByDesc(FFileSystemDesc* Desc) override
         {
             if (Desc == nullptr)
-                return (int)((unsigned long)(FileHandle));
+                return (int)((uint32_t)fl::PtrToHandle((FileHandle)));
             if (bFileInstance != 0 || Desc->Path == nullptr)
             {
                 LastError = 2;
@@ -1481,10 +1482,10 @@ namespace
                 LastError = 2;
                 return -1;
             }
-            return (int)((unsigned long)(Opened));
+            return (int)((uint32_t)fl::PtrToHandle((Opened)));
         }
         // formerly Slot80
-        int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
+        int DACOM_API GetFilePosition(uint32_t Handle, uint32_t* HighOut) override
         {
             if (NestedChild != nullptr)
                 return NestedChild->GetFilePosition(NestedHandle(Handle), HighOut);
@@ -1499,15 +1500,15 @@ namespace
             return (int)(Open->Pos);
         }
 
-        void DACOM_API GetFileSysPath(char* Out, unsigned long MaxChars) override
+        void DACOM_API GetFileSysPath(char* Out, uint32_t MaxChars) override
         {
-            long Count = (long)(std::strlen(RootPath)) + 1;
-            if ((long)(MaxChars) < Count)
-                Count = (long)(MaxChars);
+            int32_t Count = (int32_t)(std::strlen(RootPath)) + 1;
+            if ((int32_t)(MaxChars) < Count)
+                Count = (int32_t)(MaxChars);
             if (Count <= 0 || Out == nullptr)
                 return;
             std::memcpy(Out, RootPath, (size_t)(Count));
-            if (PathPrefix != 0 && Count > (long)(PathPrefix))
+            if (PathPrefix != 0 && Count > (int32_t)(PathPrefix))
             {
                 Out[PathPrefix] = '\0';
                 return;
@@ -1530,47 +1531,47 @@ namespace
             return 0;
         }
         // formerly Slot90
-        int DACOM_API FailOperation90(unsigned long, unsigned long) override
+        int DACOM_API FailOperation90(uint32_t, uint32_t) override
         {
             // Retail LAB_06b776a0: `OR EAX,0xffffffff; RET 0xc` — always fails.
             return (int)(0xFFFFFFFF);
         }
         // formerly Slot94
-        int DACOM_API FailOperation94(unsigned long, unsigned long) override
+        int DACOM_API FailOperation94(uint32_t, uint32_t) override
         {
             // Retail LAB_06b776a0 (shared with Slot90): always fails.
             return (int)(0xFFFFFFFF);
         }
         // formerly Slot98
-        int DACOM_API FailOperation98(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API FailOperation98(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             // Retail LAB_06b776b0: `OR EAX,0xffffffff; RET 0x18` — always fails.
             return (int)(0xFFFFFFFF);
         }
         // formerly Slot9C
-        int DACOM_API FailOperation9C(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API FailOperation9C(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             // Retail LAB_06b776b0 (shared with Slot98): always fails.
             return (int)(0xFFFFFFFF);
         }
         // formerly SlotA0
-        int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
+        int DACOM_API InvokeLockedCallback(uint32_t Arg0, uint32_t Callback, uint32_t Arg1) override
         {
             if (NestedChild != nullptr)
                 return NestedChild->InvokeLockedCallback(Arg0, Callback, Arg1);
-            typedef int(__stdcall* FLockedCall)(unsigned long, unsigned long);
+            typedef int(__stdcall* FLockedCall)(uint32_t, uint32_t);
             EnterCriticalSection(&Lock);
-            const int Result = ((FLockedCall)(Callback))(Arg0, Arg1);
+            const int Result = ((FLockedCall)fl::HandleToPtr((Callback)))(Arg0, Arg1);
             LeaveCriticalSection(&Lock);
             return Result;
         }
         // formerly SlotA4
-        int DACOM_API ResolvePath(char* Dest, const char* Src, unsigned long DestChars) override
+        int DACOM_API ResolvePath(char* Dest, const char* Src, uint32_t DestChars) override
         {
             return JoinRoot(RootPath + PathPrefix, Src,
-                            Dest, (long)(DestChars));
+                            Dest, (int32_t)(DestChars));
         }
 
         void CloseMappedFile()
@@ -1607,7 +1608,7 @@ namespace
             if (File == INVALID_HANDLE_VALUE)
                 return INVALID_HANDLE_VALUE;
 
-            const unsigned long Key = (unsigned long)(File);
+            const uint32_t Key = (uint32_t)fl::PtrToHandle((File));
             if (OpenFiles.find(Key) != OpenFiles.end())
                 return INVALID_HANDLE_VALUE;
             FDosOpenFile* Open = new FDosOpenFile();
@@ -1639,14 +1640,14 @@ namespace
             return true;
         }
 
-        FDosOpenFile* FindOpenFile(unsigned long Handle)
+        FDosOpenFile* FindOpenFile(uint32_t Handle)
         {
-            unsigned long Key = Handle;
+            uint32_t Key = Handle;
             if (Key == 0)
-                Key = (unsigned long)(FileHandle);
+                Key = (uint32_t)fl::PtrToHandle((FileHandle));
             if (Key == 0 || Key == 0xFFFFFFFFu)
                 return nullptr;
-            std::map<unsigned long, FDosOpenFile*>::iterator It = OpenFiles.find(Key);
+            std::map<uint32_t, FDosOpenFile*>::iterator It = OpenFiles.find(Key);
             if (It == OpenFiles.end())
                 return nullptr;
             return It->second;
@@ -1655,7 +1656,7 @@ namespace
         void AdoptCurrentFile(HANDLE Opened)
         {
             FileHandle = Opened;
-            FDosOpenFile* Open = FindOpenFile((unsigned long)(Opened));
+            FDosOpenFile* Open = FindOpenFile((uint32_t)fl::PtrToHandle((Opened)));
             if (Open == nullptr)
             {
                 MappingHandle = nullptr;
@@ -1677,12 +1678,12 @@ namespace
             MappedPos = Open->Pos;
         }
 
-        int DropMapToken(unsigned long Token)
+        int DropMapToken(uint32_t Token)
         {
-            const unsigned long Count = (unsigned long)(MapTokens.size());
-            for (unsigned long Index = 0; Index < Count; ++Index)
+            const uint32_t Count = (uint32_t)(MapTokens.size());
+            for (uint32_t Index = 0; Index < Count; ++Index)
             {
-                if ((unsigned long)(MapTokens[Index]) == Token)
+                if ((uint32_t)fl::PtrToHandle((MapTokens[Index])) == Token)
                 {
                     delete MapTokens[Index];
                     MapTokens.erase(MapTokens.begin() + (int)(Index));
@@ -1718,8 +1719,8 @@ namespace
 
         void DetachTokensFromOpen(const FDosOpenFile* Open)
         {
-            const unsigned long Count = (unsigned long)(MapTokens.size());
-            for (unsigned long Index = 0; Index < Count; ++Index)
+            const uint32_t Count = (uint32_t)(MapTokens.size());
+            for (uint32_t Index = 0; Index < Count; ++Index)
             {
                 if (MapTokens[Index]->Open == Open)
                     MapTokens[Index]->Open = nullptr;
@@ -1728,9 +1729,9 @@ namespace
 
         // The hit path of FUN_06b74bf0 (06b74c87..06b74d36). CloseFile has already rejected
         // the current handle +0x130, so the entry is never the current file.
-        void CloseOneOpenFile(unsigned long Handle)
+        void CloseOneOpenFile(uint32_t Handle)
         {
-            std::map<unsigned long, FDosOpenFile*>::iterator It = OpenFiles.find(Handle);
+            std::map<uint32_t, FDosOpenFile*>::iterator It = OpenFiles.find(Handle);
             if (It == OpenFiles.end())
                 return;
             FDosOpenFile* Open = It->second;
@@ -1741,12 +1742,12 @@ namespace
 
         void CloseAllOpenFiles()
         {
-            const unsigned long TokenCount = (unsigned long)(MapTokens.size());
-            for (unsigned long Index = 0; Index < TokenCount; ++Index)
+            const uint32_t TokenCount = (uint32_t)(MapTokens.size());
+            for (uint32_t Index = 0; Index < TokenCount; ++Index)
                 delete MapTokens[Index];
             MapTokens.clear();
 
-            std::map<unsigned long, FDosOpenFile*>::iterator It = OpenFiles.begin();
+            std::map<uint32_t, FDosOpenFile*>::iterator It = OpenFiles.begin();
             while (It != OpenFiles.end())
             {
                 ReleaseOpenFile(It->second);
@@ -1754,22 +1755,22 @@ namespace
             }
         }
 
-        unsigned long RefCount;
+        uint32_t RefCount;
         char RootPath[264];
         IFileSystem* NestedChild;
-        unsigned long PathPrefix;
+        uint32_t PathPrefix;
         CRITICAL_SECTION Lock;
         HANDLE FileHandle;
         HANDLE MappingHandle;
         void* MappedView;
-        unsigned long MappedSize;
-        unsigned long MappedPos;
-        unsigned long LastError;
-        unsigned long AccessFlags;
+        uint32_t MappedSize;
+        uint32_t MappedPos;
+        uint32_t LastError;
+        uint32_t AccessFlags;
         // Retail DOS +0x128: 1 once this instance is bound to one file (or to a nested
         // parent file); FDosFileSystem::CreateInstance refuses to run on such an instance.
-        unsigned long bFileInstance;
-        std::map<unsigned long, FDosOpenFile*> OpenFiles;
+        uint32_t bFileInstance;
+        std::map<uint32_t, FDosOpenFile*> OpenFiles;
         std::vector<FDosMapToken*> MapTokens;
     };
 
@@ -1829,7 +1830,7 @@ namespace
             if (FsDesc->Parent != nullptr)
             {
                 Child->AttachNestedChild((IFileSystem*)(FsDesc->Parent));
-                Child->FileHandle = (HANDLE)(FsDesc->Extra);
+                Child->FileHandle = (HANDLE)fl::HandleToPtr((FsDesc->Extra));
                 Child->bFileInstance = 1;
                 Child->AccessFlags = FsDesc->Access;
                 std::strncpy(RootPath, FsDesc->Path, 0x108);
@@ -1936,13 +1937,13 @@ namespace
                 CopyNestedLastError();
                 return 0;
             }
-            return (int)((unsigned long)(Found));
+            return (int)((uint32_t)fl::PtrToHandle((Found)));
         }
 
         // formerly Slot4C
-        int DACOM_API FindNext(unsigned long Handle, WIN32_FIND_DATAA* FindData) override
+        int DACOM_API FindNext(uint32_t Handle, WIN32_FIND_DATAA* FindData) override
         {
-            const BOOL Result = FindNextFileA((HANDLE)(Handle),
+            const BOOL Result = FindNextFileA((HANDLE)fl::HandleToPtr((Handle)),
                                               FindData);
             if (Result == 0)
                 CopyNestedLastError();
@@ -1950,9 +1951,9 @@ namespace
         }
 
         // formerly Slot50
-        int DACOM_API FindClose(unsigned long Handle) override
+        int DACOM_API FindClose(uint32_t Handle) override
         {
-            const BOOL Result = ::FindClose((HANDLE)(Handle));
+            const BOOL Result = ::FindClose((HANDLE)fl::HandleToPtr((Handle)));
             if (Result == 0)
                 CopyNestedLastError();
             return Result;
@@ -2104,7 +2105,7 @@ namespace
             size_t Length = std::strlen(Path);
             if (Length > sizeof(OwnPath) - 2)
                 Length = sizeof(OwnPath) - 2;
-            OwnPathPrefix = (unsigned long)(Length);
+            OwnPathPrefix = (uint32_t)(Length);
             std::memcpy(OwnPath, Path, Length);
             OwnPath[Length] = '\0';
             if (Handle == nullptr)
@@ -2112,7 +2113,7 @@ namespace
             OwnRootHandle = Handle;
             if (!Handle->IsDirectory())
                 return;
-            if ((long)(OwnPathPrefix) > 0 &&
+            if ((int32_t)(OwnPathPrefix) > 0 &&
                 IsJoinSeparator(OwnPath[OwnPathPrefix - 1]))
                 OwnPathPrefix = OwnPathPrefix - 1;
             OwnPath[OwnPathPrefix] = '\\';
@@ -2132,7 +2133,7 @@ namespace
             {
                 Result = GR_GENERIC;
                 void* Buffer = nullptr;
-                unsigned long Size = 0;
+                uint32_t Size = 0;
                 if (DataBuffer->GetBuffer(&Buffer, &Size) == GR_OK && Buffer != nullptr &&
                     Size != 0)
                 {
@@ -2179,7 +2180,7 @@ namespace
         static GENRESULT OpenArchive(FFileSystemDesc* Desc, FUtfArchiveMap* Map, void** Out)
         {
             FUtfHeader Header;
-            unsigned long Got = 0;
+            uint32_t Got = 0;
             if (Map->View != nullptr)
             {
                 if (Map->Pos < Map->Size)
@@ -2238,9 +2239,9 @@ namespace
             char Dest[0x105] = {};
             ResolvePath(Dest, Desc->Path,
                    0x104);
-            const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+            const uint32_t Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
             FUtfHandle* Found =
-                ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
+                ActiveW->Open(Dest, (uint32_t)fl::PtrToHandle((RootHandle())), Extra);
             if (Found == nullptr)
                 return GR_GENERIC;
 
@@ -2265,7 +2266,7 @@ namespace
         }
 
     public:
-        int DACOM_API GetCurrentPath(unsigned long MaxChars, char* Out) override
+        int DACOM_API GetCurrentPath(uint32_t MaxChars, char* Out) override
         {
             if (ParentFileSystem == nullptr)
             {
@@ -2278,21 +2279,21 @@ namespace
 
         // UTF LAB_06b73c70: n = strlen(+0x20) + 1, clamped to MaxChars (signed); n > 0 and
         // Out -> memcpy n bytes. No terminator fix-up when MaxChars cuts the path.
-        void DACOM_API GetFileSysPath(char* Out, unsigned long MaxChars) override
+        void DACOM_API GetFileSysPath(char* Out, uint32_t MaxChars) override
         {
-            long Count = (long)(std::strlen(OwnPath)) + 1;
-            if ((long)(MaxChars) < Count)
-                Count = (long)(MaxChars);
+            int32_t Count = (int32_t)(std::strlen(OwnPath)) + 1;
+            if ((int32_t)(MaxChars) < Count)
+                Count = (int32_t)(MaxChars);
             if (Count > 0 && Out != nullptr)
                 std::memcpy(Out, OwnPath, (size_t)(Count));
         }
 
         // UTF LAB_06b73130: FUN_06b75420's body with the root = the current path +0x128.
         // formerly SlotA4
-        int DACOM_API ResolvePath(char* Dest, const char* Src, unsigned long DestChars) override
+        int DACOM_API ResolvePath(char* Dest, const char* Src, uint32_t DestChars) override
         {
             return JoinRoot(CurrentPath, Src,
-                            Dest, (long)(DestChars));
+                            Dest, (int32_t)(DestChars));
         }
 
         int DACOM_API OpenNode(const char* Name) override
@@ -2314,7 +2315,7 @@ namespace
             }
 
             FUtfHandle* Opened =
-                ActiveW->Open(Dest, (unsigned long)(RootHandle()), 0xFFFFFFFFu);
+                ActiveW->Open(Dest, (uint32_t)fl::PtrToHandle((RootHandle())), 0xFFFFFFFFu);
             if (Opened == nullptr)
             {
                 LastError = 0xA1;
@@ -2336,7 +2337,7 @@ namespace
             return 1;
         }
 
-        FUtfHandle* ResolveHandle(unsigned long Handle) const
+        FUtfHandle* ResolveHandle(uint32_t Handle) const
         {
             if (Handle == 0)
                 return RootHandle();
@@ -2344,7 +2345,7 @@ namespace
         }
 
         // UTF LAB_06b72e90: no handle -> LastError=5, -1; else the handle's size (slot 2).
-        unsigned long DACOM_API GetSize(unsigned long Handle, unsigned long* /*HighOut*/) override
+        uint32_t DACOM_API GetSize(uint32_t Handle, uint32_t* /*HighOut*/) override
         {
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
@@ -2356,8 +2357,8 @@ namespace
         }
 
         // formerly Slot20
-        int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long*,
-                             unsigned long Origin) override
+        int DACOM_API SeekFile(uint32_t Handle, uint32_t OffLow, uint32_t*,
+                             uint32_t Origin) override
         {
             FUtfHandle* UtfHandle = ResolveHandle(Handle);
             if (UtfHandle == nullptr)
@@ -2365,8 +2366,8 @@ namespace
                 LastError = 5;
                 return -1;
             }
-            const unsigned long Size = UtfHandle->Size();
-            unsigned long NewPos = OffLow;
+            const uint32_t Size = UtfHandle->Size();
+            uint32_t NewPos = OffLow;
             if (Origin == FILE_CURRENT)
                 NewPos = UtfHandle->Position + OffLow;
             else if (Origin == FILE_END)
@@ -2378,7 +2379,7 @@ namespace
         }
 
         // formerly Slot34
-        int DACOM_API GetFileTimes(unsigned long Handle, FILETIME* CreationOut, FILETIME* AccessOut,
+        int DACOM_API GetFileTimes(uint32_t Handle, FILETIME* CreationOut, FILETIME* AccessOut,
                              FILETIME* WriteOut) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
@@ -2393,7 +2394,7 @@ namespace
                 LastError = 6;
                 return 0;
             }
-            ActiveW->GetFileTimes((unsigned long)(UtfHandle),
+            ActiveW->GetFileTimes((uint32_t)fl::PtrToHandle((UtfHandle)),
                                   CreationOut,
                                   AccessOut,
                                   WriteOut);
@@ -2416,7 +2417,7 @@ namespace
                 return 0;
             }
             const int Attributes =
-                ActiveW->GetAttributes(Dest, (unsigned long)(RootHandle()));
+                ActiveW->GetAttributes(Dest, (uint32_t)fl::PtrToHandle((RootHandle())));
             if (Attributes == -1)
             {
                 LastError = 0xA1;
@@ -2426,7 +2427,7 @@ namespace
         }
 
         // formerly Slot80
-        int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
+        int DACOM_API GetFilePosition(uint32_t Handle, uint32_t* HighOut) override
         {
             if (ParentFileSystem == nullptr || Handle == 0)
             {
@@ -2435,11 +2436,11 @@ namespace
             }
             const int Result = ParentFileSystem->GetFilePosition(Handle, HighOut);
             if (Result == -1)
-                LastError = (unsigned long)(ParentFileSystem->GetFileSystemError());
+                LastError = (uint32_t)(ParentFileSystem->GetFileSystemError());
             return Result;
         }
 
-        int DACOM_API CloseFile(unsigned long Handle) override
+        int DACOM_API CloseFile(uint32_t Handle) override
         {
             if (Handle == 0xFFFFFFFFu)
             {
@@ -2477,8 +2478,8 @@ namespace
             return ActiveW->CloseHandle(UtfHandle) ? 1 : 0;
         }
 
-        int DACOM_API Read(unsigned long Handle, void* Buffer, unsigned long Size,
-                           unsigned long* BytesRead, unsigned long /*Extra*/) override
+        int DACOM_API Read(uint32_t Handle, void* Buffer, uint32_t Size,
+                           uint32_t* BytesRead, uint32_t /*Extra*/) override
         {
             if (Buffer == nullptr || Size == 0)
             {
@@ -2504,15 +2505,15 @@ namespace
                 LastError = 0x1E;
                 return 0;
             }
-            const unsigned long DataSection = ReadUtfDword(Archive->Walker->GetView(), 0x24);
-            const unsigned long Position = UtfHandle->Position;
-            const unsigned long FileOff = DataSection + UtfHandle->DataOffset() + Position;
-            unsigned long End = Position + Size;
-            const unsigned long HandleSize = UtfHandle->Size();
+            const uint32_t DataSection = ReadUtfDword(Archive->Walker->GetView(), 0x24);
+            const uint32_t Position = UtfHandle->Position;
+            const uint32_t FileOff = DataSection + UtfHandle->DataOffset() + Position;
+            uint32_t End = Position + Size;
+            const uint32_t HandleSize = UtfHandle->Size();
             if (End > HandleSize)
                 End = HandleSize;
             UtfHandle->Position = End;
-            unsigned long Count = End - Position;
+            uint32_t Count = End - Position;
             if (FileOff > Archive->MappedSize)
             {
                 LastError = 0x1E;
@@ -2532,8 +2533,8 @@ namespace
         }
 
         // formerly Slot3C
-        int DACOM_API CreateMapping(unsigned long FileKey, unsigned long, unsigned long Protect,
-                             unsigned long, unsigned long, unsigned long) override
+        int DACOM_API CreateMapping(uint32_t FileKey, uint32_t, uint32_t Protect,
+                             uint32_t, uint32_t, uint32_t) override
         {
             if (Protect != PAGE_READONLY || ArchiveOwner == nullptr || ArchiveOwner->MappedView == nullptr ||
                 ArchiveOwner->Walker == nullptr)
@@ -2552,12 +2553,12 @@ namespace
                 return -1;
             }
             MapTokens.push_back(UtfHandle);
-            return (int)((unsigned long)(&MapTokens.back()));
+            return (int)((uint32_t)fl::PtrToHandle((&MapTokens.back())));
         }
 
         // formerly Slot40
-        int DACOM_API MapFileView(unsigned long Token, unsigned long Access, unsigned long,
-                             unsigned long OffLow, unsigned long ByteCount) override
+        int DACOM_API MapFileView(uint32_t Token, uint32_t Access, uint32_t,
+                             uint32_t OffLow, uint32_t ByteCount) override
         {
             if (Access != FILE_MAP_READ)
             {
@@ -2592,20 +2593,18 @@ namespace
                 LastError = 5;
                 return 0;
             }
-            const unsigned long DataSection = ReadUtfDword(ActiveW->GetView(), 0x24);
-            const unsigned long FileOff = DataSection + UtfHandle->DataOffset();
-            return (int)(
-                (unsigned long)((const char*)(ArchiveOwner->MappedView)) +
-                FileOff + OffLow);
+            const uint32_t DataSection = ReadUtfDword(ActiveW->GetView(), 0x24);
+            const uint32_t FileOff = DataSection + UtfHandle->DataOffset();
+            return (int)fl::PtrToHandle((const char*)(ArchiveOwner->MappedView) + FileOff + OffLow);
         }
 
         // The +0x240 token whose payload address is Value (06b736a7 / 06b738db scans).
-        std::list<FUtfHandle*>::iterator FindMapToken(unsigned long Value)
+        std::list<FUtfHandle*>::iterator FindMapToken(uint32_t Value)
         {
             std::list<FUtfHandle*>::iterator It = MapTokens.begin();
             while (It != MapTokens.end())
             {
-                if ((unsigned long)(&*It) == Value)
+                if ((uint32_t)fl::PtrToHandle((&*It)) == Value)
                     return It;
                 ++It;
             }
@@ -2614,7 +2613,7 @@ namespace
 
         // UTF LAB_06b739e0: 1 if parent UTF at +0x230, else error 5 / 0.
         // formerly Slot44
-        int DACOM_API UnmapFileView(unsigned long) override
+        int DACOM_API UnmapFileView(uint32_t) override
         {
             if (ArchiveOwner != nullptr)
                 return 1;
@@ -2633,8 +2632,8 @@ namespace
             FUtfHandle* Opened = nullptr;
             if (OpenNodeHandle != nullptr)
             {
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
-                Opened = ActiveW->Open(Desc->Path, (unsigned long)(OpenNodeHandle),
+                const uint32_t Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+                Opened = ActiveW->Open(Desc->Path, (uint32_t)fl::PtrToHandle((OpenNodeHandle)),
                                        Extra);
             }
             else
@@ -2646,15 +2645,15 @@ namespace
                     LastError = 0xA1;
                     return -1;
                 }
-                const unsigned long Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
-                Opened = ActiveW->Open(Dest, (unsigned long)(RootHandle()), Extra);
+                const uint32_t Extra = Desc->Size == 0x34 ? Desc->Field30 : 0xFFFFFFFFu;
+                Opened = ActiveW->Open(Dest, (uint32_t)fl::PtrToHandle((RootHandle())), Extra);
             }
             if (Opened == nullptr)
             {
                 LastError = 2;
                 return -1;
             }
-            return (int)((unsigned long)(Opened));
+            return (int)((uint32_t)fl::PtrToHandle((Opened)));
         }
 
         // UTF LAB_06b73cc0: *Out = +0x234 (no Out check), AddRef it when set, return 0.
@@ -2668,13 +2667,13 @@ namespace
         }
 
         // formerly SlotA0
-        int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
+        int DACOM_API InvokeLockedCallback(uint32_t Arg0, uint32_t Callback, uint32_t Arg1) override
         {
             return ParentFileSystem->InvokeLockedCallback(Arg0, Callback, Arg1);
         }
 
         // formerly Slot24
-        int DACOM_API SetEndOfFile(unsigned long) override
+        int DACOM_API SetEndOfFile(uint32_t) override
         {
             LastError = 5;
             return 0;
@@ -2693,7 +2692,7 @@ namespace
             int Result = -1;
             if (OpenNodeHandle != nullptr)
                 Result = ActiveW->FindFirst(Pattern, Out,
-                                            (unsigned long)(OpenNodeHandle));
+                                            (uint32_t)fl::PtrToHandle((OpenNodeHandle)));
             else
             {
                 char Dest[0x105];
@@ -2702,7 +2701,7 @@ namespace
                     LastError = 0xA1;
                     return -1;
                 }
-                Result = ActiveW->FindFirst(Dest, Out, (unsigned long)(OwnRootHandle));
+                Result = ActiveW->FindFirst(Dest, Out, (uint32_t)fl::PtrToHandle((OwnRootHandle)));
             }
             if (Result == -1)
                 LastError = ActiveW->GetLastError();
@@ -2710,7 +2709,7 @@ namespace
         }
 
         // formerly Slot4C
-        int DACOM_API FindNext(unsigned long Handle, WIN32_FIND_DATAA* FindData) override
+        int DACOM_API FindNext(uint32_t Handle, WIN32_FIND_DATAA* FindData) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
@@ -2726,7 +2725,7 @@ namespace
         }
 
         // formerly Slot50
-        int DACOM_API FindClose(unsigned long Handle) override
+        int DACOM_API FindClose(uint32_t Handle) override
         {
             FUtfWalker* ActiveW = ActiveWalker();
             if (ActiveW == nullptr)
@@ -2743,7 +2742,7 @@ namespace
         // +0x20: the path this object was created from (Desc->Path, "\" for the factory),
         // +0x124: its length / the clone's prefix, +0x128: the current path OpenNode keeps.
         char OwnPath[264];
-        unsigned long OwnPathPrefix;
+        uint32_t OwnPathPrefix;
         char CurrentPath[264];
         FUtfHandle* OpenNodeHandle;       // +0x22c, the handle OpenNode last opened
         FUtfFileSystem* ArchiveOwner;     // +0x230, AddRef'd
@@ -2765,11 +2764,11 @@ namespace
             {
                 return Owner->QueryInterface(Iid, Out);
             }
-            unsigned long DACOM_API AddRef() override { return Owner->AddRef(); }
-            unsigned long DACOM_API Release() override { return Owner->Release(); }
+            uint32_t DACOM_API AddRef() override { return Owner->AddRef(); }
+            uint32_t DACOM_API Release() override { return Owner->Release(); }
             // LAB_06b772a0 (slot 3 of the inner vtable 06b792e0, this = MEM+4): *OutPtr = [MEM+8]
             // (buffer), *OutSize = [MEM+0xC] (size), return 0. No argument checks.
-            GENRESULT DACOM_API GetBuffer(void** OutPtr, unsigned long* OutSize) override
+            GENRESULT DACOM_API GetBuffer(void** OutPtr, uint32_t* OutSize) override
             {
                 *OutPtr = Owner->MappedView;
                 *OutSize = Owner->AllocSize;
@@ -2896,32 +2895,32 @@ namespace
 
         // MEM LAB_06b775b0 (`XOR EAX,EAX; RET 8`): +0x10 / +0x44 / +0x50 / +0x58 / +0x60 /
         // +0x64 / +0x70 return 0 and leave LastError alone (+0x50 comes from the base).
-        int DACOM_API CloseFile(unsigned long) override { return 0; }
+        int DACOM_API CloseFile(uint32_t) override { return 0; }
 
         // formerly Slot44
-        int DACOM_API UnmapFileView(unsigned long) override { return 0; }
+        int DACOM_API UnmapFileView(uint32_t) override { return 0; }
 
         // formerly Slot58
-        int DACOM_API RejectOperation58(unsigned long) override { return 0; }
+        int DACOM_API RejectOperation58(uint32_t) override { return 0; }
 
         int DACOM_API OpenNode(const char*) override { return 0; }
 
         // formerly Slot64
-        int DACOM_API RejectOperation64(unsigned long) override { return 0; }
+        int DACOM_API RejectOperation64(uint32_t) override { return 0; }
 
         // formerly Slot70
         int DACOM_API GetPathAttributes(const char*) override { return 0; }
 
         // formerly Slot54
-        int DACOM_API RejectOperation54(const char*, unsigned long) override { return 0; }
+        int DACOM_API RejectOperation54(const char*, uint32_t) override { return 0; }
 
-        int DACOM_API GetCurrentPath(unsigned long, char*) override { return 0; }
+        int DACOM_API GetCurrentPath(uint32_t, char*) override { return 0; }
 
         // formerly Slot6C
-        int DACOM_API RejectOperation6C(unsigned long, unsigned long) override { return 0; }
+        int DACOM_API RejectOperation6C(uint32_t, uint32_t) override { return 0; }
 
         // formerly Slot74
-        int DACOM_API RejectOperation74(unsigned long, unsigned long) override { return 0; }
+        int DACOM_API RejectOperation74(uint32_t, uint32_t) override { return 0; }
 
         // formerly Slot78
         int DACOM_API GetFileSystemError() override { return 0; }
@@ -2929,18 +2928,18 @@ namespace
         int DACOM_API OpenByDesc(FFileSystemDesc*) override { return -1; }
 
         // formerly SlotA0
-        int DACOM_API InvokeLockedCallback(unsigned long Arg0, unsigned long Callback, unsigned long Arg1) override
+        int DACOM_API InvokeLockedCallback(uint32_t Arg0, uint32_t Callback, uint32_t Arg1) override
         {
             return InvokeDosRootLockedCall(Arg0, Callback, Arg1);
         }
 
         // formerly SlotA4
         int DACOM_API ResolvePath(char* DestArg, const char* SrcArg,
-                             unsigned long DestCharsArg) override
+                             uint32_t DestCharsArg) override
         {
             char* Dest = DestArg;
             const char* Src = SrcArg;
-            const long DestChars = (long)(DestCharsArg);
+            const int32_t DestChars = (int32_t)(DestCharsArg);
             int Result = 1;
             if (DestChars <= 0)
                 return 0;
@@ -2957,7 +2956,7 @@ namespace
                     Src = Src + 2;
                 while (Src[0] == '.' && Src[1] == '.')
                 {
-                    const long Length = (long)(std::strlen(Dest));
+                    const int32_t Length = (int32_t)(std::strlen(Dest));
                     if (Length <= 2)
                         Result = 0;
                     else
@@ -2979,8 +2978,8 @@ namespace
                         Src = Src + 1;
                 }
             }
-            const long Length = (long)(std::strlen(Dest));
-            const long Remaining = DestChars - Length;
+            const int32_t Length = (int32_t)(std::strlen(Dest));
+            const int32_t Remaining = DestChars - Length;
             if (Remaining > 0)
                 std::strncpy(Dest + Length, Src, (size_t)(Remaining));
             return Result;
@@ -2995,7 +2994,7 @@ namespace
         }
 
         // formerly Slot80
-        int DACOM_API GetFilePosition(unsigned long Handle, unsigned long* HighOut) override
+        int DACOM_API GetFilePosition(uint32_t Handle, uint32_t* HighOut) override
         {
             if (Handle != 0)
                 return -1;
@@ -3006,16 +3005,16 @@ namespace
 
         // MEM vtable06b792f0+0x18 = LAB_06b77330, not the DOS failure stub.
         // formerly Slot18
-        int DACOM_API Write(unsigned long Handle, const void* Buffer, unsigned long Size,
-                             unsigned long* BytesWritten, const void* PositionOverride) override
+        int DACOM_API Write(uint32_t Handle, const void* Buffer, uint32_t Size,
+                             uint32_t* BytesWritten, const void* PositionOverride) override
         {
             if (Handle != 0 || (Access & kGenericWrite) == 0)
                 return 0;
             if (PositionOverride != nullptr)
                 std::memcpy(&MappedPos, (const char*)(PositionOverride) + 8,
                             sizeof(MappedPos));
-            unsigned long ToWrite = Size;
-            const unsigned long End = MappedPos + Size;
+            uint32_t ToWrite = Size;
+            const uint32_t End = MappedPos + Size;
             if (End > AllocSize)
             {
                 if ((MemFlags & 2) != 0)
@@ -3028,7 +3027,7 @@ namespace
                 else
                 {
                     // 77392..773f7: unsigned wrapping round-up, no clamp.
-                    const unsigned long NewSize = (End + 0xFFFFu) & 0xFFFFF000u;
+                    const uint32_t NewSize = (End + 0xFFFFu) & 0xFFFFF000u;
                     void* NewView = VirtualAlloc(nullptr, NewSize, MEM_COMMIT, PAGE_READWRITE);
                     if (NewView == nullptr)
                         ToWrite = 0;
@@ -3057,7 +3056,7 @@ namespace
         }
 
         // formerly Slot24
-        int DACOM_API SetEndOfFile(unsigned long) override
+        int DACOM_API SetEndOfFile(uint32_t) override
         {
             if ((Access & kGenericWrite) == 0)
                 return 0;
@@ -3065,7 +3064,7 @@ namespace
             {
                 if ((MemFlags & 2) != 0)
                     return 0;
-                const unsigned long NewSize = (MappedPos + 0xFFFFu) & 0xFFFFF000u;
+                const uint32_t NewSize = (MappedPos + 0xFFFFu) & 0xFFFFF000u;
                 void* NewView = VirtualAlloc(nullptr, NewSize, MEM_COMMIT, PAGE_READWRITE);
                 if (NewView != nullptr)
                 {
@@ -3085,63 +3084,63 @@ namespace
         }
 
         // formerly Slot1C
-        int DACOM_API RejectOperation1C(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation1C(uint32_t, uint32_t, uint32_t, uint32_t) override
         {
             return 0;
         }
         // formerly Slot2C
-        int DACOM_API ReturnOne2C(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API ReturnOne2C(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             return 1;
         }
         // formerly Slot30
-        int DACOM_API ReturnOne30(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API ReturnOne30(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             return 1;
         }
         // formerly Slot34
-        int DACOM_API GetFileTimes(unsigned long, FILETIME*, FILETIME*, FILETIME*) override
+        int DACOM_API GetFileTimes(uint32_t, FILETIME*, FILETIME*, FILETIME*) override
         {
             return 0;
         }
         // formerly Slot38
-        int DACOM_API RejectOperation38(unsigned long, unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation38(uint32_t, uint32_t, uint32_t, uint32_t) override
         {
             return 0;
         }
         // formerly Slot3C
-        int DACOM_API CreateMapping(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long, unsigned long) override
+        int DACOM_API CreateMapping(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t, uint32_t) override
         {
             return 0;
         }
         // formerly Slot40
-        int DACOM_API MapFileView(unsigned long, unsigned long, unsigned long, unsigned long,
-                             unsigned long) override
+        int DACOM_API MapFileView(uint32_t, uint32_t, uint32_t, uint32_t,
+                             uint32_t) override
         {
             return 0;
         }
         // formerly Slot68
-        int DACOM_API RejectOperation68(unsigned long, unsigned long, unsigned long) override
+        int DACOM_API RejectOperation68(uint32_t, uint32_t, uint32_t) override
         {
             return 0;
         }
 
-        int DACOM_API Read(unsigned long Handle, void* Buffer, unsigned long Size,
-                           unsigned long* BytesRead, unsigned long Extra) override
+        int DACOM_API Read(uint32_t Handle, void* Buffer, uint32_t Size,
+                           uint32_t* BytesRead, uint32_t Extra) override
         {
             if (Handle != 0)
                 return 0;
             if (Extra != 0)
-                MappedPos = *(unsigned long*)(Extra + 8);
+                MappedPos = *(uint32_t*)((char*)fl::HandleToPtr(Extra) + 8);
             if (MappedPos > LogicalSize)
                 MappedPos = LogicalSize;
-            unsigned long Remain = 0;
+            uint32_t Remain = 0;
             if (MappedPos < LogicalSize)
                 Remain = LogicalSize - MappedPos;
-            unsigned long Got = Size;
+            uint32_t Got = Size;
             if (Got > Remain)
                 Got = Remain;
             // 06b772fb..06b7731b: REP MOVS from +8 + position and *BytesRead store, both
@@ -3152,7 +3151,7 @@ namespace
             return 1;
         }
 
-        unsigned long DACOM_API GetSize(unsigned long Handle, unsigned long* HighOut) override
+        uint32_t DACOM_API GetSize(uint32_t Handle, uint32_t* HighOut) override
         {
             if (Handle != 0)
                 return 0xFFFFFFFF;
@@ -3162,14 +3161,14 @@ namespace
         }
 
         // formerly Slot20
-        int DACOM_API SeekFile(unsigned long Handle, unsigned long OffLow, unsigned long* OffHighOut,
-                             unsigned long Origin) override
+        int DACOM_API SeekFile(uint32_t Handle, uint32_t OffLow, uint32_t* OffHighOut,
+                             uint32_t Origin) override
         {
             // MEM LAB_06b77460: handle != 0 -> -1; origin 1 = pos + off, 2 = alloc (+0xc) - off
             // (unsigned, no clamp), anything else = off; pos = it; high out (if any) = 0.
             if (Handle != 0)
                 return -1;
-            unsigned long NewPos = OffLow;
+            uint32_t NewPos = OffLow;
             if (Origin == FILE_CURRENT)
                 NewPos = MappedPos + OffLow;
             else if (Origin == FILE_END)
@@ -3181,10 +3180,10 @@ namespace
         }
 
         FMemDataBuffer Inner;
-        unsigned long AllocSize;
-        unsigned long MemFlags;
-        unsigned long Access;
-        unsigned long LogicalSize;
+        uint32_t AllocSize;
+        uint32_t MemFlags;
+        uint32_t Access;
+        uint32_t LogicalSize;
     };
 
     class FMemFactory final : public FNamedFactory
@@ -3327,17 +3326,17 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount = RefCount + 1;
             return RefCount;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount != 0)
                 RefCount = RefCount - 1;
-            const unsigned long Remaining = RefCount;
+            const uint32_t Remaining = RefCount;
             if (Remaining == 0)
             {
                 RefCount = 1;
@@ -3416,11 +3415,11 @@ namespace
 
         // LAB_06b77fc0: copy this+4 path string to dest, max chars. RET 0xC.
         // formerly Slot14
-        int DACOM_API GetPath(char* Dest, unsigned long MaxChars) override
+        int DACOM_API GetPath(char* Dest, uint32_t MaxChars) override
         {
             char* Out = Dest;
-            unsigned long Len = (unsigned long)(std::strlen(PathText)) + 1;
-            unsigned long CopyLen = MaxChars;
+            uint32_t Len = (uint32_t)(std::strlen(PathText)) + 1;
+            uint32_t CopyLen = MaxChars;
             if (MaxChars >= Len)
                 CopyLen = Len;
             if (CopyLen == 0 || Out == nullptr)
@@ -3445,7 +3444,7 @@ namespace
             Children.clear();
         }
 
-        unsigned long RefCount;            // +0x114
+        uint32_t RefCount;            // +0x114
         char PathText[0x108];              // +0x4
         std::vector<IFileSystem*> Children; // +0x10c block, slot count = size()
         int ChildCount;                    // +0x110

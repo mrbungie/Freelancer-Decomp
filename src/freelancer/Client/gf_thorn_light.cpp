@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_light.h"
+#include "fl/handles.h"
 
 #include "dacom.h"
 #include "engine_light.h"
@@ -216,7 +217,7 @@ void FThornLight::Stop()
 // FUN_00450870.
 void* FThornLight::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -268,7 +269,7 @@ GENRESULT ThornReferenceGetTransform(FThornComponent* Target, float* OutXform12)
 void* ThornReferenceGetEngineInstance(FThornComponent* Target)
 {
     if (Target == nullptr)
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     return Target->GetEngineInstance();
 }
 

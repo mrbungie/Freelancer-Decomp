@@ -81,6 +81,8 @@
 // Nothing in this file touches the SP path.
 
 #include "rpc_containers.h"
+#include <cstring>
+#include "platform/fl_x87.h"
 #include "rpc_payloads.h"
 
 // ===========================================================================
@@ -1132,12 +1134,23 @@ unsigned int RpcEncodeServerCharSelectVerified(FPacketBase& Packet,
     // 06dabfa0 / 06dabfa6, reads the window back as two plain dwords.)
     const void* DoubleSource = &Wire->Field_0x08;
     void* DoubleDest = reinterpret_cast<void*>(Packet.MarshalPtr);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov eax, DoubleSource
         fld qword ptr [eax]
         mov eax, DoubleDest
         fstp qword ptr [eax]
     }
+#else
+    {
+        // FLD/FSTP qword: bit-exact copy except a signalling NaN is quieted.
+        unsigned long long Bits;
+        std::memcpy(&Bits, DoubleSource, sizeof(Bits));
+        if ((Bits & 0x7ff0000000000000ull) == 0x7ff0000000000000ull && (Bits & 0x000fffffffffffffull) != 0)
+            Bits |= 0x0008000000000000ull;
+        std::memcpy(DoubleDest, &Bits, sizeof(Bits));
+    }
+#endif
     Packet.MarshalPtr += 8u;
     *OutLength = Stream.Length();
     RpcRecordEncodedPacket(Packet.PacketId, Stream.Length());

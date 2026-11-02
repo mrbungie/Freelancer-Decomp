@@ -56,6 +56,7 @@ namespace
 
     void StoreParamFloat(FThornExtendedProgress* Output, const float* Value)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Value
@@ -63,12 +64,16 @@ namespace
             mov ecx, Output
             fstp tbyte ptr [ecx]
         }
+#else
+        Output->Set(static_cast<double>(*Value));
+#endif
     }
 
     typedef std::list<FParamKey> FParamEvaluationList;
 
     bool ParamStrictLess(const float* Left, const float* Right)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         // FLD/FCOMP; TEST AH,05; JP takes equal/greater/unordered.
         unsigned char bLess;
         __asm
@@ -82,6 +87,9 @@ namespace
             setnp bLess
         }
         return bLess != 0;
+#else
+        return *Left < *Right;
+#endif
     }
 
     void MergeEvaluationLists(FParamEvaluationList& Destination, FParamEvaluationList& Source)
@@ -185,6 +193,7 @@ namespace
     // 2f2f0: preserve the complete extended x87 value in typed output, including
     // the caller-supplied nullable outside values. A C++ float polynomial
     // would round U²/U³ and the intermediate sums before the retail stores.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __declspec(naked) void __cdecl CatmullRom1D(const float* P0, const float* P1,
                                                const float* P2, const float* P3, float U, FThornExtendedProgress* Output)
     {
@@ -242,7 +251,25 @@ namespace
             ret
         }
     }
+#else
+    void CatmullRom1D(const float* P0, const float* P1,
+                      const float* P2, const float* P3, float U, FThornExtendedProgress* Output)
+    {
+        float p0 = P0 ? *P0 : *P1;
+        float p1 = *P1;
+        float p2 = *P2;
+        float p3 = P3 ? *P3 : *P2;
+        float u2 = U * U;
+        float u3 = u2 * U;
+        double result = 0.5 * ((2.0 * p1) +
+                               (-p0 + p2) * U +
+                               (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u2 +
+                               (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u3);
+        Output->Set(result);
+    }
+#endif
 
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __declspec(naked) void __cdecl ParamLerp(const FParamKey* Left, const FParamKey* Right, const float* T, FThornExtendedProgress* Output)
     {
         // 2f948..2f961: extended subtraction/divide/product/add to 80-bit output.
@@ -269,6 +296,14 @@ namespace
             ret
         }
     }
+#else
+    void ParamLerp(const FParamKey* Left, const FParamKey* Right, const float* T, FThornExtendedProgress* Output)
+    {
+        float fraction = (*T - Left->T) / (Right->T - Left->T);
+        double result = Left->Value + fraction * (Right->Value - Left->Value);
+        Output->Set(result);
+    }
+#endif
 
     // FUN_06f21000: shared exact x87 arithmetic including helper float stores.
     GENRESULT ThornEvalCatmullRom3D(const float* P0, const float* P1, const float* P2,
@@ -288,6 +323,7 @@ namespace
 
     // FUN_06f33df0: construction copies Value/T raw, but tangent values pass
     // through FLD/FSTP in reverse load order. Assignment is a different path.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __declspec(naked) void __cdecl ConstructHermiteRecord(FHermiteKnot* Destination, const FHermiteKnot* Source)
     {
         __asm
@@ -308,10 +344,18 @@ namespace
             ret
         }
     }
+#else
+    void ConstructHermiteRecord(FHermiteKnot* Destination, const FHermiteKnot* Source)
+    {
+        if (Destination != nullptr && Source != nullptr)
+            *Destination = *Source;
+    }
+#endif
 
     // 33160/331b0 assign four DWORDs, without loading tangent floats.
     void AssignHermiteRecord(FHermiteKnot* Destination, const FHermiteKnot* Source)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, Destination
@@ -325,9 +369,14 @@ namespace
             mov edx, dword ptr [ecx + 0ch]
             mov dword ptr [eax + 0ch], edx
         }
+#else
+        if (Destination != nullptr && Source != nullptr)
+            *Destination = *Source;
+#endif
     }
 
     // FUN_06f30480: all 60 instructions; only normalized S is stored as float.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __declspec(naked) void __cdecl Hermite1D(const FHermiteKnot& A, const FHermiteKnot& B, const float* T, FThornExtendedProgress* Output)
     {
         __asm
@@ -404,11 +453,48 @@ namespace
             ret
         }
     }
+#else
+    void Hermite1D(const FHermiteKnot& A, const FHermiteKnot& B, const float* T, FThornExtendedProgress* Output)
+    {
+        float t = *T;
+        if (t <= A.T)
+        {
+            Output->Set(static_cast<double>(A.Value));
+            return;
+        }
+        if (t >= B.T)
+        {
+            Output->Set(static_cast<double>(B.Value));
+            return;
+        }
+        float dt = B.T - A.T;
+        float s = (t - A.T) / dt;
+        union { float f; int i; } outTangent;
+        outTangent.f = A.MOut;
+        if (outTangent.i == -1)
+        {
+            Output->Set(static_cast<double>(A.Value));
+            return;
+        }
+        double s2 = static_cast<double>(s) * static_cast<double>(s);
+        double s3 = s2 * static_cast<double>(s);
+        double h00 = 2.0 * s3 - 3.0 * s2 + 1.0;
+        double h10 = s3 - 2.0 * s2 + static_cast<double>(s);
+        double h01 = -2.0 * s3 + 3.0 * s2;
+        double h11 = s3 - s2;
+        double result = h00 * static_cast<double>(A.Value) +
+                       h10 * static_cast<double>(dt) * static_cast<double>(A.MOut) +
+                       h01 * static_cast<double>(B.Value) +
+                       h11 * static_cast<double>(dt) * static_cast<double>(B.MIn);
+        Output->Set(result);
+    }
+#endif
 
     // FUN_06f30520: exact endpoint/seed/walk arithmetic, followed by an
     // ordinary typed kernel call. No C++ function is invoked inside asm.
     void HermiteEvaluate(const FHermiteKnot* Begin, int Count, const float* T, FThornExtendedProgress* Output)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const FHermiteKnot* Left;
         const FHermiteKnot* Right;
         int LastIndex;
@@ -528,6 +614,37 @@ namespace
         }
         if (!bEndpoint)
             Hermite1D(*Left, *Right, T, Output);
+#else
+        if (Begin == nullptr || Count == 0)
+            return;
+        if (Count == 1)
+        {
+            Output->Set(static_cast<double>(Begin[0].Value));
+            return;
+        }
+        float t = *T;
+        if (t <= Begin[0].T)
+        {
+            Output->Set(static_cast<double>(Begin[0].Value));
+            return;
+        }
+        if (t >= Begin[Count - 1].T)
+        {
+            Output->Set(static_cast<double>(Begin[Count - 1].Value));
+            return;
+        }
+        int low = 0;
+        int high = Count - 1;
+        while (low < high - 1)
+        {
+            int mid = (low + high) / 2;
+            if (t < Begin[mid].T)
+                high = mid;
+            else
+                low = mid;
+        }
+        Hermite1D(Begin[low], Begin[high], T, Output);
+#endif
     }
 
     void ApplyHermiteTangents(FHermiteKnot* Knots, int Count, int TangentMode)
@@ -539,6 +656,7 @@ namespace
         {
             FHermiteKnot* Current = &Knots[Index];
             FHermiteKnot* Next = &Knots[Index + 1];
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             float DeltaT;
             float DeltaV;
             // 300e5..30110: both differences are stored before the clamp,
@@ -651,6 +769,80 @@ namespace
             default:
                 break;
             }
+#else
+            float DeltaT = Next->T - Current->T;
+            float DeltaV = Next->Value - Current->Value;
+            if (DeltaT < G_MinDeltaT)
+            {
+                union { float f; unsigned int u; } minDt;
+                minDt.u = 0x38d1b717u;
+                DeltaT = minDt.f;
+            }
+            switch (TangentMode)
+            {
+            case 0:
+            {
+                union { float f; unsigned int u; } negOne;
+                negOne.u = 0xffffffffu;
+                Current->MOut = negOne.f;
+                break;
+            }
+            case 1:
+            {
+                float slope = DeltaV / DeltaT;
+                Next->MIn = slope;
+                Current->MOut = slope;
+                break;
+            }
+            case 4:
+                Current->MOut = 0.0f;
+                Next->MIn = 0.0f;
+                break;
+            case 5:
+            {
+                float slope = DeltaV / (DeltaT * G_ScalarHalfFloat);
+                if (Current->Value <= Next->Value)
+                {
+                    Current->MOut = slope;
+                    Next->MIn = 0.0f;
+                }
+                else
+                {
+                    Current->MOut = 0.0f;
+                    Next->MIn = slope;
+                }
+                break;
+            }
+            case 2:
+            {
+                Current->MOut = 0.0f;
+                Next->MIn = DeltaV / (DeltaT * G_ScalarHalfFloat);
+                break;
+            }
+            case 3:
+            {
+                Current->MOut = DeltaV / (DeltaT * G_ScalarHalfFloat);
+                Next->MIn = 0.0f;
+                break;
+            }
+            case 6:
+            {
+                if (Current->Value >= Next->Value)
+                {
+                    Current->MOut = DeltaV / (DeltaT * G_ScalarHalfFloat);
+                    Next->MIn = 0.0f;
+                }
+                else
+                {
+                    Current->MOut = 0.0f;
+                    Next->MIn = DeltaV / (DeltaT * G_ScalarHalfFloat);
+                }
+                break;
+            }
+            default:
+                break;
+            }
+#endif
         }
     }
 
@@ -748,7 +940,7 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount_; }
 
         // Retail likewise clones Release per curve factory's vtable
         // (confirmed identical bodies at LAB_06f33710, LAB_06f33800,
@@ -756,7 +948,7 @@ namespace
         // dword at +0x3c, and when it reaches zero, force it to 1 and call
         // vtable+0x38 (Slot14Dtor) with DeleteFlag=1 before returning 0. All
         // of those clones are covered by this one method + Slot14Dtor.
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             // 33717/33719 only decrement a positive count; zero still tears down.
             if (RefCount_ != 0)
@@ -778,7 +970,11 @@ namespace
             // The typed worker preserves its result in 80-bit output storage.
             // Pass the original argument address: no FP load before worker comparisons.
             EvaluateExtended(&T, &Result);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm { fld tbyte ptr Result }
+#else
+            return static_cast<float>(Result.Get());
+#endif
         }
 #pragma warning(pop)
 
@@ -791,6 +987,7 @@ namespace
 
         void DACOM_API WrapEvaluateToExtended(int A, int B, FThornExtendedProgress* Output) override
         {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             int Remainder;
             float Normalized;
             // Same 2f810 signed division and mandatory argument rounding.
@@ -805,6 +1002,11 @@ namespace
                 fstp dword ptr Normalized
             }
             EvaluateToExtended(&Normalized, Output);
+#else
+            int Remainder = A % B;
+            float Normalized = static_cast<float>(Remainder) / static_cast<float>(B);
+            EvaluateToExtended(&Normalized, Output);
+#endif
         }
 
         unsigned char DACOM_API Slot4Replace(int Id, float F0, float F1, float F2,
@@ -816,6 +1018,7 @@ namespace
                 return 0;
             float TargetT;
             unsigned char bAccepted;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             const float Zero = 0.0f;
             const float One = 1.0f;
             const double EndpointZero = 0.0;
@@ -872,6 +1075,25 @@ namespace
                 mov bAccepted, 0
             ReplaceTimeDone:
             }
+#else
+            if (Id == 0)
+                TargetT = 0.0f;
+            else if (Id == 1)
+                TargetT = 1.0f;
+            else if (F0 > 1.0f)
+                TargetT = 1.0f;
+            else if (F0 < 0.0f)
+                TargetT = 0.0f;
+            else
+                TargetT = F0;
+
+            if (TargetT == 0.0f && Id != 0)
+                bAccepted = 0;
+            else if (TargetT == 1.0f && Id != 1)
+                bAccepted = 0;
+            else
+                bAccepted = 1;
+#endif
             if (!bAccepted)
                 return 0;
             Key->T = TargetT;
@@ -903,9 +1125,10 @@ namespace
 
         int DACOM_API AddKey(float F0, float F1, float F2, float F3) override
         {
+            int TimeClass;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             const float Zero = 0.0f;
             const float One = 1.0f;
-            int TimeClass;
             // 2f560..2f5f0: reject strictly outside, select only ordered
             // endpoint equality; unordered reaches new-key construction.
             __asm
@@ -942,6 +1165,16 @@ namespace
                 mov TimeClass, 1
             AddTimeDone:
             }
+#else
+            if (F0 < 0.0f || F0 > 1.0f)
+                TimeClass = -1;
+            else if (F0 == 0.0f)
+                TimeClass = 0;
+            else if (F0 == 1.0f)
+                TimeClass = 1;
+            else
+                TimeClass = 3;
+#endif
             if (TimeClass < 0)
                 return -1;
 
@@ -1031,6 +1264,7 @@ namespace
 #pragma warning(disable: 4716) // Virtual evaluator returns extended ST(0).
         float DACOM_API Slot12WrapEvaluate(int A, int B) override
         {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             int Remainder;
             float Normalized;
             // 2f810: signed IDIV (including both hardware fault cases), then
@@ -1046,6 +1280,11 @@ namespace
                 fstp dword ptr Normalized
             }
             return Evaluate(Normalized);
+#else
+            int Remainder = A % B;
+            float Normalized = static_cast<float>(Remainder) / static_cast<float>(B);
+            return Evaluate(Normalized);
+#endif
         }
 #pragma warning(pop)
 
@@ -1108,6 +1347,7 @@ namespace
             int InsertAt = 0;
             while (InsertAt < KnotCount_)
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* ExistingTime = &Knots_[InsertAt].T;
                 const float* NewTime = &Record.T;
                 unsigned char bInsertBefore;
@@ -1125,6 +1365,10 @@ namespace
                 }
                 if (bInsertBefore)
                     break;
+#else
+                if (Record.T <= Knots_[InsertAt].T)
+                    break;
+#endif
                 InsertAt = InsertAt + 1;
             }
 
@@ -1240,6 +1484,7 @@ namespace
             FParamEvaluationList::const_iterator Previous = EvaluationKeys_.end();
             while (Key != EvaluationKeys_.end())
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* KeyTime = &Key->T;
                 unsigned char bGreater;
                 unsigned char bEqual;
@@ -1275,6 +1520,20 @@ namespace
                     StoreParamFloat(Output, &Key->Value);
                     return;
                 }
+#else
+                if (Key->T > *T)
+                {
+                    if (Previous == EvaluationKeys_.end())
+                        break;
+                    EvaluateCatmull(Previous, Key, T, Output);
+                    return;
+                }
+                if (Key->T == *T)
+                {
+                    StoreParamFloat(Output, &Key->Value);
+                    return;
+                }
+#endif
                 Previous = Key;
                 ++Key;
             }
@@ -1290,6 +1549,7 @@ namespace
             FParamEvaluationList::const_iterator Previous = EvaluationKeys_.end();
             while (Key != EvaluationKeys_.end())
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* KeyTime = &Key->T;
                 unsigned char bGreater;
                 __asm
@@ -1311,6 +1571,17 @@ namespace
                     ParamLerp(Left, Right, T, Output);
                     return;
                 }
+#else
+                if (Key->T > *T)
+                {
+                    if (Previous == EvaluationKeys_.end())
+                        break;
+                    const FParamKey* Left = &*Previous;
+                    const FParamKey* Right = &*Key;
+                    ParamLerp(Left, Right, T, Output);
+                    return;
+                }
+#endif
                 Previous = Key;
                 ++Key;
             }
@@ -1326,6 +1597,7 @@ namespace
             const float* T1 = &Right->T;
             float U;
             // 2f266..2f285: extended subtracts/divide, then one FSTP DWORD.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov eax, T0
@@ -1338,6 +1610,9 @@ namespace
                 fdivp st(1), st(0)
                 fstp U
             }
+#else
+            U = (*T - *T0) / (*T1 - *T0);
+#endif
             const float* P0 = nullptr;
             const float* P3 = nullptr;
             FParamEvaluationList::const_iterator Outside = Left;
@@ -1362,7 +1637,7 @@ namespace
             HermiteEvaluate(Begin, Count, T, Output);
         }
 
-        unsigned long RefCount_;
+        uint32_t RefCount_;
         const FCurveSpec* Spec_;
         // Base2f090 destroys ID payloads/map before its evaluation list.
         // Declaration order also constructs the list before ID storage.

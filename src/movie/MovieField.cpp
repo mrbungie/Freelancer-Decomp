@@ -17,13 +17,13 @@ int GMovieAllocCount = 0;
 
 // Callees outside this file. Names stay Movie_<addr> until those lanes name them.
 // 0x06ac45a0. Defined in MovieExp.cpp. RET 0x18.
-long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch);
+int32_t __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch);
 
 // 0x06ac85c0. Limb add, borrow/carry in EAX. RET 0x10.
-long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
+int32_t __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
 
 // 0x06ac89d0. Limb subtract, borrow in EAX. RET 0x10.
-long __stdcall SubtractLimbs(unsigned int* Left, unsigned int* Right, int Dest, int Count);
+int32_t __stdcall SubtractLimbs(unsigned int* Left, unsigned int* Right, int Dest, int Count);
 
 // 0x06ac8bd0. In-place limb shift. RET 0x10.
 unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, int Count);
@@ -35,7 +35,7 @@ unsigned int __stdcall Movie_SubtractScaledLimbs(int Modulus, unsigned int Digit
 unsigned int __stdcall Movie_AddScaledLimbs(int Modulus, unsigned int Scale, unsigned int* Buffer, int Count);
 
 // 0x06ac8a90. Signed compare of two limb integers. RET 0x10.
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
 
 // 0x06aca7d0. RET 0x4.
 void __stdcall FillWindowTable(unsigned int Size);
@@ -149,7 +149,7 @@ unsigned int __stdcall Movie_CopyOrReduceField(unsigned int* Source, unsigned in
 void __stdcall Movie_AddModulo(unsigned int* Left, unsigned int* Right, unsigned int* Sum, unsigned int* Modulus)
 {
     unsigned int LimbCount = Modulus[0x40];
-    long Carry = Movie_AddLimbsCarry(Left, Right, (int)Sum, (int)LimbCount);
+    int32_t Carry = Movie_AddLimbsCarry(Left, Right, (int)Sum, (int)LimbCount);
     if (Carry == 0)
     {
         if (Movie_CompareDescending(Sum, Modulus, LimbCount) < 0)
@@ -157,7 +157,7 @@ void __stdcall Movie_AddModulo(unsigned int* Left, unsigned int* Right, unsigned
             return;
         }
     }
-    long Borrow = SubtractLimbs(Sum, Modulus, (int)Sum, (int)LimbCount);
+    int32_t Borrow = SubtractLimbs(Sum, Modulus, (int)Sum, (int)LimbCount);
     if (Carry - Borrow != 0)
     {
         GMovieGraphCode = 0x19;
@@ -300,7 +300,7 @@ void __stdcall Movie_ShiftModulo(unsigned int* Source, int BitCount, unsigned in
             Remaining = Remaining - Chunk;
             continue;
         }
-        long Borrow = SubtractLimbs(Dest, Modulus, (int)Dest, (int)LimbCount);
+        int32_t Borrow = SubtractLimbs(Dest, Modulus, (int)Dest, (int)LimbCount);
         if (Diff - (unsigned int)Borrow != 0u)
         {
             GMovieGraphCode = 0x1a;
@@ -346,10 +346,10 @@ void __stdcall Movie_ShiftModulo(unsigned int* Source, int BitCount, unsigned in
 void __stdcall Movie_SubtractModulo(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* Modulus)
 {
     unsigned int LimbCount = Modulus[0x40];
-    long Borrow = SubtractLimbs(Left, Right, (int)Dest, (int)LimbCount);
+    int32_t Borrow = SubtractLimbs(Left, Right, (int)Dest, (int)LimbCount);
     if (Borrow != 0)
     {
-        long Carry = Movie_AddLimbsCarry(Dest, Modulus, (int)Dest, (int)LimbCount);
+        int32_t Carry = Movie_AddLimbsCarry(Dest, Modulus, (int)Dest, (int)LimbCount);
         if (Borrow - Carry != 0)
         {
             GMovieGraphCode = 0x1d;
@@ -383,7 +383,7 @@ void __stdcall Movie_SplitLimbs(unsigned int* Source, unsigned int Count, unsign
 // Reduces Source[0..Count) into Dest. Field_0x110 == 0 copies and zero-pads.
 // Otherwise the value is staged at Workspace+0x100 and reduced.
 // Returns 0 after clearing Dest when the 0x261C workspace cannot be allocated.
-long __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus)
+int32_t __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus)
 {
     unsigned int LimbCount = Modulus[0x40];
     unsigned int* Workspace = (unsigned int*)Movie_AllocateBlock(0x261c);
@@ -564,7 +564,7 @@ int __stdcall Movie_DivideLimbs(unsigned int* Dividend, unsigned int DividendCou
                     if (Mul > SavedHigh)
                     {
                         Digit = Digit - 1u;
-                        long Carry = Movie_AddLimbsCarry(Remainder, Divisor, (int)Remainder, DivisorCount);
+                        int32_t Carry = Movie_AddLimbsCarry(Remainder, Divisor, (int)Remainder, DivisorCount);
                         Mul = Mul - (unsigned int)Carry;
                     }
                     if (Mul != SavedHigh)

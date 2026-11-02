@@ -24,6 +24,7 @@
 // here are the list and handle primitives those bodies and the codecs share.
 
 #include "rpc_containers.h"
+#include "wire_wchar.h"
 #include "rpc_payloads.h"
 
 // Retail rpclocal imports COMMON.DLL::EquipDesc::is_internal (.rdata:06db30d8) and
@@ -1702,12 +1703,10 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
             // 06d94b73 / 06d94ba8: the length is in CHARACTERS and the run is 2*that.
             const unsigned short LenA = (unsigned short)(Record->TextA.size() & 0xffffu);
             Stream.PutWord(LenA);
-            Stream.PutBytes(LenA != 0 ? Record->TextA.data() : nullptr,
-                            (unsigned int)LenA * 2u);
+            Stream.PutBytes(FlWire16Out(LenA != 0 ? Record->TextA.data() : nullptr, (unsigned int)LenA), (unsigned int)LenA * 2u);
             const unsigned short LenB = (unsigned short)(Record->TextB.size() & 0xffffu);
             Stream.PutWord(LenB);                                   // 06d94c1b
-            Stream.PutBytes(LenB != 0 ? Record->TextB.data() : nullptr,
-                            (unsigned int)LenB * 2u);
+            Stream.PutBytes(FlWire16Out(LenB != 0 ? Record->TextB.data() : nullptr, (unsigned int)LenB), (unsigned int)LenB * 2u);
             Stream.PutDword(Record->Field_0x224);                   // 06d94ca7
             Stream.PutDword(Record->Field_0x22c);                   // 06d94cd4
             Stream.PutDword(Record->Field_0x228);                   // 06d94d01
@@ -1824,16 +1823,14 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             return Stream.GetError();
         }
         Record->TextA.append((size_t)Length, L' ');
-        if (!Stream.GetBytes(Length != 0 ? &Record->TextA[0] : nullptr,
-                             (unsigned int)Length * 2u)) {
+        if (!Stream.GetBytes(FlWire16In(Length != 0 ? &Record->TextA[0] : nullptr, (unsigned int)Length), (unsigned int)Length * 2u)) {
             return Stream.GetError();
         }
         if (!Stream.GetWord(Length)) {                               // 06d9384a
             return Stream.GetError();
         }
         Record->TextB.append((size_t)Length, L' ');
-        if (!Stream.GetBytes(Length != 0 ? &Record->TextB[0] : nullptr,
-                             (unsigned int)Length * 2u)) {
+        if (!Stream.GetBytes(FlWire16In(Length != 0 ? &Record->TextB[0] : nullptr, (unsigned int)Length), (unsigned int)Length * 2u)) {
             return Stream.GetError();
         }
         if (!Stream.GetDword(Record->Field_0x224)) { return Stream.GetError(); }  // 06d9393a
@@ -2311,7 +2308,7 @@ unsigned int RpcEncodeCreateObjectCommon(FRpcMarshalStream& Stream,
                                    static_cast<double>(MaxHitPts)) *
                                   FRpcMarshalStream::kPercentScale;
             Percent = static_cast<unsigned char>(
-                static_cast<unsigned long>(static_cast<long>(Scaled)) & 0xffu);
+                static_cast<uint32_t>(static_cast<int32_t>(Scaled)) & 0xffu);
         }
         // MaxHitPts == 0 cannot be reached through Common.dll (GetArchMaxHitPts defaults
         // to 1 on a miss). If it ever were, retail's FDIVR would produce an infinity and
@@ -2461,7 +2458,7 @@ unsigned int RpcDecodeCreateObjectCommon(FRpcMarshalStream& Stream,
         const double Fraction = static_cast<double>(static_cast<unsigned int>(Percent)) *
                                 FRpcMarshalStream::kPercentInvScale;
         Wire->Field_0x48 = static_cast<unsigned int>(
-            static_cast<long>(MaxHitPts * Fraction));                    // 06da4394
+            static_cast<int32_t>(MaxHitPts * Fraction));                    // 06da4394
     }
     if (SinglePlayer()) {                                                // 06da4397 / 06da439f
         if (!Stream.GetDword(Wire->Field_0x4c)) {                        // 06da43c8
@@ -2743,7 +2740,7 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
             if (!Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu))) {
                 return Stream.GetError();
             }
-            if (!Stream.PutBytes(Wire->DisplayName, Wire->DisplayNameLength * 2u)) {
+            if (!Stream.PutBytes(FlWire16Out(Wire->DisplayName, Wire->DisplayNameLength), Wire->DisplayNameLength * 2u)) {
                 return Stream.GetError();
             }
         }
@@ -2844,8 +2841,8 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
             const unsigned int Length = (unsigned int)(int)(signed char)LengthByte;
             Wire->DisplayNameLength = Length;                            // 06d98469
             Wire->DisplayName = static_cast<wchar_t*>(
-                ::operator new((Length * 2u) + 2u, std::nothrow));       // 06d9846f
-            if (!Stream.GetBytes(Wire->DisplayName, Length * 2u)) {      // 06d9847a / 06d984c3
+                ::operator new((static_cast<size_t>(Length) + 1u) * sizeof(wchar_t), std::nothrow));       // 06d9846f
+            if (!Stream.GetBytes(FlWire16In(Wire->DisplayName, Length), Length * 2u)) {      // 06d9847a / 06d984c3
                 return Stream.GetError();
             }
             Wire->DisplayName[Length] = L'\0';                           // 06d984e1
@@ -3367,7 +3364,7 @@ unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** B
         return FRpcMarshalStream::kEncodeOverflow;
     }
     if (Wire->NameCharCount != 0 &&
-        !Stream.PutBytes(Wire->NameChars, Wire->NameCharCount * 2u)) {
+        !Stream.PutBytes(FlWire16Out(Wire->NameChars, Wire->NameCharCount), Wire->NameCharCount * 2u)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
 

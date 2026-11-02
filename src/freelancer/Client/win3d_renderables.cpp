@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "win3d_renderables.h"
+#include "fl/handles.h"
 #ifdef FREELANCER_WALK_MODE
 #include "base_walk.h"
 #endif
@@ -87,7 +88,7 @@ namespace
     FImmedStatePair const kImmedTss[] = {{1, 1}, {2, 2}, {3, 1}, {4, 1}, {5, 2}, {6, 1}, {0, 0}};
 
     // The handle the flush passes for "the pipeline's current buffer".
-    void* const kImmedCurrentBuffer = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    void* const kImmedCurrentBuffer = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
     // 0x005a3068..0x005a30a9 and 0x005a31ce..0x005a31ea: a stack object {pipeline, state,
     // saved value} (EH state 0, unwind LAB_005c503b) -- the state is read into it and set to 0,
@@ -203,7 +204,7 @@ namespace
     // null is queried from DALib::Pipeline (slot 0). The query results are not read.
     void CreateImmedBatch(FImmedBatcher* Batch)
     {
-        Batch->VertBase = static_cast<FImmedVertex*>(operator new(0xc000));
+        Batch->VertBase = static_cast<FImmedVertex*>(operator new(sizeof(FImmedVertex) > 0xc000 ? sizeof(FImmedVertex) : 0xc000));
         Batch->IndexBase = static_cast<unsigned short*>(operator new(0x3000));
         Batch->VertCount = 0;
         Batch->IndexCount = 0;
@@ -324,7 +325,7 @@ void Win3DImmedBatchFlushAll()
 }
 
 void ImmedBatchAddLine(FImmedBatcher* Batch, float const* A, float const* B,
-                       unsigned long Color, unsigned long EdgeColor, float Width)
+                       uint32_t Color, uint32_t EdgeColor, float Width)
 {
 #ifdef FREELANCER_WALK_MODE
     Color = BaseWalkFadeInterfaceColor(Color);
@@ -399,8 +400,8 @@ void Win3DImmedBatchDestroyAll()
     DestroyImmedBatch(&G_ImmedBatchB);
 }
 
-void Win3DImmedDrawLine(float const* A, float const* B, unsigned long Color,
-                        unsigned long EdgeColor, float Width)
+void Win3DImmedDrawLine(float const* A, float const* B, uint32_t Color,
+                        uint32_t EdgeColor, float Width)
 {
     // FUN_005a2940 (.text:005a2940-005a2963), cdecl: the five arguments passed on unchanged to
     // FUN_005a2a40 on DAT_0067dd68.

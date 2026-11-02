@@ -17,7 +17,7 @@ struct IFLAppearance : IDAComponent
     virtual GENRESULT DACOM_API RemoveInstanceValue(int Key) = 0;
     virtual GENRESULT DACOM_API SetDirectionalLight(const float* First, const float* Second) = 0;
     virtual GENRESULT DACOM_API SetDirectionalLightEnabled(unsigned char Flag) = 0;
-    virtual GENRESULT DACOM_API GetOverrideMaterial(unsigned long Index, void** Out) = 0;
+    virtual GENRESULT DACOM_API GetOverrideMaterial(uint32_t Index, void** Out) = 0;
     // +0x24/+0x28: Camera and engine instance passed to Renderer2 with the
     // Backdrop (066fe270) / Starsphere (066fe570) override material.
     virtual GENRESULT DACOM_API DrawBackdrop(void* A, void* Extra) = 0;
@@ -29,7 +29,7 @@ struct IFLAppearance : IDAComponent
 
 struct FAggDesc18
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     void* OuterAt8;
     void** InnerOutAtC;

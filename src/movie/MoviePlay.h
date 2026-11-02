@@ -9,10 +9,10 @@
 #include <windows.h>
 
 // 0x06ac1e50. Builds the filter graph with WM ASF Reader, calls Run, returns while playback continues.
-long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path);
+int32_t __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path);
 
 // 0x06ac16a0. Logs when Code < 0. Returns true when Code < 0.
-bool __cdecl Movie_LogNegativeCode(long Code, const char* File, int Line);
+bool __cdecl Movie_LogNegativeCode(int32_t Code, const char* File, int Line);
 
 // 0x06ac1bd0. Returns the playback flag.
 bool __cdecl Movie_IsPlaying();

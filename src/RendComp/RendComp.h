@@ -45,8 +45,8 @@ static const char* const G_FileVMPartArch =
 static const char* const G_FileSphereMeshArchetype =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\RendComp\\SphereMesh\\SphereMeshArchetype.cpp";
 
-static const unsigned long G_RegisterPriority = 0x80000000;
-static const unsigned long G_HandleFail = 0xFFFFFFFF;
+static const uint32_t G_RegisterPriority = 0x80000000;
+static const uint32_t G_HandleFail = 0xFFFFFFFF;
 static const float G_DefaultLodDistance = 1000000.0f;
 
 struct FDacomFactory;
@@ -68,11 +68,11 @@ struct FDacomFactory final : IComponentFactory
     }
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Out) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
     FDacomFactoryCreateFn Create;
 };
@@ -82,7 +82,7 @@ struct FDacomFactory final : IComponentFactory
 // (LAB_06c2db50) requires exactly this size, and FUN_06c2d720 requires +8 and +0xC non-null.
 struct FRenderPluginDesc
 {
-    unsigned long Size;         // +0x00 0x10
+    uint32_t Size;         // +0x00 0x10
     const char* Name;           // +0x04 the [RenderManager] line, cut at the first tab/space/';'
     IDAComponent* Parent;       // +0x08 RenderManager +0x28 (the system container)
     IEngine* Engine;            // +0x0C DAT_06c37d4c
@@ -129,14 +129,14 @@ struct FVmeshGroup;
 // VMeshData, 0x38 bytes: operator new(0x38) + ctor FUN_06c2df60 in FUN_06c2dd20.
 struct FVmeshData
 {
-    unsigned long Crc;          // +0x00 DACOM_CRC::GetCRC32(Name)
+    uint32_t Crc;          // +0x00 DACOM_CRC::GetCRC32(Name)
     char* Name;                 // +0x04 _strdup of the .vms directory name (case kept)
     IMaterial** Materials;      // +0x08 one per facegroup, zeroed (FUN_06c2dd20)
     void* VertexBuffer;         // +0x0C the group's VB (FUN_06c2d4a0)
-    unsigned long Fvf;          // +0x10 the group's FVF
-    unsigned long BaseVertex;   // +0x14 first vertex of this mesh inside the group VB
+    uint32_t Fvf;          // +0x10 the group's FVF
+    uint32_t BaseVertex;   // +0x14 first vertex of this mesh inside the group VB
     void* IndexBuffer;          // +0x18 the group's IB (FUN_06c2d5a0)
-    unsigned long StartIndex;   // +0x1C first index of this mesh inside the group IB
+    uint32_t StartIndex;   // +0x1C first index of this mesh inside the group IB
     FVmeshData* Next;           // +0x20 group list
     FVmeshData* Prev;           // +0x24
     FVmeshGroup* Group;         // +0x28
@@ -148,11 +148,11 @@ struct FVmeshData
 // Shared-buffer group, 0x28 bytes: operator new(0x28) + ten zero stores (LAB_06c2ee30).
 struct FVmeshGroup
 {
-    unsigned long VertexTotal;  // +0x00 sum of member Header->Vertices
-    unsigned long IndexTotal;   // +0x04 sum of member Header->Indices
-    unsigned long Fvf;          // +0x08 0 until the first member is added
-    unsigned long Field0C;      // +0x0C TODO: zeroed at construction, no reader in 06c2d330..06c2f480
-    unsigned long Field10;      // +0x10 TODO: zeroed at construction, no reader in 06c2d330..06c2f480
+    uint32_t VertexTotal;  // +0x00 sum of member Header->Vertices
+    uint32_t IndexTotal;   // +0x04 sum of member Header->Indices
+    uint32_t Fvf;          // +0x08 0 until the first member is added
+    uint32_t Field0C;      // +0x0C TODO: zeroed at construction, no reader in 06c2d330..06c2f480
+    uint32_t Field10;      // +0x10 TODO: zeroed at construction, no reader in 06c2d330..06c2f480
     void* VertexBuffer;         // +0x14
     void* IndexBuffer;          // +0x18
     FVmeshData* First;          // +0x1C
@@ -164,7 +164,7 @@ struct FVmeshGroup
 struct FVmeshKey
 {
     const char* Name;
-    unsigned long Crc;
+    uint32_t Crc;
 };
 
 static_assert(offsetof(FVmeshData, Group) == 0x28, "VMeshData+0x28 group");
@@ -178,9 +178,9 @@ bool RendCompIidEqual(const char* Left, const char* Right);
 
 int FileOpenNode(void* File, const char* Name);
 int FileClose(void* File, int Handle);
-int FileRead(void* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut);
-unsigned long FileGetSize(void* File, int Handle);
-int FileGetCurrentPath(void* File, char* Out, unsigned long MaxChars);
+int FileRead(void* File, int Handle, void* Buffer, uint32_t Size, uint32_t* ReadOut);
+uint32_t FileGetSize(void* File, int Handle);
+int FileGetCurrentPath(void* File, char* Out, uint32_t MaxChars);
 int FileOpenByName(void* File, const char* ChildName);
 // FUN_06c24980: the 0x34 FileSystem descriptor (Path, "FileSystem", GENERIC_READ, share 1,
 // OPEN_EXISTING, 0x8000080, +0x30 = -1).
@@ -222,7 +222,7 @@ FVmeshData* VMeshDataFind(const FVmeshKey* Key);                  // FUN_06c2e72
 int VMeshDataAddRef(FVmeshData* Data);                            // FUN_06c2dfe0
 int VMeshDataRelease(FVmeshData* Data);                           // FUN_06c2dff0
 int VMeshGroupEnsureVb(FVmeshGroup* Group);                       // FUN_06c2d4a0
-int VMeshGroupEnsureIb(FVmeshGroup* Group, unsigned long BaseVertex); // FUN_06c2d5a0
+int VMeshGroupEnsureIb(FVmeshGroup* Group, uint32_t BaseVertex); // FUN_06c2d5a0
 void VMeshGroupDestroyVb(FVmeshGroup* Group);                     // FUN_06c2d480
 void VMeshGroupDestroyIb(FVmeshGroup* Group);                     // FUN_06c2d490
 
@@ -237,17 +237,17 @@ struct FVmeshChannelRecord
     int VertexCount;            // +0x10
 };
 
-bool VMeshChannelPresent(unsigned long Fvf, unsigned int ChannelId);
-int VMeshChannelByteOffset(unsigned long Fvf, unsigned int ChannelId);
-unsigned int VMeshFvfStride(unsigned long Fvf);
+bool VMeshChannelPresent(uint32_t Fvf, unsigned int ChannelId);
+int VMeshChannelByteOffset(uint32_t Fvf, unsigned int ChannelId);
+unsigned int VMeshFvfStride(uint32_t Fvf);
 // FUN_06c2e020 (VertexStart 0, VertexCount Header->Vertices) and FUN_06c31500 (the VMeshRef's
 // range): false and Out untouched when the channel is absent.
-bool VMeshFillChannelRecord(const FVmeshDataHeader* Header, unsigned long VertexStart,
-                            unsigned long VertexCount, unsigned int ChannelId,
+bool VMeshFillChannelRecord(const FVmeshDataHeader* Header, uint32_t VertexStart,
+                            uint32_t VertexCount, unsigned int ChannelId,
                             FVmeshChannelRecord* Out);
 // FUN_06c2e510 / FUN_06c31730: the 0x70 vertex-source descriptor.
-void VMeshBuildVertexDesc(const FVmeshDataHeader* Header, unsigned long VertexStart,
-                          unsigned long VertexCount, FRpVertexSrcDesc* Out);
+void VMeshBuildVertexDesc(const FVmeshDataHeader* Header, uint32_t VertexStart,
+                          uint32_t VertexCount, FRpVertexSrcDesc* Out);
 
 // The object-building halves of the TriMesh (LAB_06c22210) and SphereMesh (LAB_06c2a3d0)
 // factories, after PluginFactoryCreate's AGGDESC checks (Plugins.cpp).

@@ -43,7 +43,7 @@ namespace MediaPlayer
     __declspec(dllexport) void __cdecl Startup();
     __declspec(dllexport) bool __cdecl UpdateMovie();
     __declspec(dllexport) void __cdecl StopMovie();
-    __declspec(dllexport) long __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path);
+    __declspec(dllexport) int32_t __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path);
     __declspec(dllexport) void __cdecl FreeMovie();
     __declspec(dllexport) void __cdecl Shutdown();
     __declspec(dllexport) void __cdecl SetApproach(Approach approach);

@@ -31,8 +31,8 @@ namespace AlchemyImpl
     {
     public:
         // DLL-global callbacks set by LAB_062024c0 / LAB_062024d0.
-        using FnUpdateCallback = void(__cdecl*)(unsigned long, void*, unsigned long);
-        using FnFilterCallback = unsigned long(__cdecl*)(void*, void*);
+        using FnUpdateCallback = void(__cdecl*)(uint32_t, void*, uint32_t);
+        using FnFilterCallback = uint32_t(__cdecl*)(void*, void*);
 
         FAlchemy()
             : Inner_(this), Controller_(&Inner_), Attaches_(nullptr), AttachCount_(0),
@@ -49,8 +49,8 @@ namespace AlchemyImpl
         ~FAlchemy() noexcept(false);
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         void SetController(IDAComponent* OuterUnknown)
         {
@@ -60,14 +60,14 @@ namespace AlchemyImpl
 
         GENRESULT DACOM_API LoadNodeLibrary(IFileSystem* Filesys) override;
         GENRESULT DACOM_API SaveNodeLibrary(IFileSystem* Filesys) override;
-        unsigned long DACOM_API HashNodeName(const char* Name) override
+        uint32_t DACOM_API HashNodeName(const char* Name) override
         {
             return HashNameCrc(Name);
         }
         // FUN_062274b0 RET 0x10: name, prototype, optional output hash.
         GENRESULT DACOM_API NodeLibSlot6(const char* Name, IDAComponent* Node,
-                                       unsigned long* OutHash) override;
-        GENRESULT DACOM_API NodeLibSlot7(unsigned long Hash) override;
+                                       uint32_t* OutHash) override;
+        GENRESULT DACOM_API NodeLibSlot7(uint32_t Hash) override;
         // FUN_06228b00: enumerate node-lib entries, Callback(Node, Context),
         // stop at first nonzero result.
         GENRESULT DACOM_API NodeLibSlot8(FNodeLibraryEnumCallback Callback, void* Context) override;
@@ -75,9 +75,9 @@ namespace AlchemyImpl
         // FUN_062277e0: MakeUniqueName-style "#N" collision avoidance.
         GENRESULT DACOM_API NodeLibSlot10(void* Name, void* Out) override;
         // LAB_06227710: find prototype by hash, then CloneNode(Out).
-        GENRESULT DACOM_API NodeLibSlot11(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API NodeLibSlot11(uint32_t Hash, IDAComponent** Out) override;
         // LAB_06227770: find CRC, write stored ptr, AddRef.
-        GENRESULT DACOM_API NodeLibSlot12(unsigned long Hash, IDAComponent** Out) override;
+        GENRESULT DACOM_API NodeLibSlot12(uint32_t Hash, IDAComponent** Out) override;
 
         GENRESULT DACOM_API CreateVertexBuffer() override;
         GENRESULT DACOM_API ReleaseVertexBuffer() override;
@@ -142,20 +142,20 @@ namespace AlchemyImpl
             explicit FInnerUnknown(FAlchemy* Owner) : RefCount_(1), Owner_(Owner) {}
 
             GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-            unsigned long DACOM_API AddRef() override;
-            unsigned long DACOM_API Release() override;
+            uint32_t DACOM_API AddRef() override;
+            uint32_t DACOM_API Release() override;
 
         private:
-            unsigned long RefCount_;
+            uint32_t RefCount_;
             FAlchemy* Owner_;
         };
 
         GENRESULT AcquirePipelineInterfaces(AGGDESC* Desc);
         void BindInitFxNode();
-        IDAComponent* FindNodeEntry(unsigned long Hash);
+        IDAComponent* FindNodeEntry(uint32_t Hash);
         GENRESULT InsertNodeByName(const char* Name, IDAComponent* Node,
-                                  unsigned long* OutHash = nullptr);
-        GENRESULT RemoveNodeByHash(unsigned long Hash);
+                                  uint32_t* OutHash = nullptr);
+        GENRESULT RemoveNodeByHash(uint32_t Hash);
         void ClearNodeList();
         void ClearAttaches();
         // FUN_06202070: shared submit walk used by SubmitNode/SubmitChildNodes.
@@ -165,8 +165,8 @@ namespace AlchemyImpl
         IDAComponent* Controller_;
         FNodePrototypeRegistry NodeRegistry_;
         FAlchemyAttach* Attaches_;
-        unsigned long AttachCount_;
-        unsigned long AttachCapacity_;
+        uint32_t AttachCount_;
+        uint32_t AttachCapacity_;
         IDAComponent* InitNode_;
         int SavedRsAlphaTest_;
         int SavedRsAlphaBlend_;

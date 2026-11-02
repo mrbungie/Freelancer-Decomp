@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "engine_light.h"
+#include "fl/handles.h"
 
 #include "common_csys.h"
 #include "common_ini.h"
@@ -68,7 +69,7 @@ namespace
         case 2:
         case 3:
             if (bAlsoD3dType)
-                Light->D3d.Type = static_cast<unsigned long>(LightType);
+                Light->D3d.Type = static_cast<uint32_t>(LightType);
             Light->Type = LightType;
             break;
         case -2:
@@ -90,10 +91,10 @@ namespace
     // DAT_006164ec — soft-light 3DMathEngine cache (FUN_005b73e0).
     I3DMathEngine* G_SoftLightMath = nullptr;
 
-    FEngineLight* ListNext(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->Field04)); }
-    FEngineLight* ListPrev(FEngineLight const* L) { return reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(L->Field08)); }
-    void SetListNext(FEngineLight* L, FEngineLight* V) { L->Field04 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
-    void SetListPrev(FEngineLight* L, FEngineLight* V) { L->Field08 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(V)); }
+    FEngineLight* ListNext(FEngineLight const* L) { return fl::HandleTo<FEngineLight>(L->Field04); }
+    FEngineLight* ListPrev(FEngineLight const* L) { return fl::HandleTo<FEngineLight>(L->Field08); }
+    void SetListNext(FEngineLight* L, FEngineLight* V) { L->Field04 = static_cast<unsigned>(fl::PtrToHandle(V)); }
+    void SetListPrev(FEngineLight* L, FEngineLight* V) { L->Field08 = static_cast<unsigned>(fl::PtrToHandle(V)); }
 
     I3DMathEngine* AcquireSoftLightMath()
     {
@@ -1625,7 +1626,7 @@ void GameLightTick(FGameLight* Light, float Dt)
         // 0x0053787e..0x0053788b: DALib::Engine vt+0xa0 (GetInstanceTransform) on +0xec, no
         // null test on the engine or the result.
         float* const InstRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Light->EngineIndex)));
+            static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Light->EngineIndex))));
         // 0x00537893..0x005378a1: DAT_006789c0, FUN_005b73e0 when still null.
         if (G_GameLightMath == nullptr)
             G_GameLightMath = Acquire3DMathEngine();

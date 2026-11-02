@@ -63,7 +63,6 @@ void FontIdFormat(TString<64>* Dst, char const* Fmt, ...)
 FontImp::FontImp()
     : FixedHeight(0.0f)
     , InitLineHeight(0)
-    , Dc(nullptr)
     , Font(nullptr)
     , RealizedHeight(0)
     , LayoutGeneration(0)
@@ -84,11 +83,8 @@ FontImp::~FontImp()
     // FUN_00416490: the handles are only forgotten -- no DeleteObject / DeleteDC.
     if (Font != nullptr)
     {
+        delete Font; // (retail leaked the HFONT; the platform font is ours to free)
         Font = nullptr; // 004164a8
-    }
-    if (Dc != nullptr)
-    {
-        Dc = nullptr; // 004164b6
     }
     LayoutGeneration = 0; // 004164c2
     // 004164bc..0041653e: the tree at +0x15c is cleared and its head/nil nodes freed (the
@@ -110,25 +106,28 @@ bool FontImp::Realize(int Height)
     // FUN_00415ea0
     if (Font != nullptr)
     {
-        if (RealizedHeight == Height || Height == Metrics.tmHeight)
+        if (RealizedHeight == Height || Height == Metrics.height)
         {
             return true; // 00415eb8 / 00415ec0
         }
-        DeleteObject(Font);
+        delete Font;
         Font = nullptr;
     }
     LogFont.lfHeight = Height; // 00415eda
-    Font = CreateFontIndirectA(&LogFont);
+    fl::text::IRasterizer* const Rasterizer = fl::text::GetRasterizer();
+    Font = Rasterizer != nullptr ? Rasterizer->CreateFont(LogFont.lfFaceName, Height, LogFont.lfWeight >= 700,
+                                                           LogFont.lfItalic != 0, LogFont.lfUnderline != 0)
+                                 : nullptr;
     if (Font == nullptr)
     {
         // 00415f26: FDUMP(0x100001, ..., Font.cpp, 0x9ae, name +0x8, height).
-        FDUMP(0x100001, "%s(%d) : *** ERROR: failed to create font %s height=%d\n", kFontCpp, 0x9ae,
-              Name.Data, Height);
+        FDUMP(0x100001, "%s(%d) : *** ERROR: failed to create font %s height=%d\n", kFontCpp,
+              0x9ae, Name.Data, Height);
         return false;
     }
     RealizedHeight = Height; // 00415ef4
-    SelectObject(Dc, Font);
-    GetTextMetricsA(Dc, &Metrics);
+    Metrics = Font->Metrics();
+    if (getenv("FL_TRACE_FONT")) fprintf(stderr, "[fl] font: realized '%s' face='%s' height=%d asc=%d desc=%d\n", Name.Data, LogFont.lfFaceName, Height, Metrics.ascent, Metrics.descent);
     LayoutGeneration = G_FontLayoutGeneration; // 00415f19
     return true;
 }
@@ -318,14 +317,11 @@ void FontImp::RefreshScale(bool bRatioTarget)
 bool FontImp::Init(FFontDesc const& Desc)
 {
     // FUN_00415a80
-    // 00415a8b..00415ab3: the previous handles are only forgotten; the generation is zeroed.
+    // 00415a8b..00415ab3: the previous face is dropped; the generation is zeroed.
     if (Font != nullptr)
     {
+        delete Font;
         Font = nullptr;
-    }
-    if (Dc != nullptr)
-    {
-        Dc = nullptr;
     }
     LayoutGeneration = 0;
     // 00415ab9..00415acc: FUN_004183c0(&Id, "%s,%d", Desc.Face) -- retail pushes three
@@ -350,16 +346,11 @@ bool FontImp::Init(FFontDesc const& Desc)
     LogFont.lfItalic = Desc.bItalic ? 1 : 0;
     LogFont.lfUnderline = Desc.bUnderline ? 1 : 0;
     LogFont.lfStrikeOut = 0;
-    // 00415bb9..00415bd1
-    if (Dc == nullptr)
-    {
-        Dc = CreateCompatibleDC(nullptr);
-    }
     FixedHeight = Desc.FixedHeight; // 00415be0
     // 00415be6..00415e1c: the autoscale prelude inlined (the generation is 0 here and
     // DAT_006105b0 never is, so it always runs).
     RefreshScale(false);
-    InitLineHeight = Metrics.tmHeight; // 00415e29
+    InitLineHeight = Metrics.height; // 00415e29
     return true;
 }
 
@@ -381,7 +372,7 @@ float FontImp::GetFixedHeight()
     return FixedHeight;
 }
 
-HFONT__* FontImp::Slot03()
+void* FontImp::Slot03()
 {
     // LAB_00416570
     RefreshScale(false);
@@ -399,15 +390,7 @@ float FontImp::GetGlyphAdvance(wchar_t Ch)
 {
     // LAB_00416dc0
     RefreshScale(true);
-    // 00416ef9..00416f3c: select the face, GetCharWidthW (FUN_005b7445) into a zeroed int whose
-    // result is not checked, restore the previous object.
-    HDC const SelectedDc = Dc;
-    HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
-    UINT const Glyph = static_cast<unsigned short>(Ch);
-    INT Width = 0;
-    GetCharWidthW(Dc, Glyph, Glyph, &Width);
-    float const Advance = static_cast<float>(Width);
-    SelectObject(SelectedDc, Previous);
+    float const Advance = Font != nullptr ? static_cast<float>(Font->CharWidth(Ch)) : 0.0f;
     return Advance;
 }
 
@@ -417,7 +400,7 @@ int FontImp::GetLineHeight()
     RefreshScale(false);
     if (Font != nullptr)
     {
-        return Metrics.tmHeight; // 00416d98
+        return Metrics.height; // 00416d98
     }
     return Slot07(); // 00416dab, vtable +0x1c
 }
@@ -439,70 +422,18 @@ void FontImp::MeasureString(int* OutWH, wchar_t const* Text, int Len)
     int Width = 0;
     int Height = 0;
     // 00415fc4: a null string or a zero length measures as 0 x 0 without touching the DC.
-    if (Text != nullptr && Len != 0)
+    if (Text != nullptr && Len != 0 && Font != nullptr)
     {
-        HDC const SelectedDc = Dc;                                // +0xd8
-        HGDIOBJ const Previous = SelectObject(SelectedDc, Font); // +0x118
         if (Len == -1)
         {
             Len = static_cast<int>(wcslen(Text)); // 00416004
         }
-
-        // 0041600f: the one-time OS probe (OSVERSIONINFOA, size 0x94).
-        if (!G_bFontOsVersionProbed)
+        int W = 0, H = 0;
+        if (Font->Extent(Text, Len, &W, &H))
         {
-            G_bFontOsVersionProbed = true;
-            OSVERSIONINFOA Version;
-            Version.dwOSVersionInfoSize = 0x94;
-#pragma warning(push)
-#pragma warning(disable : 4996) // GetVersionExA is deprecated; retail calls it here.
-            BOOL const bVersion = GetVersionExA(&Version);
-#pragma warning(pop)
-            if (bVersion)
-            {
-                G_bFontWholeStringExtent = Version.dwMajorVersion > 4; // 0041603c SETA
-            }
-            else
-            {
-                G_bFontWholeStringExtent = false; // 00416062
-            }
+            Width = W;
+            Height = H;
         }
-
-        SIZE Extent;
-        BOOL bOk = FALSE;
-        if (G_bFontWholeStringExtent)
-        {
-            // 0041605a: FUN_005b746a, the delay-load stub of gdi32!GetTextExtentPointW.
-            bOk = GetTextExtentPointW(SelectedDc, Text, Len, &Extent);
-        }
-        else
-        {
-            // 00416069: per-glyph sum through FUN_005b7445 (gdi32!GetCharWidthW); the height is
-            // the realized TEXTMETRIC's tmHeight (+0x120). The count is compared unsigned (JBE /
-            // JC), and the first failing glyph zeroes the result.
-            Extent.cx = 0;
-            Extent.cy = Metrics.tmHeight;
-            unsigned const Count = static_cast<unsigned>(Len);
-            for (unsigned Index = 0; Index < Count; ++Index)
-            {
-                UINT const Glyph = static_cast<unsigned short>(Text[Index]);
-                INT GlyphWidth = 0;
-                bOk = GetCharWidthW(SelectedDc, Glyph, Glyph, &GlyphWidth);
-                if (!bOk)
-                {
-                    break;
-                }
-                Extent.cx += GlyphWidth;
-            }
-        }
-
-        // 004160c1: any failure (or an empty loop) reports 0 x 0.
-        if (bOk)
-        {
-            Width = Extent.cx;
-            Height = Extent.cy;
-        }
-        SelectObject(SelectedDc, Previous); // 004160dd
     }
     OutWH[0] = Width;
     OutWH[1] = Height;
@@ -520,9 +451,6 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
     {
         Len = static_cast<int>(wcslen(Text));
     }
-    // 00417408..00417424: select the face into the DC, the previous object kept.
-    HDC const SelectedDc = Dc;
-    HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
     // 00417428..00417478: stop once the sum reaches MaxWidth (JNC) or the next character would
     // pass it (JA); both compares are unsigned.
     unsigned const Limit = static_cast<unsigned>(MaxWidth);
@@ -534,9 +462,7 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
             {
                 break;
             }
-            UINT const Glyph = static_cast<unsigned short>(Text[Index]);
-            INT Width = 0;
-            GetCharWidthW(Dc, Glyph, Glyph, &Width);
+            int const Width = Font != nullptr ? Font->CharWidth(Text[Index]) : 0;
             unsigned const Next = static_cast<unsigned>(Width) + Sum;
             if (Next > Limit)
             {
@@ -547,8 +473,6 @@ int FontImp::ProbeString(int MaxWidth, wchar_t const* Text, int Len)
             ++Index;
         } while (Index < static_cast<unsigned>(Len));
     }
-    // 0041747e..00417484: restore the previous object.
-    SelectObject(SelectedDc, Previous);
     return Count;
 }
 
@@ -557,9 +481,6 @@ int FontImp::GetCharWidths(wchar_t const* Text, int Len, int* OutWidths)
     // LAB_004170e0 (vtable slot 10, RET 0xc).
     RefreshScale(true);
 
-    // 00417219..0041722d: SelectObject(+0xd8 DC, +0x118 HFONT), the previous object kept.
-    HDC const SelectedDc = Dc;
-    HGDIOBJ const Previous = SelectObject(SelectedDc, Font);
     // 00417237..0041724e: Len == -1 -> wcslen.
     if (Len == -1)
     {
@@ -570,14 +491,10 @@ int FontImp::GetCharWidths(wchar_t const* Text, int Len, int* OutWidths)
     int Sum = 0;
     for (unsigned Index = 0; Index < static_cast<unsigned>(Len); ++Index)
     {
-        UINT const Glyph = static_cast<unsigned short>(Text[Index]);
-        INT Width = 0;
-        GetCharWidthW(Dc, Glyph, Glyph, &Width);
+        int const Width = Font != nullptr ? Font->CharWidth(Text[Index]) : 0;
         Sum += Width;
         OutWidths[Index] = Width;
     }
-    // 0041728c..00417296: restore the previous object; the sum is returned.
-    SelectObject(SelectedDc, Previous);
     return Sum;
 }
 

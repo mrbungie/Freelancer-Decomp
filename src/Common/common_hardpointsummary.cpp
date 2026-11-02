@@ -8,6 +8,7 @@
 // HardpointToWorld and HardpointSummary. Split out of common_goods.cpp.
 
 #include "common_goods.h"
+#include "fl/handles.h"
 #include "common_cobject.h" // CompoundInstanceAnalyze
 #include "common_misc.h"
 #include "DALib.h"
@@ -22,11 +23,11 @@ int CallDacomStricmp(const char* Left, const char* Right);
 namespace
 {
     // The engine handle sentinel the whole hardpoint block compares against.
-    long const kNoEngineHandle = -1;
+    int32_t const kNoEngineHandle = -1;
 
     // FUN_0630e870 — the search shared by FindHardpoint and FindHardpoint_OS. Returns the
     // handle it matched on, which for a child hit is the child's, not the caller's.
-    bool FindHardpointCore(long Handle, char const* Name, long* OutHandle, HardpointInfo* OutInfo)
+    bool FindHardpointCore(int32_t Handle, char const* Name, int32_t* OutHandle, HardpointInfo* OutInfo)
     {
         // Retail FUN_0630e870 (Common.dll.txt 310643+): loads DALib::Engine and immediately
         // dereferences — no null checks on Engine, Hardpoint, Name, or the out pointers.
@@ -36,8 +37,8 @@ namespace
         IEngine* const Engine = DALib::Engine;
 
         // The archetype (part) handle of the instance; -1 when there is none.
-        void* const Part = Engine->GetInstanceArchetype((void*)Handle);
-        if ((long)Part == kNoEngineHandle)
+        void* const Part = Engine->GetInstanceArchetype((void*)fl::HandleToPtr(Handle));
+        if ((int32_t)fl::PtrToHandle(Part) == kNoEngineHandle)
             return false;
 
         // 0630e89e writes the name, 0630e8b0 the CRC just above it -- FHardpointKey.
@@ -56,10 +57,10 @@ namespace
             return true;
         }
 
-        long Child = kNoEngineHandle;
+        int32_t Child = kNoEngineHandle;
         while (true)
         {
-            Child = (long)Engine->GetRelatedInstance((void*)Handle, 1, (void*)Child);
+            Child = (int32_t)fl::PtrToHandle(Engine->GetRelatedInstance((void*)fl::HandleToPtr(Handle), 1, (void*)fl::HandleToPtr(Child)));
             if (Child == kNoEngineHandle)
                 return false;
             if (FindHardpointCore(Child, Name, OutHandle, OutInfo))
@@ -69,11 +70,11 @@ namespace
 
     // Engine slot 40 (+0xa0) hands back the instance's transform: a 3x3 followed by a vector,
     // which is exactly the port's Transform.
-    Transform const* EngineGetTransform(long Handle)
+    Transform const* EngineGetTransform(int32_t Handle)
     {
         // Retail FindHardpoint_PS (0630e9c6) loads Engine and calls +0xa0 with no null gate.
         IEngine* const Engine = DALib::Engine;
-        return (Transform const*)Engine->GetInstanceTransform((void*)Handle);
+        return (Transform const*)Engine->GetInstanceTransform((void*)fl::HandleToPtr(Handle));
     }
 
     // 3DMathEngine slot 7 (+0x1c, MulTransform): Out = Parent * Local - what retail's
@@ -86,7 +87,7 @@ namespace
     }
 }
 
-bool __cdecl FindHardpoint(long Handle, char const* Name, long& OutHandle)
+bool __cdecl FindHardpoint(int32_t Handle, char const* Name, int32_t& OutHandle)
 {
     // 0630e940-0630e95f: FUN_0630e870 with a 0x48-byte uninitialised stack scratch for the
     // info, which is thrown away.
@@ -94,14 +95,14 @@ bool __cdecl FindHardpoint(long Handle, char const* Name, long& OutHandle)
     return FindHardpointCore(Handle, Name, &OutHandle, &Scratch);
 }
 
-bool __cdecl FindHardpoint_OS(long Handle, char const* Name, long& OutHandle,
+bool __cdecl FindHardpoint_OS(int32_t Handle, char const* Name, int32_t& OutHandle,
                               HardpointInfo& OutInfo)
 {
     // 0xaeb70 — the core, unmodified.
     return FindHardpointCore(Handle, Name, &OutHandle, &OutInfo);
 }
 
-bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
+bool __cdecl FindHardpoint_PS(int32_t Handle, char const* Name, int32_t& OutHandle,
                               HardpointInfo& OutInfo)
 {
     // 0630e960-0630eb61. FUN_0630e870 finds the hardpoint (a miss is false); when it sits on
@@ -149,7 +150,7 @@ bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
     return true;
 }
 
-void __cdecl HardpointToWorld(long Handle, HardpointInfo& Info)
+void __cdecl HardpointToWorld(int32_t Handle, HardpointInfo& Info)
 {
     // 0630eba0-0630ec36: L = {Info.Orient, Info.Position}; T = Engine +0xa0 (no null check);
     // W = T * L (3DMathEngine +0x1c); Info.Position = W.Translation, Info.Orient = W.Rotation.
@@ -259,7 +260,7 @@ HardpointInfo const& HardpointSummary::get_info(int Index) const
 }
 
 // 06334710: Instances[Index], unchecked.
-long HardpointSummary::get_instance(int Index) const
+int32_t HardpointSummary::get_instance(int Index) const
 {
     return Instances[Index];
 }
@@ -278,7 +279,7 @@ int HardpointSummary::find_name(char const* Name) const
 }
 
 // 06334770: the same scan (MSVCRT _stricmp, last match wins); Instances[match] or -1.
-long HardpointSummary::find_name_instance(char const* Name) const
+int32_t HardpointSummary::find_name_instance(char const* Name) const
 {
     int Result = -1;
     int Index = 0;
@@ -316,15 +317,15 @@ void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
 // 06334820: Part = DALib::Engine slot 25 (+0x64) on the instance; DALib::Hardpoint slot 5
 // (+0x14) enumerates the part's names into hardpoint_callback1; Engine slot 15 (+0x3c)
 // releases the part. No null tests.
-void HardpointSummary::count_hardpoints_callback(long Instance, void* Context)
+void HardpointSummary::count_hardpoints_callback(int32_t Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    void* const Part = DALib::Engine->GetInstanceArchetype((void*)fl::HandleToPtr(Instance));
     DALib::Hardpoint->EnumerateHardpoints(&hardpoint_callback1, Part, Context);
     DALib::Engine->ReleaseHandle(Part);
 }
 
 // 06334860: Count = 0, then CompoundInstanceAnalyze with count_hardpoints_callback.
-void HardpointSummary::count_hardpoints(long Instance)
+void HardpointSummary::count_hardpoints(int32_t Instance)
 {
     Count = 0;
     CompoundInstanceAnalyze(Instance, count_hardpoints_callback, this);
@@ -343,7 +344,7 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
     Query.Name = Name;
     Query.Crc = DACOM_CRC::GetCRC32(Name);
     HardpointInfo Found;
-    unsigned long const Hit = DALib::Hardpoint->GetHardpoint(Self->FillPart, &Query, &Found);
+    uint32_t const Hit = DALib::Hardpoint->GetHardpoint(Self->FillPart, &Query, &Found);
     if ((unsigned char)Hit != 0)
         memcpy(&Self->Infos[Self->FillCursor], &Found, sizeof(HardpointInfo));
 
@@ -354,9 +355,9 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 // 06334900: Part = Engine slot 25 on the instance; FillInstance = instance, FillPart = part;
 // Hardpoint slot 5 enumerates the part's names into hardpoint_callback2; Engine slot 15
 // releases the part. No null tests.
-void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
+void HardpointSummary::fill_hardpoints_callback(int32_t Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    void* const Part = DALib::Engine->GetInstanceArchetype((void*)fl::HandleToPtr(Instance));
     HardpointSummary* const Self = (HardpointSummary*)Context;
     Self->FillInstance = Instance;
     Self->FillPart = Part;
@@ -365,7 +366,7 @@ void HardpointSummary::fill_hardpoints_callback(long Instance, void* Context)
 }
 
 // 06334950: FillCursor = 0, then CompoundInstanceAnalyze with fill_hardpoints_callback.
-void HardpointSummary::fill_hardpoints(long Instance)
+void HardpointSummary::fill_hardpoints(int32_t Instance)
 {
     FillCursor = 0;
     CompoundInstanceAnalyze(Instance, fill_hardpoints_callback, this);
@@ -376,7 +377,7 @@ void HardpointSummary::fill_hardpoints(long Instance)
 // Infos left uninitialised), Names[i] = 0 and Instances[i] = -1 for every slot. Both paths end
 // with FillCursor = 0, FillInstance = FillPart = -1 and return Count. The Infos block stays
 // a raw allocation: retail leaves it uninitialised.
-int HardpointSummary::analyze_instance(long Instance)
+int HardpointSummary::analyze_instance(int32_t Instance)
 {
     destroy();
 
@@ -386,7 +387,7 @@ int HardpointSummary::analyze_instance(long Instance)
 
         Names = new char const*[Count];
         Infos = (HardpointInfo*)operator new((size_t)Count * sizeof(HardpointInfo));
-        Instances = new long[Count];
+        Instances = new int32_t[Count];
 
         int Index = 0;
         for (Index = 0; Index < Count; ++Index)

@@ -6,6 +6,8 @@
 
 #define RPCLOCAL_EXPORTS
 #include <windows.h>
+#include <cstring>
+#include "platform/fl_x87.h"
 #include "../include/rpc_iserver.h"
 #define GetChatClientInterface __NetworkGetChatClientInterface
 #define GetChatServerInterface __NetworkGetChatServerInterface
@@ -330,11 +332,15 @@ void IServerImpl::ReqHullStatus(float HullStatus, unsigned int SessionId) {
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQHULLSTATUS, &Packet) == 0) {
         FRpcRequestHullStatusPacket* TypedPacket = static_cast<FRpcRequestHullStatusPacket*>(Packet);
         float* Destination = &TypedPacket->Value;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld HullStatus
             mov eax, Destination
             fstp dword ptr [eax]
         }
+#else
+        FlX87CopyFloat(&HullStatus, Destination);
+#endif
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -435,6 +441,7 @@ void IServerImpl::ReqAddItem(unsigned int ArchId, const char* Hardpoint, int Cou
         float* HealthDestination = &TypedPacket->Health;
         unsigned char Mounted;
         // 06bd75bd..75db: FLD precedes both integer stores; FSTP follows them.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld Health
             mov eax, ArchId
@@ -448,6 +455,14 @@ void IServerImpl::ReqAddItem(unsigned int ArchId, const char* Hardpoint, int Cou
             mov edx, HealthDestination
             fstp dword ptr [edx]
         }
+#else
+        float HealthTemp;
+        FlX87CopyFloat(&Health, &HealthTemp);
+        *ArchDestination = ArchId;
+        *CountDestination = Count;
+        Mounted = bMounted;
+        *HealthDestination = HealthTemp;
+#endif
         TypedPacket->bMounted = Mounted;
         TypedPacket->CopyHardpoint(Hardpoint, static_cast<unsigned int>(strlen(Hardpoint) + 1u));
         this->PushToServer(Packet->AsRaw());
@@ -473,6 +488,7 @@ void IServerImpl::ReqModifyItem(unsigned short EquipId, const char* Hardpoint, i
         float* HealthDestination = &TypedPacket->Health;
         unsigned char Mounted;
         // 06bd768d..76ad: retain MOVZX and the stores between FLD and FSTP.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld Health
             movzx eax, EquipId
@@ -486,6 +502,14 @@ void IServerImpl::ReqModifyItem(unsigned short EquipId, const char* Hardpoint, i
             mov edx, HealthDestination
             fstp dword ptr [edx]
         }
+#else
+        float HealthTemp;
+        FlX87CopyFloat(&Health, &HealthTemp);
+        *EquipDestination = static_cast<unsigned int>(EquipId);
+        *CountDestination = Count;
+        Mounted = bMounted;
+        *HealthDestination = HealthTemp;
+#endif
         TypedPacket->bMounted = Mounted;
         TypedPacket->CopyHardpoint(Hardpoint, static_cast<unsigned int>(strlen(Hardpoint) + 1u));
         this->PushToServer(Packet->AsRaw());
@@ -586,7 +610,7 @@ void IServerImpl::GFGoodVaporized(const SGFGoodVaporizedInfo& Info, unsigned int
     }
 }
 
-void IServerImpl::MissionResponse(unsigned int Arg0, unsigned long MissionId, unsigned char bAccepted, unsigned int SessionId) {
+void IServerImpl::MissionResponse(unsigned int Arg0, uint32_t MissionId, unsigned char bAccepted, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MISSIONRESPONSE, &Packet) == 0) {
         FRpcMissionResponsePacket* TypedPacket = static_cast<FRpcMissionResponsePacket*>(Packet);
@@ -684,11 +708,19 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& Info, unsigned int Session
         const double* TimeSource = &Info.Timestamp;
         float NarrowedTime;
         // 06bd7fc6/7fcc narrows before any packet payload store.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov eax, TimeSource
             fld qword ptr [eax]
             fstp dword ptr NarrowedTime
         }
+#else
+        {
+            double TimeValue;
+            std::memcpy(&TimeValue, TimeSource, sizeof(TimeValue));
+            NarrowedTime = static_cast<float>(TimeValue);
+        }
+#endif
         FRpcUpdateObjectPacket* TypedPacket = static_cast<FRpcUpdateObjectPacket*>(Packet);
         TypedPacket->Field_0x00 = Info.Field_0x2c;
         TypedPacket->ObjectId = Info.ObjectId;
@@ -772,7 +804,7 @@ void IServerImpl::SaveGame(const CHARACTER_ID& CharId, const wchar_t* Descriptio
     }
 }
 
-void IServerImpl::MissionSaveB(unsigned int SessionId, unsigned long MissionId) {
+void IServerImpl::MissionSaveB(unsigned int SessionId, uint32_t MissionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_MISSIONSAVEB, &Packet) == 0) {
         FRpcMissionSaveBPacket* TypedPacket = static_cast<FRpcMissionSaveBPacket*>(Packet);
@@ -781,7 +813,7 @@ void IServerImpl::MissionSaveB(unsigned int SessionId, unsigned long MissionId) 
     }
 }
 
-void IServerImpl::RequestEvent(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3, unsigned long Arg4, unsigned int SessionId) {
+void IServerImpl::RequestEvent(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned int Arg3, uint32_t Arg4, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_EVENT, &Packet) == 0) {
         FRpcRequestEventPacket* TypedPacket = static_cast<FRpcRequestEventPacket*>(Packet);
@@ -794,7 +826,7 @@ void IServerImpl::RequestEvent(int EventType, unsigned int Arg1, unsigned int Ar
     }
 }
 
-void IServerImpl::RequestCancel(int EventType, unsigned int Arg1, unsigned int Arg2, unsigned long Arg3, unsigned int SessionId) {
+void IServerImpl::RequestCancel(int EventType, unsigned int Arg1, unsigned int Arg2, uint32_t Arg3, unsigned int SessionId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQUEST_CANCEL, &Packet) == 0) {
         FRpcRequestCancelPacket* TypedPacket = static_cast<FRpcRequestCancelPacket*>(Packet);
@@ -999,7 +1031,7 @@ void IServerImpl::AcceptTrade(unsigned int SessionId, bool bAccepted) {
     }
 }
 
-void IServerImpl::SetTradeMoney(unsigned int SessionId, unsigned long Money) {
+void IServerImpl::SetTradeMoney(unsigned int SessionId, uint32_t Money) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x12, &Packet) == 0) {
         FRpcPlayerTradePacket* TypedPacket = static_cast<FRpcPlayerTradePacket*>(Packet);
@@ -1018,12 +1050,16 @@ void IServerImpl::AddTradeEquip(unsigned int SessionId, const EquipDesc& Equip) 
         TypedPacket->EquipCount = Equip.get_count();
         const float* HealthSource = &Equip.Health;
         float* HealthDestination = &TypedPacket->EquipHealth;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov eax, HealthSource
             mov edx, HealthDestination
             fld dword ptr [eax]
             fstp dword ptr [edx]
         }
+#else
+        FlX87CopyFloat(HealthSource, HealthDestination);
+#endif
         TypedPacket->EquipId = Equip.get_id();
         this->PushToServer(Packet->AsRaw());
     }
@@ -1066,11 +1102,15 @@ void IServerImpl::ReqDifficultyScale(float Scale, unsigned int SessionId) {
     if (Serializer->Allocate(3, FLPACKET_CLIENT_REQDIFFICULTYSCALE, &Packet) == 0) {
         FRpcRequestDifficultyScalePacket* TypedPacket = static_cast<FRpcRequestDifficultyScalePacket*>(Packet);
         float* Destination = &TypedPacket->Value;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld Scale
             mov eax, Destination
             fstp dword ptr [eax]
         }
+#else
+        FlX87CopyFloat(&Scale, Destination);
+#endif
         this->PushToServer(Packet->AsRaw());
     }
 }
@@ -1100,7 +1140,7 @@ void IServerImpl::PushToServer(CDAPacket* Packet) {
     return;
 }
 
-void IServerImpl::SubmitChat(CHAT_ID SenderId, unsigned long Size, const void* MsgData, CHAT_ID TargetId, int SystemId) {
+void IServerImpl::SubmitChat(CHAT_ID SenderId, uint32_t Size, const void* MsgData, CHAT_ID TargetId, int SystemId) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x05, &Packet) == 0) {
         FRpcChatMsgPacket* TypedPacket = static_cast<FRpcChatMsgPacket*>(Packet);

@@ -52,16 +52,16 @@ struct FBaseWalkInterfaceFade
         return 1.0f - Elapsed * Elapsed * (3.0f - 2.0f * Elapsed);
     }
 
-    static unsigned long FadeColor(unsigned long Argb, float Opacity, bool bAdditive = false)
+    static uint32_t FadeColor(uint32_t Argb, float Opacity, bool bAdditive = false)
     {
-        unsigned long Result = Argb & 0x00fffffful;
+        uint32_t Result = Argb & 0x00fffffful;
         if (bAdditive)
         {
             Result = 0;
             for (int Shift = 0; Shift < 24; Shift += 8)
-                Result |= static_cast<unsigned long>(((Argb >> Shift) & 0xfful) * Opacity) << Shift;
+                Result |= static_cast<uint32_t>(((Argb >> Shift) & 0xfful) * Opacity) << Shift;
         }
-        return Result | (static_cast<unsigned long>((Argb >> 24) * Opacity) << 24);
+        return Result | (static_cast<uint32_t>((Argb >> 24) * Opacity) << 24);
     }
 };
 

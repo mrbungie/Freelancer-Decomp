@@ -7,6 +7,7 @@
 // Retail NN_Inventory -- see nn_inventory.h for the class, its vftable and layout.
 
 #include "nn_inventory.h"
+#include "fl/handles.h"
 
 #include "cargo_bar_control.h"      // ToolTipHoverInit / SetCaption
 #include "client_base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510), ClientMarketGetPrice
@@ -151,7 +152,7 @@ void FInventoryShipModel::LoadShip(EquipDescList const* Source, unsigned char bF
     {
         EquipDesc& Item = *It;
         if (GoodList::find_by_archetype(Item.ArchId) != nullptr)
-            Item.set_owner(static_cast<int>(reinterpret_cast<intptr_t>(this)));
+            Item.set_owner(static_cast<int>(fl::PtrToHandle(this)));
     }
 
     // 004c6379..004c638b: the name label's slot 42 (0x1e, ids_name, 0).
@@ -712,7 +713,7 @@ int NnLoadoutResaleValue(EquipDescList const* List, FInventoryShipModel const* O
 
     // 004c6f97..004c707b
     int Total = 0;
-    unsigned const OwnerTag = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Owner));
+    unsigned const OwnerTag = static_cast<unsigned>(fl::PtrToHandle(Owner));
     for (std::list<EquipDesc>::const_iterator It = List->Items.begin(); It != List->Items.end();
          ++It)
     {
@@ -2443,7 +2444,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         FToolTipHoverInfo Info;
         ToolTipHoverInit(&Info);
         ToolTipHoverSetCaption(&Info, G_NnTextScratchB);
-        Info.IdsAlt = static_cast<int>(reinterpret_cast<intptr_t>(Control));
+        Info.IdsAlt = static_cast<int>(fl::PtrToHandle(Control));
         Info.Ids = 0;
         WireStaticControl const* const Wire = static_cast<WireStaticControl const*>(ItemButton[Row]);
         Info.WorldPos[0] = Wire->WireCenter[0];
@@ -2492,7 +2493,7 @@ intptr_t NnInventory::SetProperty(int Msg, uintptr_t A, uintptr_t B)
     case 0x15:
         // 0047a314: the ship view picked an instance -- select the row of its hardpoint and
         // clear the dealer's selection.
-        SelectHardpoint(Ship.ShipView->GetHardpointOfInstance(static_cast<long>(A))); // FUN_00585e20
+        SelectHardpoint(Ship.ShipView->GetHardpointOfInstance(static_cast<int32_t>(A))); // FUN_00585e20
         if (Dealer != nullptr)
             Dealer->ClearSelection();
         break;

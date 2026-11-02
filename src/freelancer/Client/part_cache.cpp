@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "part_cache.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "common_csys.h"
@@ -143,7 +144,7 @@ void PartCacheEntryConstruct(FPartCacheEntry* Entry)
     Entry->Vertices = nullptr;
     Entry->IndexCount = 0;
     Entry->Indices = nullptr;
-    Entry->InstanceId = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    Entry->InstanceId = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     Entry->Tag = 0xFFFFFFFFu;
     Entry->bHidden = 0;
     Entry->bActive = 1;
@@ -452,7 +453,7 @@ namespace
 // DALib::Engine.
 void PartCacheMarkHidden(FPartCache* Cache, void* Instance, bool bRecurseChildren)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    void* const kInvalid = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
     FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
     if (Found != nullptr)
@@ -487,7 +488,7 @@ void PartCacheClearHiddenActive(FPartCache* Cache)
 // record matched ([ESP+0x13]). No test of the cache, of the vertex array or of DALib::Engine.
 bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChildren, unsigned Tag)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    void* const kInvalid = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     bool bFound = false;
 
     FPartCacheEntry* Found = PartCacheFindRecord(Cache, Instance);
@@ -517,7 +518,7 @@ bool PartCacheActivatePart(FPartCache* Cache, void* Instance, bool bRecurseChild
 // FUN_00405b10 (thiscall on the cache, RET 8: Instance, Tag).
 bool PartCacheBuild(FPartCache* Cache, void* Instance, unsigned Tag)
 {
-    void* const kInvalid = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    void* const kInvalid = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
     // 0x00405b33: an unset instance returns false before anything is touched.
     if (Instance == kInvalid)
@@ -675,19 +676,19 @@ namespace
     // DAT_005c7608 / DAT_005c7628 / DAT_005c7640: {render state, value} pairs ended by state 0.
     // 0x89 D3DRS_LIGHTING, 0x1d D3DRS_SPECULARENABLE, 0x1b D3DRS_ALPHABLENDENABLE,
     // 0x8d D3DRS_COLORVERTEX, 0x91 D3DRS_DIFFUSEMATERIALSOURCE.
-    unsigned long const kPartDrawStatesOff[] = {0x89, 0, 0x1d, 0, 0x1b, 0, 0};
-    unsigned long const kPartDrawColourVertexOn[] = {0x8d, 1, 0x91, 1, 0};
-    unsigned long const kPartDrawColourVertexOff[] = {0x8d, 0, 0};
+    uint32_t const kPartDrawStatesOff[] = {0x89, 0, 0x1d, 0, 0x1b, 0, 0};
+    uint32_t const kPartDrawColourVertexOn[] = {0x8d, 1, 0x91, 1, 0};
+    uint32_t const kPartDrawColourVertexOff[] = {0x8d, 0, 0};
     // DAT_005c7650: {texture stage state, value} pairs for stage 0, ended by type 0 -- COLOROP
     // SELECTARG1, COLORARG1 DIFFUSE, COLORARG2 CURRENT, ALPHAOP SELECTARG1, ALPHAARG1 DIFFUSE,
     // ALPHAARG2 CURRENT.
-    unsigned long const kPartDrawStage0[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    uint32_t const kPartDrawStage0[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
 
     // FUN_00406510's loops: the first pair's state is an immediate, then [cursor + 8] until 0.
-    void PartDrawApplyStates(IRenderPipeline* Pipeline, unsigned long const* Table)
+    void PartDrawApplyStates(IRenderPipeline* Pipeline, uint32_t const* Table)
     {
-        unsigned long State = Table[0];
-        unsigned long const* Cursor = Table;
+        uint32_t State = Table[0];
+        uint32_t const* Cursor = Table;
         while (State != 0)
         {
             Pipeline->SetRenderState((D3DRENDERSTATETYPE)State, static_cast<int>(Cursor[1]));
@@ -788,8 +789,8 @@ void PartCacheDraw(FPartCache* Cache, ICamera* Camera, FTransform const* Xform)
     }
     DALib::VertexBuffer->UnlockVertexMemory(&LockOut);
 
-    unsigned long const* Stage = kPartDrawStage0;
-    unsigned long Type = Stage[0];
+    uint32_t const* Stage = kPartDrawStage0;
+    uint32_t Type = Stage[0];
     while (Type != 0)
     {
         DALib::Pipeline->SetTextureStageState(0, static_cast<int>(Type), static_cast<int>(Stage[1]));

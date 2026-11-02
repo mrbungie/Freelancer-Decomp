@@ -45,6 +45,7 @@
 // ===========================================================================
 
 #include "rpc_containers.h"
+#include "wire_wchar.h"
 #include "rpc_payloads.h"
 
 #include <new>
@@ -748,7 +749,7 @@ unsigned int RpcEncodeServerPlayerList(FPacketBase& Packet, unsigned char** Buff
     }
     if (Count != 0) {                                                     // 06d99aa6
         // 06d99ab0 `SHL EAX,0x1` -- the reservation and the copy are both 2*Count.
-        if (!Stream.PutBytes(Wire->Name, (unsigned int)Count * 2u)) {      // 06d99add
+        if (!Stream.PutBytes(FlWire16Out(Wire->Name, (unsigned int)Count), (unsigned int)Count * 2u)) {      // 06d99add
             return Stream.GetError();
         }
     }

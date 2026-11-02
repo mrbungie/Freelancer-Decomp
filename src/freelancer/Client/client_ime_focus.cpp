@@ -29,8 +29,8 @@ namespace
     ClientIMEFocus* G_ClientImeFocus = nullptr;
     // DAT_0067a480 / DAT_0067a484 -- set once by the static initializers LAB_00563ad0 /
     // LAB_00563ab0 (XC table 0x0060fe74 / 0x0060fe70): DACOM_CRC::GetCRC32 of the literal.
-    unsigned long G_ImeBackgroundKey = DACOM_CRC::GetCRC32("IMEbkground");
-    unsigned long G_ImeTextKey = DACOM_CRC::GetCRC32("IMEtext");
+    uint32_t G_ImeBackgroundKey = DACOM_CRC::GetCRC32("IMEbkground");
+    uint32_t G_ImeTextKey = DACOM_CRC::GetCRC32("IMEtext");
 
     // FUN_00417790 (cdecl OutPrev, NewKey) — 0x00417790..0x004177a5: the old DAT_00616670 into
     // ECX, NewKey stored, *OutPrev = old (no null test).
@@ -65,12 +65,12 @@ IFont* ClientConfirmPlayerFont()
     return G_ConfirmPlayerFont;
 }
 
-unsigned long ClientImeBackgroundKey()
+uint32_t ClientImeBackgroundKey()
 {
     return G_ImeBackgroundKey;
 }
 
-unsigned long ClientImeTextKey()
+uint32_t ClientImeTextKey()
 {
     return G_ImeTextKey;
 }

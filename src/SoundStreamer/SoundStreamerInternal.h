@@ -13,8 +13,8 @@
 #include <msacm.h>
 #include <stddef.h>
 
-static const unsigned long kAggDescSize = 0x14;
-static const unsigned long kRegisterPriority = 0x40000000;
+static const uint32_t kAggDescSize = 0x14;
+static const uint32_t kRegisterPriority = 0x40000000;
 
 static const char kComponentName[] = "SoundStreamer";
 
@@ -41,7 +41,7 @@ static const GUID kIidDirectSoundRetail = {
 
 struct FStreamerAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -56,10 +56,10 @@ public:
     FStreamerInner();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FSoundStreamer* Self;
 };
 
@@ -69,11 +69,11 @@ public:
     FSoundStreamerFactory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -81,59 +81,59 @@ public:
 struct FStreamingSound
 {
     char* Path;                      // +0x00
-    unsigned long PathLen;           // +0x04
-    unsigned long PathCap;           // +0x08
-    unsigned long PathPad;           // +0x0C
+    uint32_t PathLen;           // +0x04
+    uint32_t PathCap;           // +0x08
+    uint32_t PathPad;           // +0x0C
     IDAComponent* FileSystem;        // +0x10
-    unsigned long FileHandle;        // +0x14
-    unsigned long MapHandle;         // +0x18
+    uint32_t FileHandle;        // +0x14
+    uint32_t MapHandle;         // +0x18
     unsigned char* MappedView;       // +0x1C
-    unsigned long MappedSize;        // +0x20
-    unsigned long ReadCursor;        // +0x24
+    uint32_t MappedSize;        // +0x20
+    uint32_t ReadCursor;        // +0x24
     HACMSTREAM AcmStream;            // +0x28
     ACMSTREAMHEADER AcmHeader;       // +0x2C size 0x54 → +0x80
-    unsigned long State;             // +0x80
+    uint32_t State;             // +0x80
     unsigned char bBufferReady;      // +0x84
     unsigned char bLoop;             // +0x85
     unsigned char bWantPlay;         // +0x86
     unsigned char bOwnedMap;         // +0x87 retail owned-map flag; port uses FS view
-    long Volume;                     // +0x88
-    long Pan;                        // +0x8C
-    unsigned long FactSamples;       // +0x90
-    unsigned long DecodeOutSize;     // +0x94
-    unsigned long SourceBlock;       // +0x98
+    int32_t Volume;                     // +0x88
+    int32_t Pan;                        // +0x8C
+    uint32_t FactSamples;       // +0x90
+    uint32_t DecodeOutSize;     // +0x94
+    uint32_t SourceBlock;       // +0x98
     unsigned char* DataPtr;          // +0x9C
-    unsigned long DataSize;          // +0xA0
-    unsigned long DataCursor;        // +0xA4
+    uint32_t DataSize;          // +0xA0
+    uint32_t DataCursor;        // +0xA4
     unsigned char* DecodeHeap;       // +0xA8
-    unsigned long DecodeCap;         // +0xAC
-    unsigned long DecodeRead;        // +0xB0
-    unsigned long DecodeFilled;      // +0xB4
+    uint32_t DecodeCap;         // +0xAC
+    uint32_t DecodeRead;        // +0xB0
+    uint32_t DecodeFilled;      // +0xB4
     IDirectSoundBuffer* Buffer;      // +0xB8
-    unsigned long BufferBytes;       // +0xBC
-    unsigned long WriteCursor;       // +0xC0
+    uint32_t BufferBytes;       // +0xBC
+    uint32_t WriteCursor;       // +0xC0
     float Threshold;                 // +0xC4
-    unsigned long EmittedPcm;        // +0xC8
-    unsigned long TrimSamples;       // +0xCC
-    long EncoderDelayBytes;          // +0xD0
+    uint32_t EmittedPcm;        // +0xC8
+    uint32_t TrimSamples;       // +0xCC
+    int32_t EncoderDelayBytes;          // +0xD0
     unsigned char* FmtBlob;          // +0xD4
     unsigned short PcmTag;           // +0xD8
     unsigned short PcmChannels;      // +0xDA
-    unsigned long PcmRate;           // +0xDC
-    unsigned long PcmAvg;            // +0xE0
+    uint32_t PcmRate;           // +0xDC
+    uint32_t PcmAvg;            // +0xE0
     unsigned short PcmBlock;         // +0xE4
     unsigned short PcmBits;          // +0xE6
     unsigned short PcmCbSize;        // +0xE8
     unsigned short FmtPad;           // +0xEA
-    unsigned long AlignedSize;       // +0xEC
-    unsigned long BytesPerSec;       // +0xF0
-    unsigned long EndMarkF4;         // +0xF4 drain start (play cursor at EOF)
-    unsigned long EndMarkF8;         // +0xF8 drain end (write cursor); -1 = not armed
-    unsigned long SilenceBytes;      // +0xFC FUN_06ef1ee0 remaining silence
+    uint32_t AlignedSize;       // +0xEC
+    uint32_t BytesPerSec;       // +0xF0
+    uint32_t EndMarkF4;         // +0xF4 drain start (play cursor at EOF)
+    uint32_t EndMarkF8;         // +0xF8 drain end (write cursor); -1 = not armed
+    uint32_t SilenceBytes;      // +0xFC FUN_06ef1ee0 remaining silence
     void* LockPtr1;                  // +0x100
-    unsigned long LockBytes1;        // +0x104
+    DWORD LockBytes1;        // +0x104
     void* LockPtr2;                  // +0x108
-    unsigned long LockBytes2;        // +0x10C
+    DWORD LockBytes2;        // +0x10C
 };
 
 class FSoundStreamer final : public IStreamer2, public IAggregateComponent
@@ -143,56 +143,56 @@ public:
     ~FSoundStreamer();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     int DACOM_API InitializeDevice(FStreamerInitDesc* Desc) override;
     void* DACOM_API CreateStream(const char* Path, IDAComponent* FileSystem,
-                                 unsigned long Flags) override;
+                                 uint32_t Flags) override;
     GENRESULT DACOM_API DestroyStream(void* Handle) override;
     GENRESULT DACOM_API StopStream(void* Handle) override;
     GENRESULT DACOM_API StartStream(void* Handle) override;
-    GENRESULT DACOM_API SetVolume(void* Handle, long Volume) override;
-    GENRESULT DACOM_API GetVolume(void* Handle, long* Out) override;
-    unsigned long DACOM_API QueryStatus(void* Handle) override;
-    unsigned long DACOM_API GetReserved58() override;
-    unsigned long DACOM_API GetReserved5C() override;
-    GENRESULT DACOM_API SetPan(void* Handle, long Pan) override;
-    GENRESULT DACOM_API GetPan(void* Handle, long* Out) override;
+    GENRESULT DACOM_API SetVolume(void* Handle, int32_t Volume) override;
+    GENRESULT DACOM_API GetVolume(void* Handle, int32_t* Out) override;
+    uint32_t DACOM_API QueryStatus(void* Handle) override;
+    uint32_t DACOM_API GetReserved58() override;
+    uint32_t DACOM_API GetReserved5C() override;
+    GENRESULT DACOM_API SetPan(void* Handle, int32_t Pan) override;
+    GENRESULT DACOM_API GetPan(void* Handle, int32_t* Out) override;
 
     GENRESULT DACOM_API Initialize() override;
 
     void BindOuter(FStreamerAggDesc* Desc);
     void ShutdownDevice();
-    unsigned long PumpStreams();
+    uint32_t PumpStreams();
     void PumpOneStream(FStreamingSound* Stream);
     void MovePendingActive();
     bool OpenOwnDirectSound();
     bool LoadWav(FStreamingSound* Stream, const char* Path, IDAComponent* FileSystem); // FUN_06ef1560
     bool OpenAcmStream(FStreamingSound* Stream);                                      // FUN_06ef13d0
-    void FillStreamBlock(FStreamingSound* Stream, unsigned long Want);                // FUN_06ef27a0
+    void FillStreamBlock(FStreamingSound* Stream, uint32_t Want);                // FUN_06ef27a0
     void ReleaseStreamResources(FStreamingSound* Stream); // FUN_06ef1120 + 3910 / 3ea0 / 3ec0
 
     IDirectSound* DirectSound;    // +0x08
     HWND Window;                  // +0x0C
-    unsigned long Extra;          // +0x10
-    unsigned long Pad14;
+    uint32_t Extra;          // +0x10
+    uint32_t Pad14;
     float Gain;                   // +0x18
     unsigned char bCoInitialized; // +0x1C
     unsigned char Pad1D[3];
     CRITICAL_SECTION Lock;        // +0x20
-    unsigned long ActiveCookie;   // +0x38 VC6 vector cookie
+    uint32_t ActiveCookie;   // +0x38 VC6 vector cookie
     FStreamingSound** ActiveBegin;// +0x3C
     FStreamingSound** ActiveEnd;  // +0x40
     FStreamingSound** ActiveCap;  // +0x44
-    unsigned long PendingCookie;  // +0x48
+    uint32_t PendingCookie;  // +0x48
     FStreamingSound** PendingBegin;
     FStreamingSound** PendingEnd;
     FStreamingSound** PendingCap;
-    unsigned long Reserved58;     // +0x58
-    unsigned long Reserved5C;     // +0x5C
+    uint32_t Reserved58;     // +0x58
+    uint32_t Reserved5C;     // +0x5C
     HANDLE WorkerThread;          // +0x60
-    unsigned long ThreadFlags;    // +0x64 bit0 started, bit1 exited, bit7 stop
+    uint32_t ThreadFlags;    // +0x64 bit0 started, bit1 exited, bit7 stop
     HANDLE WakeEvent;             // +0x68
     IDAComponent* Controlling;    // +0x6C
     FStreamerInner Inner;         // +0x70

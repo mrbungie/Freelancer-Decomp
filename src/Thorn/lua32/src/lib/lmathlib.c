@@ -43,6 +43,7 @@ static void math_sin (void) {
   double Scale;
   double Result;
   memcpy(&Scale, &ScaleBits, sizeof(Scale));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   /* 56540: the compiled C/intrinsic candidates reduce huge inputs, while
      retail FSIN leaves out-of-range operands unchanged (C2). */
   __asm {
@@ -51,6 +52,9 @@ static void math_sin (void) {
     fsin
     fstp Result
   }
+#else
+  Result = sin(Input * Scale);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -60,6 +64,7 @@ static void math_cos (void) {
   double Scale;
   double Result;
   memcpy(&Scale, &ScaleBits, sizeof(Scale));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   /* 56560: native C/intrinsic FCOS policy differs on finite and C2 inputs. */
   __asm {
     fld Input
@@ -67,6 +72,9 @@ static void math_cos (void) {
     fcos
     fstp Result
   }
+#else
+  Result = cos(Input * Scale);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -78,6 +86,7 @@ static void math_tan (void) {
   double Scale;
   double Result;
   memcpy(&Scale, &ScaleBits, sizeof(Scale));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   __asm {
     fld Input
     fmul Scale
@@ -85,6 +94,9 @@ static void math_tan (void) {
     fstp st(0)
     fstp Result
   }
+#else
+  Result = tan(Input * Scale);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -110,6 +122,7 @@ static void math_atan (void) {
   double Scale;
   double Result;
   memcpy(&Scale, &ScaleBits, sizeof(Scale));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   /* Native C/intrinsic atan differs from this owned FPATAN at PC24. */
   __asm {
     fld Input
@@ -118,6 +131,9 @@ static void math_atan (void) {
     fmul Scale
     fstp Result
   }
+#else
+  Result = atan(Input) * Scale;
+#endif
   lua_pushnumber(Result);
 }
 
@@ -131,6 +147,7 @@ static void math_atan2 (void) {
   double Scale;
   double Result;
   memcpy(&Scale, &ScaleBits, sizeof(Scale));
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   __asm {
     fld First
     fld Second
@@ -138,6 +155,9 @@ static void math_atan2 (void) {
     fmul Scale
     fstp Result
   }
+#else
+  Result = atan2(First, Second) * Scale;
+#endif
   lua_pushnumber(Result);
 }
 
@@ -161,12 +181,16 @@ static void math_mod (void) {
 static void math_sqrt (void) {
   const double Input = luaL_check_number(1);
   double Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   /* Current compiled sqrt/intrinsic differs from owned FSQRT under RC_DOWN. */
   __asm {
     fld Input
     fsqrt
     fstp Result
   }
+#else
+  Result = sqrt(Input);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -181,6 +205,7 @@ static void math_pow (void) {
 static void math_log (void) {
   const double Input = luaL_check_number(1);
   double Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   __asm {
     fld Input
     fldln2
@@ -188,6 +213,9 @@ static void math_log (void) {
     fyl2x
     fstp Result
   }
+#else
+  Result = log(Input);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -196,6 +224,7 @@ static void math_log (void) {
 static void math_log10 (void) {
   const double Input = luaL_check_number(1);
   double Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   __asm {
     fld Input
     fldlg2
@@ -203,6 +232,9 @@ static void math_log10 (void) {
     fyl2x
     fstp Result
   }
+#else
+  Result = log10(Input);
+#endif
   lua_pushnumber(Result);
 }
 
@@ -211,6 +243,7 @@ static void math_log10 (void) {
 static void math_exp (void) {
   const double Input = luaL_check_number(1);
   double Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
   __asm {
     fld Input
     fldl2e
@@ -226,6 +259,9 @@ static void math_exp (void) {
     fstp st(1)
     fstp Result
   }
+#else
+  Result = exp(Input);
+#endif
   lua_pushnumber(Result);
 }
 

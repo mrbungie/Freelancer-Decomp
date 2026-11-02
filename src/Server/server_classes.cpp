@@ -2156,7 +2156,15 @@ static void PlayerDB_LeaveSystem(PlayerData& Slot, unsigned int SessionId) {
     // system id (from IBase::SystemId, the base's `system` key in universe.ini)
     // has no SysMap entry -- check universe.ini data. See THE MISS ARM above;
     // retail faults at .text:06d0874c. Do not fix: user decision 2026-09-24.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     StarSystem& System = It._Ptr->_Myval.second; // KNOWN CRASH on SysMap miss, see above
+#else
+    // Portable STL: no node pointer. A miss cannot address the head node's unconstructed
+    // storage, so it runs on zeroed placeholder storage instead of faulting as retail does.
+    alignas(StarSystem) static unsigned char MissStorage[sizeof(StarSystem)];
+    StarSystem& System = It != SysDB::SysMap.end() ? It->second
+                                                   : *reinterpret_cast<StarSystem*>(MissStorage);
+#endif
 
     System.remove_player(SessionId);                               // FUN_06d08740
 
@@ -3930,6 +3938,7 @@ unsigned char PlayerDB::load_user_data(const SLoginInfo& Info, unsigned int Sess
         _makepath(AccountDir, nullptr, Server_GetAccountsRoot(), DirName, nullptr); // .text:06d534d2
     }
 
+    if (getenv("FL_TRACE_RPC")) fprintf(stderr, "[fl] server: load_user_data dir='%s' create=%d access=%d\n", AccountDir, (int)static_cast<unsigned char>(Info.CreateFlag), _access(AccountDir, 6));
     if (_access(AccountDir, 6) != 0) {                                      // .text:06d534e8
         // .text:06d534f5 MOV AL,[EBP + 0xc0]: retail tests the low BYTE only.
         if (static_cast<unsigned char>(Info.CreateFlag) == 0)
@@ -4818,7 +4827,7 @@ void CPlayerGroup::SendChat(int Style, const wchar_t* Msg, ...) {
 // IServerImpl::SubmitChat's group branch (.text:06d19d79), pushes the encoded chat
 // buffer DAT_06d8e5a8 and its size. Retail has no null check on DAT_06d8fb18 --
 // it reloads it per member (0x06d5bf40) -- so neither does this.
-void CPlayerGroup::DeliverChat(unsigned long MsgType, const void* MsgData) {
+void CPlayerGroup::DeliverChat(uint32_t MsgType, const void* MsgData) {
     std::set<unsigned int>::const_iterator It = m_Members.begin();
     for (; It != m_Members.end(); ++It) {
         g_pChatClientInterface->SendCommonChatMsg(CHAT_ID(MakeChatId(*It)), CHAT_ID(GDeliverChatSourceId),
@@ -5551,11 +5560,11 @@ void MedMine::deleted(CObject* Obj)
 struct FSrvAsteroidCube {
     CmnAsteroid::CAsteroidCube* Cube;              // +0x00
     unsigned int SystemId;                         // +0x04 (FUN_06d04ab0 reads it for SysMap)
-    unsigned long CubeId;                          // +0x08
+    uint32_t CubeId;                          // +0x08
     int CubeSize;                                  // +0x0c
     // +0x10..+0x20: asteroid_marker::AsteroidId -> the server object (node+0x10).
     // Size at +0x20 is what FUN_06d04480's prune pass tests (node+0x30).
-    std::map<unsigned long, GameObject*> Objects;
+    std::map<uint32_t, GameObject*> Objects;
 
     FSrvAsteroidCube()
         : Cube(nullptr)
@@ -5568,7 +5577,7 @@ struct FSrvAsteroidCube {
     // every object's vtable +0x15c -- GameObject::destroy_notify -- in map
     // order (.text:06d04579 in the inlined copy), then the tree is freed.
     ~FSrvAsteroidCube() {
-        for (std::map<unsigned long, GameObject*>::iterator It = Objects.begin(); It != Objects.end(); ++It)
+        for (std::map<uint32_t, GameObject*>::iterator It = Objects.begin(); It != Objects.end(); ++It)
             It->second->destroy_notify();
     }
 
@@ -5594,7 +5603,7 @@ struct FSrvAsteroidCube {
 //       .text:06d04b27  MOV ECX,[EDI] -- SystemId (+0x04) is the second argument
 //     .text:06d04b55  Objects.insert({AsteroidId, object})
 void FSrvAsteroidCube::apply_marker(CmnAsteroid::asteroid_marker const* Marker) {
-    std::map<unsigned long, GameObject*>::iterator It = Objects.find(Marker->AsteroidId);
+    std::map<uint32_t, GameObject*>::iterator It = Objects.find(Marker->AsteroidId);
     if (!Marker->bCubeActive) {
         if (It != Objects.end()) {
             It->second->destroy_notify();
@@ -5614,7 +5623,7 @@ void FSrvAsteroidCube::apply_marker(CmnAsteroid::asteroid_marker const* Marker) 
         } else {
             Obj = System.create_med_asteroid(Marker->ObjId);
         }
-        Objects.insert(std::map<unsigned long, GameObject*>::value_type(Marker->AsteroidId, Obj));
+        Objects.insert(std::map<uint32_t, GameObject*>::value_type(Marker->AsteroidId, Obj));
         return;
     }
     It->second->get_position();
@@ -5627,7 +5636,7 @@ void FSrvAsteroidCube::apply_marker(CmnAsteroid::asteroid_marker const* Marker) 
 // ---------------------------------------------------------------------------
 struct FSrvAsteroidField {
     CmnAsteroid::CAsteroidField* Field;                   // +0x00
-    std::map<unsigned long, FSrvAsteroidCube> Cubes;      // +0x04..+0x14, keyed by CubeId
+    std::map<uint32_t, FSrvAsteroidCube> Cubes;      // +0x04..+0x14, keyed by CubeId
     int CubeSize;                                         // +0x18
     unsigned int SystemId;                                // +0x1c
 
@@ -5718,7 +5727,7 @@ void FSrvAsteroidField::update() {
     CmnAsteroid::asteroid_marker* Marker = Field->get_changes();
     while (Marker != nullptr) {
         FSrvAsteroidCube* Record;
-        std::map<unsigned long, FSrvAsteroidCube>::iterator It = Cubes.find(Marker->CubeId);
+        std::map<uint32_t, FSrvAsteroidCube>::iterator It = Cubes.find(Marker->CubeId);
         if (It == Cubes.end()) {
             It = Cubes.insert(std::make_pair(Marker->CubeId, FSrvAsteroidCube())).first;
             Record = &It->second;
@@ -5736,7 +5745,7 @@ void FSrvAsteroidField::update() {
         Marker = Marker->Next;
     }
 
-    std::map<unsigned long, FSrvAsteroidCube>::iterator It = Cubes.begin();
+    std::map<uint32_t, FSrvAsteroidCube>::iterator It = Cubes.begin();
     while (It != Cubes.end()) {
         if (It->second.Objects.size() == 0)
             It = Cubes.erase(It);

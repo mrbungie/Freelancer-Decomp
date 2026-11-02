@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "nn_button_control.h"
+#include "fl/handles.h"
 #include "hud_widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
 
 #include "game_options.h"         // GetGameOption (FUN_005792b0)
@@ -74,7 +75,7 @@ namespace
     {
         // The `CMP [ESI+0x84],-1` every slot below inlines.
         return Control->MeshHolder.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     // The parent notification the handlers spell out: the parent as a WinControl (slot 2),
@@ -617,7 +618,7 @@ void NnButtonControl::Draw()
     else if ((ButtonBits & 0x02) != 0 || ((ButtonBits & 0x01) != 0 && (ButtonBits2 & 0x08) != 0))
     {
         // Focused, or hovered with the hover pulse on: two FUN_00561da0 samples.
-        unsigned long Pulse = 0;
+        uint32_t Pulse = 0;
         NnUiPulseBlendArgb(&Pulse);
         memcpy(Body, &Pulse, sizeof(Body));
         NnUiPulseBlendArgb(&Pulse);
@@ -659,10 +660,10 @@ void NnButtonControl::Draw()
     {
         if (HasInstance(this))
         {
-            GlowArgb = (static_cast<unsigned long>(Glow[3]) << 24) |
-                       (static_cast<unsigned long>(Glow[0]) << 16) |
-                       (static_cast<unsigned long>(Glow[1]) << 8) |
-                       static_cast<unsigned long>(Glow[2]);
+            GlowArgb = (static_cast<uint32_t>(Glow[3]) << 24) |
+                       (static_cast<uint32_t>(Glow[0]) << 16) |
+                       (static_cast<uint32_t>(Glow[1]) << 8) |
+                       static_cast<uint32_t>(Glow[2]);
             SubmitWin3DTintedEngineInstanceWrapped(Win3DGetCamera(), MeshHolder.EngineInstance,
                                                   1, Glow, 1, 1.0f, 0); // FUN_00434630
         }
@@ -977,7 +978,7 @@ namespace
     {
         // The `CMP [reg+0x37c],-1` the slots inline.
         return Control->ToggleMesh.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     // The parent notification with a B argument (FUN_0055cc90's 0x30 carries the state).
@@ -1276,7 +1277,7 @@ void NnToggleButtonControl::Draw()
     // the orientation {C,0,S, 0,1,0, -S,0,C} of DAT_005e1738 replaces the instance's (updated),
     // the tinted submit FUN_00434630 in the glow colour, and the saved orientation goes back
     // without an update.
-    if (GlowArgb != 0 && Instance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (GlowArgb != 0 && Instance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
     {
         float Saved[9];
         memcpy(Saved, DALib::Engine->GetInstanceOrientation(Instance), sizeof(Saved)); // vt+0x98

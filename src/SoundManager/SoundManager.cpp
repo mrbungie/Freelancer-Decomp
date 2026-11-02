@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "SoundManagerInternal.h"
+#include "fl/handles.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 #include "readfile.h"
 
@@ -33,7 +34,7 @@ namespace
     // head node in the static initializer 06ee1740 -> 06ee1750 (alloc, self-link, count = 0) at DLL
     // load and registers 06ee17f0 through _onexit (06ee17e0); FInstanceListInit below does both.
     FSoundInstanceNode G_InstanceSentinel;
-    unsigned long G_InstanceCount = 0;
+    uint32_t G_InstanceCount = 0;
     struct FInstanceListInit
     {
         FInstanceListInit()
@@ -47,15 +48,15 @@ namespace
     FInstanceListInit G_InstanceListInit;
     HANDLE G_MixerEvent = nullptr;   // DAT_06eeaf70: CreateEventA in ctor 06ee1dc2, CloseHandle in dtor 06ee1e15
     HANDLE G_NotifyThread = nullptr; // DAT_06eeaf6c, FUN_06ee1a40
-    unsigned long G_MixerStopFlag = 0; // DAT_06eeaf74, set by FUN_06ee4900, read by FUN_06ee18e0
+    uint32_t G_MixerStopFlag = 0; // DAT_06eeaf74, set by FUN_06ee4900, read by FUN_06ee18e0
 
     // DAT_06eeaf5c / DAT_06eeaf60 / DAT_06eea028 / DAT_06eeaf64 / DAT_06eeaf68 / DAT_06eea020
-    unsigned long G_AllowHwToSw = 0;
-    unsigned long G_AllowSwToHw = 0;
-    unsigned long G_ForceFreqToSw = 1;
-    unsigned long G_NeverSetStartPos = 0;
-    unsigned long G_DisplayExtraDebug = 0;
-    unsigned long G_Ds3dCreateFlags = 0x00040090;
+    uint32_t G_AllowHwToSw = 0;
+    uint32_t G_AllowSwToHw = 0;
+    uint32_t G_ForceFreqToSw = 1;
+    uint32_t G_NeverSetStartPos = 0;
+    uint32_t G_DisplayExtraDebug = 0;
+    uint32_t G_Ds3dCreateFlags = 0x00040090;
 
     const char kDefaultDeviceId[] = "{00000000-0000-0000-0000-000000000000}";
     // s_0123456789truefalsynox.. at 06eea428 (36 chars + NUL, copied with 9 MOVSD + 1 MOVSB at
@@ -73,7 +74,7 @@ namespace
         0xC241333F, 0x1C1B, 0x11D2, {0x94, 0xF5, 0x00, 0xC0, 0x4F, 0xC2, 0x8A, 0xCA}};
     const GUID kDs3dAlgGuidNull = {0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0}};
 
-    const unsigned long kSpeakerTable[] = {
+    const uint32_t kSpeakerTable[] = {
         DSSPEAKER_MONO,                             // 0 unused by slot 7
         DSSPEAKER_HEADPHONE,                        // 1
         DSSPEAKER_STEREO,                           // 2
@@ -86,7 +87,7 @@ namespace
         DSSPEAKER_5POINT1,                          // 9
         7,                                          // 10 DSSPEAKER_7POINT1
     };
-    const unsigned long kSpeakerCount = sizeof(kSpeakerTable) / sizeof(kSpeakerTable[0]);
+    const uint32_t kSpeakerCount = sizeof(kSpeakerTable) / sizeof(kSpeakerTable[0]);
 
     // FUN_06ee71c0 cdecl (buffer, fmt, ...): _vsnprintf(buffer, 0x2000, fmt, args), returns
     // the buffer. No terminator is forced. Every retail message is formatted through it
@@ -142,7 +143,7 @@ namespace
 
     // 06ee705f..7094: a field starts at the cursor, runs while hex digits last, and the cursor
     // then steps one past the stop character (a NUL included) before strtoul(field, 0, 16).
-    unsigned long ParseGuidField(const char*& Cursor)
+    uint32_t ParseGuidField(const char*& Cursor)
     {
         const char* Field = Cursor;
         while (*Cursor != '\0' && IsGuidHexDigit(*Cursor))
@@ -171,9 +172,9 @@ namespace
         ++Cursor;
         char DeadCopy[0xC8]; // 06ee704d local_c8
         strcpy(DeadCopy, Cursor);
-        const unsigned long Data1 = ParseGuidField(Cursor);
-        const unsigned long Data2 = ParseGuidField(Cursor);
-        const unsigned long Data3 = ParseGuidField(Cursor);
+        const uint32_t Data1 = ParseGuidField(Cursor);
+        const uint32_t Data2 = ParseGuidField(Cursor);
+        const uint32_t Data3 = ParseGuidField(Cursor);
         unsigned char Data4[8];
         char Pair[3];
         Pair[0] = Cursor[0];
@@ -214,7 +215,7 @@ namespace
     // non-zero; then "true"/"yes" -> 1 and "false"/"no" -> 0 (stricmp, one call each), an 'x' or 'X'
     // anywhere -> strtoul(.., 0, 16), else atoi. The strspn(buf, "0123456789+-") retail runs just
     // before atoi has its result discarded, so nothing is cut there.
-    unsigned long ParseIniUnsigned(char* Text)
+    uint32_t ParseIniUnsigned(char* Text)
     {
         const size_t Span = strspn(Text, kIntCharset);
         if (Span != 0)
@@ -229,7 +230,7 @@ namespace
             return 0;
         if (strchr(Text, 'x') != nullptr || strchr(Text, 'X') != nullptr)
             return strtoul(Text, nullptr, 16);
-        return static_cast<unsigned long>(MsvcrtAtoi(Text));
+        return static_cast<uint32_t>(MsvcrtAtoi(Text));
     }
 
     // Inlined after every float GetString (06ee3b0d.., 3bee.., 3ccb.., 3da8..): strspn against
@@ -287,10 +288,10 @@ namespace
     // stack variable to every call and reads it back, so a failed acquisition keeps the previous
     // key's value. Otherwise *Out = default, OpenSection(section, 3) (0 -> skip), GetString(key,
     // DAT_06eeafa0, 0x400) (0 -> keep default), parse, CloseSection; Release the parser; return *Out.
-    unsigned long ReadProfileInt(ICOManager* Dacom, IProfileParser* Cached, const char* Section,
-                                 const char* Key, unsigned long DefaultValue, unsigned long* Out)
+    uint32_t ReadProfileInt(ICOManager* Dacom, IProfileParser* Cached, const char* Section,
+                                 const char* Key, uint32_t DefaultValue, uint32_t* Out)
     {
-        unsigned long Fallback = 0;
+        uint32_t Fallback = 0;
         if (Out == nullptr)
             Out = &Fallback;
         IDAComponent* Local = nullptr;
@@ -310,12 +311,12 @@ namespace
                 *Out = ParseIniUnsigned(G_IniIntBuffer);
             Parser->CloseSection(Handle);
         }
-        const unsigned long Value = *Out;
+        const uint32_t Value = *Out;
         Local->Release();
         return Value;
     }
 
-    void CopyAlgGuid(unsigned long* Dest, const GUID* Src)
+    void CopyAlgGuid(uint32_t* Dest, const GUID* Src)
     {
         memcpy(Dest, Src, sizeof(GUID));
     }
@@ -351,9 +352,9 @@ namespace
 
     // FUN_06ee5f00 thiscall RET 8 (payload at node+8, hw-used count). Returns AL.
     unsigned char MaybeMigrateHwSw(FSoundManager* Manager, FSoundInstanceNode* Node,
-                                   unsigned long HwUsed)
+                                   uint32_t HwUsed)
     {
-        unsigned long Flags = Node->StatusFlags;
+        uint32_t Flags = Node->StatusFlags;
         if ((Flags & 0x24) != 0)
             return 0;
         if (Node->NotifyEvent != nullptr)
@@ -409,7 +410,7 @@ namespace
     }
 
     // FUN_06ee56e0 stdcall RET 4: factory Initialize hook, always 0.
-    unsigned long SoundManagerFactoryInitialize(void* /*Unused*/)
+    uint32_t SoundManagerFactoryInitialize(void* /*Unused*/)
     {
         return 0;
     }
@@ -483,7 +484,7 @@ namespace
     {
     public:
         virtual unsigned char Consume(const unsigned short* Fmt8, const void* Samples,
-                                      unsigned long ByteCount) = 0;
+                                      uint32_t ByteCount) = 0;
     };
 
     // Stack object of FUN_06ee8960: {file system, map handle, view, mapped size, read cursor}.
@@ -494,21 +495,21 @@ namespace
         IFileSystem* FileSystem;   // +0x00
         int Handle;                // +0x04
         const unsigned char* View; // +0x08
-        unsigned long Size;        // +0x0C
-        unsigned long Cursor;      // +0x10
+        uint32_t Size;        // +0x0C
+        uint32_t Cursor;      // +0x10
 
         // FUN_06ee8c00
         ~FWavLibMap()
         {
             if (Handle != -1 && FileSystem != nullptr)
             {
-                FileSystem->CloseFile(static_cast<unsigned long>(Handle)); // +0x10
+                FileSystem->CloseFile(static_cast<uint32_t>(Handle)); // +0x10
                 Handle = -1;
             }
         }
 
         // FUN_06ee8c30 thiscall RET 8: pointer into the view, or 0 when unmapped / out of range.
-        const unsigned char* Range(unsigned long Offset, unsigned long Length) const
+        const unsigned char* Range(uint32_t Offset, uint32_t Length) const
         {
             if (Handle == -1)
                 return nullptr;
@@ -521,8 +522,8 @@ namespace
     // FUN_06ee86c0 cdecl: whole-file ACM decode of a compressed WAV; the PCM goes to the sink
     // and is freed afterwards. Trim (encoder delay) and fact (sample count) are honoured only
     // when positive.
-    unsigned char WavLibAcmDecode(const WAVEFORMATEX* Src, const unsigned char* Data, unsigned long DataSize,
-                                  unsigned long TrimSamples, unsigned long FactSamples, FWavSink* Sink)
+    unsigned char WavLibAcmDecode(const WAVEFORMATEX* Src, const unsigned char* Data, uint32_t DataSize,
+                                  uint32_t TrimSamples, uint32_t FactSamples, FWavSink* Sink)
     {
         if (G_WavLibDriver == nullptr) // 06ee86cc
             WavLibInitAcmDriver();
@@ -559,7 +560,7 @@ namespace
                     FdumpWavLib(kFdumpError, 0x120, "WavLib: did not decode entire sound.\n");
                 else
                 {
-                    unsigned long Used = Header.cbDstLengthUsed;
+                    uint32_t Used = Header.cbDstLengthUsed;
                     if (Used == Header.cbDstLength)
                         FdumpWavLib(kFdumpWarning, 0x129, "WavLib: possible incomplete ACM decode.\n");
                     // IMUL bits*channels; CDQ/AND 7/ADD/SAR 3 = signed division by 8.
@@ -569,7 +570,7 @@ namespace
                     const int Trim = static_cast<int>(TrimSamples);
                     if (Trim > 0)
                     {
-                        const unsigned long Skip = static_cast<unsigned long>(FrameBytes * Trim);
+                        const uint32_t Skip = static_cast<uint32_t>(FrameBytes * Trim);
                         if (Skip < Used)
                         {
                             Pcm += Skip; // the pointer advances; nothing is moved
@@ -579,7 +580,7 @@ namespace
                     const int Fact = static_cast<int>(FactSamples);
                     if (Fact > 0)
                     {
-                        const unsigned long Cap = static_cast<unsigned long>(FrameBytes * Fact);
+                        const uint32_t Cap = static_cast<uint32_t>(FrameBytes * Fact);
                         if (Used > Cap)
                             Used = Cap;
                     }
@@ -624,30 +625,30 @@ namespace
         Map.Handle = FileSystem->CreateMapping(0, 0, 2, 0, 0, 0);
         if (Map.Handle == -1)
             return 0;
-        Map.View = reinterpret_cast<const unsigned char*>(static_cast<uintptr_t>(static_cast<unsigned int>(
-            FileSystem->MapFileView(static_cast<unsigned long>(Map.Handle), 4, 0, 0, 0))));
+        Map.View = static_cast<const unsigned char*>(fl::HandleToPtr(static_cast<uint32_t>(
+            FileSystem->MapFileView(static_cast<uint32_t>(Map.Handle), 4, 0, 0, 0))));
         Map.Size = FileSystem->GetSize(0, 0);
         Map.Cursor = 0;
         if (Map.View == nullptr)
             return 0;
-        const unsigned long* Riff = reinterpret_cast<const unsigned long*>(Map.Range(0, 0xC));
+        const uint32_t* Riff = reinterpret_cast<const uint32_t*>(Map.Range(0, 0xC));
         if (Riff == nullptr)
             return 0;
         Map.Cursor += 0xC;
         if (Riff[0] != 0x46464952 || Riff[2] != 0x45564157) // "RIFF" / "WAVE"
             return 0;
         // A chunk pointer addresses its 8-byte header; the last chunk of each kind wins.
-        const unsigned long* FmtChunk = nullptr;  // ESI
-        const unsigned long* FactChunk = nullptr; // EBP
-        const unsigned long* TrimChunk = nullptr; // [ESP+0x3C]
-        const unsigned long* DataChunk = nullptr; // EBX
+        const uint32_t* FmtChunk = nullptr;  // ESI
+        const uint32_t* FactChunk = nullptr; // EBP
+        const uint32_t* TrimChunk = nullptr; // [ESP+0x3C]
+        const uint32_t* DataChunk = nullptr; // EBX
         for (;;)
         {
-            const unsigned long* Chunk = reinterpret_cast<const unsigned long*>(Map.Range(Map.Cursor, 8));
+            const uint32_t* Chunk = reinterpret_cast<const uint32_t*>(Map.Range(Map.Cursor, 8));
             if (Chunk == nullptr)
                 break;
             Map.Cursor += 8;
-            const unsigned long Id = Chunk[0];
+            const uint32_t Id = Chunk[0];
             if (Id == 0x74636166) // "fact"
                 FactChunk = Chunk;
             else if (Id == 0x6D697274) // "trim"
@@ -657,12 +658,12 @@ namespace
             else if (Id == 0x61746164) // "data"
                 DataChunk = Chunk;
             // No even-size padding; JNS clamps a negative sum to 0, JLE clamps to the mapped size.
-            long Next = static_cast<long>(Chunk[1] + Map.Cursor);
+            int32_t Next = static_cast<int32_t>(Chunk[1] + Map.Cursor);
             if (Next < 0)
                 Next = 0;
-            if (Next > static_cast<long>(Map.Size))
-                Next = static_cast<long>(Map.Size);
-            Map.Cursor = static_cast<unsigned long>(Next);
+            if (Next > static_cast<int32_t>(Map.Size))
+                Next = static_cast<int32_t>(Map.Size);
+            Map.Cursor = static_cast<uint32_t>(Next);
         }
         if (FmtChunk == nullptr || DataChunk == nullptr)
             return 0;
@@ -670,10 +671,10 @@ namespace
         const unsigned short Tag = Format->wFormatTag;
         if (FmtChunk[1] < (Tag == WAVE_FORMAT_PCM ? 0xEu : 0x12u))
             return 0;
-        unsigned long FactSamples = 0xFFFFFFFF;
+        uint32_t FactSamples = 0xFFFFFFFF;
         if (FactChunk != nullptr && FactChunk[1] >= 4)
             FactSamples = FactChunk[2];
-        unsigned long TrimSamples = 0xFFFFFFFF;
+        uint32_t TrimSamples = 0xFFFFFFFF;
         if (TrimChunk != nullptr && TrimChunk[1] == 4)
             TrimSamples = TrimChunk[2];
         const unsigned char* Samples = reinterpret_cast<const unsigned char*>(DataChunk + 2);
@@ -694,14 +695,14 @@ namespace
     public:
         FSoundArchetype* Archetype; // +0x04
         IDirectSound* DirectSound;  // +0x08
-        unsigned long Flags;        // +0x0C
+        uint32_t Flags;        // +0x0C
 
         // LAB_06ee12f0 thiscall RET 0xC: frames = bytes / fmt[3] (DIV, no zero test);
         // FUN_06ee1330(fmt, bytes, 0, frames, samples, DS, flags); NEG/SBB/INC -> (hr == 0).
         unsigned char Consume(const unsigned short* Fmt8, const void* Samples,
-                              unsigned long ByteCount) override
+                              uint32_t ByteCount) override
         {
-            const unsigned long Frames = ByteCount / Fmt8[3];
+            const uint32_t Frames = ByteCount / Fmt8[3];
             const GENRESULT Hr =
                 Archetype->FillFromPcm(Fmt8, ByteCount, 0, Frames, Samples, DirectSound, Flags);
             return Hr == GR_OK ? 1 : 0;
@@ -714,7 +715,7 @@ namespace
     // exact spills of those register values, so the single float rounding point is the same.
     float QuakeDistance(float DistSq)
     {
-        long Bits = *reinterpret_cast<long*>(&DistSq);
+        int32_t Bits = *reinterpret_cast<int32_t*>(&DistSq);
         Bits = 0x5F3759DF - (Bits >> 1);
         const float Y = *reinterpret_cast<float*>(&Bits);
         const double YD = Y;
@@ -732,6 +733,7 @@ namespace
     {
         static const double kTen = 10.0; // DAT_06ee9480
         float Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld MinDistance
@@ -749,6 +751,12 @@ namespace
             fadd ClientAtten
             fstp Result
         }
+#else
+        // Same expression on the x87 stack, evaluated in double (log10 via libm).
+        const double Min = MinDistance;
+        const double Denominator = (static_cast<double>(Dist) * DistanceFactor - Min) * RolloffFactor + Min;
+        Result = static_cast<float>(std::log10(Min / Denominator) * kTen + ClientAtten);
+#endif
         return Result;
     }
 
@@ -768,9 +776,9 @@ namespace
     }
 
     // MSVCRT ftol: truncate toward zero into a 64-bit integer; the callers keep EAX.
-    unsigned long Ftol32(double Value)
+    uint32_t Ftol32(double Value)
     {
-        return static_cast<unsigned long>(static_cast<long long>(Value));
+        return static_cast<uint32_t>(static_cast<long long>(Value));
     }
 
     // FUN_06ee16c0 cdecl (archetype, play-key): archetype null -> 0; DurationMs (+0x1C) if
@@ -778,11 +786,11 @@ namespace
     // (TEST AH,0x44 + JNP: only C3 alone skips, NaN goes on); else
     // ftol(float(DurationMs) / PitchToMultiplier) with the duration FILD qword -> FSTP float
     // and the FDIVR on the FPU stack. No play-key null check.
-    unsigned long ScaledDurationMs(FSoundArchetype* Archetype, ISoundSource* PlayKey)
+    uint32_t ScaledDurationMs(FSoundArchetype* Archetype, ISoundSource* PlayKey)
     {
         if (Archetype == nullptr)
             return 0;
-        unsigned long Duration = Archetype->DurationMs;
+        uint32_t Duration = Archetype->DurationMs;
         if ((Archetype->Flags & 2) == 0)
             return Duration;
         float Pitch = 0.0f;
@@ -901,7 +909,7 @@ namespace
     // failure (JL) -> FDUMP ERROR 0xD03 "Couldn't lock sound buffer.\n" (06eeac28), -1. Else
     // copy min(byteCount, b1) (REP MOVSD/MOVSB, no null test), Unlock(p1, b1, 0, 0) with its
     // result ignored, return 0.
-    int UploadSoundBuffer(IDirectSoundBuffer* Buffer, const void* Samples, unsigned long ByteCount)
+    int UploadSoundBuffer(IDirectSoundBuffer* Buffer, const void* Samples, uint32_t ByteCount)
     {
         void* Ptr1 = nullptr;
         DWORD Bytes1 = 0;
@@ -910,7 +918,7 @@ namespace
             Fdump(kFdumpError, 0xD03, "Couldn't lock sound buffer.\n");
             return -1;
         }
-        unsigned long CopyBytes = ByteCount;
+        uint32_t CopyBytes = ByteCount;
         if (ByteCount > Bytes1)
             CopyBytes = Bytes1;
         memcpy(Ptr1, Samples, CopyBytes);
@@ -930,10 +938,10 @@ namespace
         {
             // 06ee18f0..1945: operator new((count + 1) * 4), zero it, collect node+0x14 events.
             EnterCriticalSection(&G_InstanceLock);
-            const unsigned long AllocBytes = G_InstanceCount * 4u + 4u;
+            const uint32_t AllocBytes = G_InstanceCount * 4u + 4u;
             Handles = static_cast<HANDLE*>(operator new(AllocBytes));
             memset(Handles, 0, AllocBytes);
-            unsigned long Count = 0;
+            uint32_t Count = 0;
             FSoundInstanceNode* Node = G_InstanceSentinel.Next;
             while (Node != &G_InstanceSentinel)
             {
@@ -1066,17 +1074,17 @@ GENRESULT DACOM_API FSoundArchetype::QueryInterface(const char* Iid, void** Out)
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundArchetype::AddRef()
+uint32_t DACOM_API FSoundArchetype::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
-unsigned long DACOM_API FSoundArchetype::Release()
+uint32_t DACOM_API FSoundArchetype::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    const unsigned long Remaining = RefCount;
+    const uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         RefCount = 1;
@@ -1091,7 +1099,7 @@ GENRESULT DACOM_API FSoundArchetype::GetFormat(void* Out)
     // LAB_06ee1530 RET 8: copy [this+4] and [this+8] as two dwords. No null check.
     // EAX leftover is [this+8]; callers ignore HRESULT.
     memcpy(Out, &nChannels, 8);
-    unsigned long Packed = 0;
+    uint32_t Packed = 0;
     memcpy(&Packed, &nSamplesPerSec, 4);
     return static_cast<GENRESULT>(Packed);
 }
@@ -1103,7 +1111,7 @@ GENRESULT DACOM_API FSoundArchetype::GetSamples(void* /*Out*/)
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundArchetype::GetNumFrames()
+uint32_t DACOM_API FSoundArchetype::GetNumFrames()
 {
     return NumFrames;
 }
@@ -1114,13 +1122,13 @@ float DACOM_API FSoundArchetype::GetGain()
     return Gain;
 }
 
-unsigned long DACOM_API FSoundArchetype::GetChannelCount()
+uint32_t DACOM_API FSoundArchetype::GetChannelCount()
 {
     // LAB_06ee15a0 RET 4: MOVZX EAX, word [this+4].
     return nChannels;
 }
 
-unsigned long DACOM_API FSoundArchetype::GetDurationMs()
+uint32_t DACOM_API FSoundArchetype::GetDurationMs()
 {
     // LAB_06ee15b0 RET 4: EAX = [this+0x1C].
     return DurationMs;
@@ -1146,13 +1154,13 @@ GENRESULT DACOM_API FSoundArchetype::SetGain(float InGain)
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundArchetype::IsReady()
+uint32_t DACOM_API FSoundArchetype::IsReady()
 {
     // LAB_06ee15c0 RET 4: AL=1.
     return 1;
 }
 
-GENRESULT DACOM_API FSoundArchetype::GetLoopRange(unsigned long* Start, unsigned long* End)
+GENRESULT DACOM_API FSoundArchetype::GetLoopRange(uint32_t* Start, uint32_t* End)
 {
     // LAB_06ee15d0 RET 0xC: no null check; EAX leftover = LoopEnd.
     *Start = LoopStart;
@@ -1160,10 +1168,10 @@ GENRESULT DACOM_API FSoundArchetype::GetLoopRange(unsigned long* Start, unsigned
     return static_cast<GENRESULT>(LoopEnd);
 }
 
-GENRESULT FSoundArchetype::FillFromPcm(const unsigned short* Fmt8, unsigned long ByteCount,
-                                       unsigned long InLoopStart, unsigned long InLoopEnd,
+GENRESULT FSoundArchetype::FillFromPcm(const unsigned short* Fmt8, uint32_t ByteCount,
+                                       uint32_t InLoopStart, uint32_t InLoopEnd,
                                        const void* Samples, IDirectSound* DirectSound,
-                                       unsigned long InFlags)
+                                       uint32_t InFlags)
 {
     // FUN_06ee1330 thiscall RET 0x1C.
     if (Buffer != nullptr)
@@ -1192,7 +1200,7 @@ GENRESULT FSoundArchetype::FillFromPcm(const unsigned short* Fmt8, unsigned long
     const unsigned short AvgAlign = static_cast<unsigned short>(
         Ftol32(static_cast<double>(static_cast<int>(Bits) * static_cast<int>(nChannels)) * 0.125));
     Wave.nBlockAlign = AvgAlign;
-    Wave.nAvgBytesPerSec = static_cast<unsigned long>(AvgAlign) * nSamplesPerSec;
+    Wave.nAvgBytesPerSec = static_cast<uint32_t>(AvgAlign) * nSamplesPerSec;
     Wave.cbSize = 0;
 
     DSBUFFERDESC Desc = {};
@@ -1236,7 +1244,7 @@ GENRESULT FSoundArchetype::FillFromPcm(const unsigned short* Fmt8, unsigned long
 }
 
 GENRESULT FSoundArchetype::FillFromWav(IDAComponent* FileSystem, IDirectSound* DirectSound,
-                                       unsigned long InFlags)
+                                       uint32_t InFlags)
 {
     // FUN_06ee1240 thiscall RET 0xC: build the sink on the stack, FUN_06ee8960(FS, &sink).
     // Sink result nonzero -> 0. Otherwise FS+0x84 (name, 0x80), FUN_06ee71c0 = _vsnprintf 0x2000,
@@ -1292,17 +1300,17 @@ GENRESULT DACOM_API FSoundInner::QueryInterface(const char* Iid, void** Out)
     return GR_INTERFACE_UNSUPPORTED;
 }
 
-unsigned long DACOM_API FSoundInner::AddRef()
+uint32_t DACOM_API FSoundInner::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
-unsigned long DACOM_API FSoundInner::Release()
+uint32_t DACOM_API FSoundInner::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    const unsigned long Remaining = RefCount;
+    const uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         // LAB_06ee8520: count = 1, then if Self(+8) run the dtor FUN_06ee1de0 (which itself calls
@@ -1334,17 +1342,17 @@ GENRESULT DACOM_API FSoundManagerFactory::QueryInterface(const char* Iid, void**
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundManagerFactory::AddRef()
+uint32_t DACOM_API FSoundManagerFactory::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
-unsigned long DACOM_API FSoundManagerFactory::Release()
+uint32_t DACOM_API FSoundManagerFactory::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    const unsigned long Remaining = RefCount;
+    const uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         RefCount = 1;
@@ -1513,12 +1521,12 @@ GENRESULT DACOM_API FSoundManager::QueryInterface(const char* Iid, void** Out)
     return Controlling->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FSoundManager::AddRef()
+uint32_t DACOM_API FSoundManager::AddRef()
 {
     return Controlling->AddRef();
 }
 
-unsigned long DACOM_API FSoundManager::Release()
+uint32_t DACOM_API FSoundManager::Release()
 {
     return Controlling->Release();
 }
@@ -1527,7 +1535,7 @@ GENRESULT DACOM_API FSoundManager::SetPcmFormat(unsigned short* Fmt)
 {
     SampleRate = Fmt[2];
     Channels = Fmt[0];
-    BitsPerSample = static_cast<unsigned long>(Fmt[3]) << 3;
+    BitsPerSample = static_cast<uint32_t>(Fmt[3]) << 3;
     return GR_OK;
 }
 
@@ -1538,7 +1546,7 @@ GENRESULT DACOM_API FSoundManager::GetPcmFormat(unsigned short* Fmt)
     Fmt[2] = static_cast<unsigned short>(SampleRate);
     Fmt[0] = static_cast<unsigned short>(Channels);
     Fmt[3] = static_cast<unsigned short>(BitsPerSample >> 3);
-    Fmt[1] = static_cast<unsigned short>(static_cast<unsigned long>(Fmt[3]) / Channels);
+    Fmt[1] = static_cast<unsigned short>(static_cast<uint32_t>(Fmt[3]) / Channels);
     return GR_OK;
 }
 
@@ -1548,13 +1556,13 @@ GENRESULT DACOM_API FSoundManager::SetMasterGain(float Gain)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::SetMaxChannels(unsigned long Count)
+GENRESULT DACOM_API FSoundManager::SetMaxChannels(uint32_t Count)
 {
     MaxChannels = Count;
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::SetSpeakerConfig(unsigned long Index)
+GENRESULT DACOM_API FSoundManager::SetSpeakerConfig(uint32_t Index)
 {
     if (DirectSound == nullptr || Index < 1 || Index >= 0xB)
         return GR_GENERIC;
@@ -1567,19 +1575,19 @@ float DACOM_API FSoundManager::GetMasterGain()
     return MasterGain;
 }
 
-unsigned long DACOM_API FSoundManager::GetMaxChannels()
+uint32_t DACOM_API FSoundManager::GetMaxChannels()
 {
     return MaxChannels;
 }
 
-unsigned long DACOM_API FSoundManager::GetSpeakerConfig()
+uint32_t DACOM_API FSoundManager::GetSpeakerConfig()
 {
     if (DirectSound == nullptr)
         return 0xC;
     DWORD Config = 0;
     if (DirectSound->GetSpeakerConfig(&Config) < 0)
         return 0xC;
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < 0xB)
     {
         if (kSpeakerTable[Index] == Config)
@@ -1664,7 +1672,7 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
     {
         // 06ee2299..22db: the 0x10-byte stack buffer is not pre-zeroed and the Get result is
         // ignored; whatever is there lands in +0x68..+0x74.
-        unsigned long Cached[4];
+        uint32_t Cached[4];
         PropertySet->Get(kDsPropSetEax20Buffer, 0, nullptr, 0, Cached, 0x10, nullptr);
         Field68 = Cached[0];
         Field6C = Cached[1];
@@ -1675,13 +1683,13 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
 
     struct FEaxBlob
     {
-        unsigned long Env;
+        uint32_t Env;
         float Vol;
         float Decay;
         float Damp;
     };
     FEaxBlob Blob;
-    Blob.Env = static_cast<unsigned long>(EaxEnv);
+    Blob.Env = static_cast<uint32_t>(EaxEnv);
     Blob.Vol = EaxVol;
     Blob.Decay = EaxDecay;
     Blob.Damp = EaxDamp;
@@ -1690,15 +1698,15 @@ GENRESULT DACOM_API FSoundManager::SetEaxPreview(int Env, float Vol, float Decay
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::GetEaxPreview(unsigned long* Env, unsigned long* Vol,
-                                                unsigned long* Decay, unsigned long* Damp)
+GENRESULT DACOM_API FSoundManager::GetEaxPreview(uint32_t* Env, uint32_t* Vol,
+                                                uint32_t* Decay, uint32_t* Damp)
 {
     // LAB_06ee2350 RET 0x14: unconditional DWORD copies +0x58..+0x64. No null checks. No status:
     // EAX is left holding the +0x64 dword (06ee236f) at return.
-    *Env = static_cast<unsigned long>(EaxEnv);
+    *Env = static_cast<uint32_t>(EaxEnv);
     memcpy(Vol, &EaxVol, sizeof(float));
     memcpy(Decay, &EaxDecay, sizeof(float));
-    unsigned long DampBits;
+    uint32_t DampBits;
     memcpy(&DampBits, &EaxDamp, sizeof(float));
     *Damp = DampBits;
     return static_cast<GENRESULT>(DampBits);
@@ -1897,8 +1905,8 @@ float DACOM_API FSoundManager::GetRolloffFactor()
     return RolloffFactor;
 }
 
-GENRESULT DACOM_API FSoundManager::EaxGetInstance(void* Id, GUID* Set, unsigned long Prop, void* Buf,
-                                                 unsigned long Cb, unsigned long* Pcb)
+GENRESULT DACOM_API FSoundManager::EaxGetInstance(void* Id, GUID* Set, uint32_t Prop, void* Buf,
+                                                 uint32_t Cb, uint32_t* Pcb)
 {
     // LAB_06ee2890 RET 0x1C: walk DAT_06eeaf04 matching node+8; QI IKsPropertySet on node+0xC;
     // QuerySupport bit0 (GET); IKsPropertySet::Get(+0x0C). HRESULT of Get ignored. Fail → -1.
@@ -1916,7 +1924,10 @@ GENRESULT DACOM_API FSoundManager::EaxGetInstance(void* Id, GUID* Set, unsigned 
                 PropertySet->QuerySupport(*Set, Prop, &Support);
                 if ((Support & 1) != 0)
                 {
-                    PropertySet->Get(*Set, Prop, nullptr, 0, Buf, Cb, Pcb);
+                    ULONG PropBytes = 0;
+                    PropertySet->Get(*Set, Prop, nullptr, 0, Buf, static_cast<ULONG>(Cb), &PropBytes);
+                    if (Pcb != nullptr)
+                        *Pcb = PropBytes;
                     Result = GR_OK;
                 }
                 PropertySet->Release();
@@ -1928,8 +1939,8 @@ GENRESULT DACOM_API FSoundManager::EaxGetInstance(void* Id, GUID* Set, unsigned 
     return Result;
 }
 
-GENRESULT DACOM_API FSoundManager::EaxSetInstance(void* Id, GUID* Set, unsigned long Prop, void* Data,
-                                                 unsigned long Cb)
+GENRESULT DACOM_API FSoundManager::EaxSetInstance(void* Id, GUID* Set, uint32_t Prop, void* Data,
+                                                 uint32_t Cb)
 {
     // LAB_06ee2a40 RET 0x18: same instance walk; QuerySupport bit1 (SET); IKsPropertySet::Set(+0x10).
     GENRESULT Result = GR_GENERIC;
@@ -1958,8 +1969,8 @@ GENRESULT DACOM_API FSoundManager::EaxSetInstance(void* Id, GUID* Set, unsigned 
     return Result;
 }
 
-GENRESULT DACOM_API FSoundManager::EaxGetPrimary(GUID* Set, unsigned long Prop, void* Buf,
-                                                unsigned long Cb, unsigned long* Pcb)
+GENRESULT DACOM_API FSoundManager::EaxGetPrimary(GUID* Set, uint32_t Prop, void* Buf,
+                                                uint32_t Cb, uint32_t* Pcb)
 {
     // LAB_06ee2940 RET 0x18: if +0x12C==0 → -1. Probe format 22050/16/2, FUN_06ee1000, CreateSoundBuffer
     // on the wrapper. If wrapper.Buffer≠0, QI IKsPropertySet on primary +0x130; QuerySupport bit0; Get.
@@ -1989,7 +2000,10 @@ GENRESULT DACOM_API FSoundManager::EaxGetPrimary(GUID* Set, unsigned long Prop, 
             PropertySet->QuerySupport(*Set, Prop, &Support);
             if ((Support & 1) != 0)
             {
-                PropertySet->Get(*Set, Prop, nullptr, 0, Buf, Cb, Pcb);
+                ULONG PropBytes = 0;
+                    PropertySet->Get(*Set, Prop, nullptr, 0, Buf, static_cast<ULONG>(Cb), &PropBytes);
+                    if (Pcb != nullptr)
+                        *Pcb = PropBytes;
                 Result = GR_OK;
             }
             PropertySet->Release();
@@ -1999,8 +2013,8 @@ GENRESULT DACOM_API FSoundManager::EaxGetPrimary(GUID* Set, unsigned long Prop, 
     return Result;
 }
 
-GENRESULT DACOM_API FSoundManager::EaxSetPrimary(GUID* Set, unsigned long Prop, void* Data,
-                                                unsigned long Cb)
+GENRESULT DACOM_API FSoundManager::EaxSetPrimary(GUID* Set, uint32_t Prop, void* Data,
+                                                uint32_t Cb)
 {
     // LAB_06ee2af0 RET 0x14: same probe + primary QI as Get; QuerySupport bit1; IKsPropertySet::Set.
     GENRESULT Result = GR_GENERIC;
@@ -2042,7 +2056,7 @@ FSoundArchetype* FSoundManager::LookupArchetype(int Id)
 {
     if (Id == -1)
         return nullptr;
-    for (unsigned long Index = 0; Index < ArchCount; ++Index)
+    for (uint32_t Index = 0; Index < ArchCount; ++Index)
     {
         if (ArchEntries[Index].Id == Id)
         {
@@ -2059,7 +2073,7 @@ int FSoundManager::InsertArchetype(FSoundArchetype* Archetype)
         return -1;
     if (ArchCount == ArchCap)
     {
-        const unsigned long NewCap = ArchCap == 0 ? 8 : ArchCap * 2;
+        const uint32_t NewCap = ArchCap == 0 ? 8 : ArchCap * 2;
         FArchMapEntry* Grown =
             static_cast<FArchMapEntry*>(realloc(ArchEntries, NewCap * sizeof(FArchMapEntry)));
         if (Grown == nullptr)
@@ -2102,7 +2116,7 @@ void FSoundManager::DestroyAllArchetypes()
     // then Release the value (06ee481f..4825, no null check); then clear the map. Retail
     // walks an RB-tree at +0xF8; the port keeps the linear array sorted by id (insert appends
     // increasing ids, erase shifts down), so the order matches (deviations.md).
-    for (unsigned long Index = 0; Index < ArchCount; ++Index)
+    for (uint32_t Index = 0; Index < ArchCount; ++Index)
     {
         StopInstancesForArch(ArchEntries[Index].Id);
         ArchEntries[Index].Archetype->Release();
@@ -2275,7 +2289,7 @@ void FSoundManager::MixerApplyEax(FSoundInstanceNode* Node)
     // Set (+0x10)(DSPROPSETID_EAX20_ListenerProperties, 1, NULL, 0, &probe, 4); Release.
     if ((CapsFlags & 4) == 0)
         return;
-    unsigned long Probe = 0;
+    uint32_t Probe = 0;
     const int ProbeHr = Node->PlayKey->GetEaxEnvironment(&Probe);
     if (ProbeHr != 0)
         return;
@@ -2300,8 +2314,8 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
     // GetApplyMode (+0x54) into a zeroed dword: JL -> keep 1; 0 -> 1, 1 -> 0, else FDUMP
     // WARNING 0xD1A and 1. The value is handed to every DS3D setter as dwApply as-is, so
     // mode 0 means DS3D_DEFERRED (the mixer commits at 06ee524e) and mode 1 DS3D_IMMEDIATE.
-    unsigned long Apply = 1;
-    unsigned long ApplyMode = 0;
+    uint32_t Apply = 1;
+    uint32_t ApplyMode = 0;
     const int ApplyHr = PlayKey->GetApplyMode(&ApplyMode);
     if (ApplyHr >= 0)
     {
@@ -2337,10 +2351,10 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
             if ((CapsFlags & 2) != 0)
                 Node->StatusFlags |= 8;
 
-            unsigned long SoundMode = 0;
+            uint32_t SoundMode = 0;
             if (PlayKey->GetSoundMode(&SoundMode) >= 0)
             {
-                unsigned long DsMode = DS3DMODE_NORMAL;
+                uint32_t DsMode = DS3DMODE_NORMAL;
                 if (SoundMode == 1)
                     DsMode = DS3DMODE_HEADRELATIVE;
                 else if (SoundMode != 0)
@@ -2351,8 +2365,8 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
                 Buffer3d->SetMode(DsMode, Apply);
             }
 
-            unsigned long Inside = 360;
-            unsigned long Outside = 360;
+            uint32_t Inside = 360;
+            uint32_t Outside = 360;
             if (PlayKey->GetConeAngles(&Inside, &Outside) >= 0)
             {
                 if (Inside > 360)
@@ -2426,8 +2440,8 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
                 const double Dot = (static_cast<double>(Node->Direction.Z) * RightZ +
                                     static_cast<double>(Node->Direction.Y) * RightY) +
                                    static_cast<double>(Node->Direction.X) * RightX;
-                const long WantPan = static_cast<long>(Ftol32(Dot * Max3dPan));
-                long CurrentPan = 0;
+                const int32_t WantPan = static_cast<int32_t>(Ftol32(Dot * Max3dPan));
+                LONG CurrentPan = 0;
                 Node->Buffer->GetPan(&CurrentPan);
                 if (WantPan != CurrentPan)
                 {
@@ -2445,14 +2459,14 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
         if ((Node->DsCapsFlags & 0x40) != 0)
         {
             // 06ee6948: client GetPan (+0x2C), JL skips; clamp [-10000, 10000] signed.
-            long ClientPan = 0;
+            int32_t ClientPan = 0;
             if (PlayKey->GetPan(&ClientPan) >= 0)
             {
                 if (ClientPan < -10000)
                     ClientPan = -10000;
                 else if (ClientPan > 10000)
                     ClientPan = 10000;
-                long CurrentPan = 0;
+                LONG CurrentPan = 0;
                 Node->Buffer->GetPan(&CurrentPan);
                 if (ClientPan != CurrentPan)
                 {
@@ -2476,7 +2490,7 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
         float Pitch;
         if (PlayKey->GetPitch(&Pitch) >= 0)
         {
-            unsigned long Frequency = Ftol32(PitchToMultiplier(Pitch) * static_cast<double>(Rate));
+            uint32_t Frequency = Ftol32(PitchToMultiplier(Pitch) * static_cast<double>(Rate));
             if (Frequency > 100000)
                 Frequency = 100000;
             else if (Frequency < 100)
@@ -2501,8 +2515,8 @@ unsigned char FSoundManager::MixerApplyInstance(FSoundInstanceNode* Node)
         Volume = 0.0;
     else if (Volume < -10000.0)
         Volume = -10000.0;
-    const long WantVolume = static_cast<long>(Ftol32(Volume));
-    long CurrentVolume = 0;
+    const int32_t WantVolume = static_cast<int32_t>(Ftol32(Volume));
+    LONG CurrentVolume = 0;
     Node->Buffer->GetVolume(&CurrentVolume);
     if (WantVolume != CurrentVolume)
     {
@@ -2526,8 +2540,8 @@ unsigned char FSoundManager::OneShotAlreadyExpired(ISoundSource* PlayKey)
     FSoundArchetype* Archetype = LookupArchetype(ArchId);
     if (Archetype == nullptr)
         return 1;
-    const unsigned long DurationMs = ScaledDurationMs(Archetype, PlayKey);
-    const unsigned long StartTick = PlayKey->GetStartTick();
+    const uint32_t DurationMs = ScaledDurationMs(Archetype, PlayKey);
+    const uint32_t StartTick = PlayKey->GetStartTick();
     Archetype->Release();
     return Field4C > (DurationMs + StartTick) ? 1 : 0;
 }
@@ -2572,7 +2586,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     // FUN_06ee6b70 thiscall RET 4 (sole caller 06ee528c). Payload = node+8. AL gates the
     // mixer's Play. No null checks in retail.
     ISoundSource* PlayKey = Node->PlayKey;
-    unsigned long Tick;
+    uint32_t Tick;
     if ((Node->StatusFlags & 0x40) == 0)
     {
         PlayKey->Slot3();
@@ -2590,7 +2604,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     FSoundArchetype* Archetype = LookupArchetype(PlayKey->GetArchId());
     if (Archetype == nullptr)
         return 0;
-    unsigned long Delta = Field4C - Tick;
+    uint32_t Delta = Field4C - Tick;
     if ((Node->StatusFlags & 0x20) != 0)
     {
         // 06ee6bfa: GetPitch (+0x28) into its own slot; 0 -> FUN_06ee1670(pitch), else clear
@@ -2604,7 +2618,7 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
         Delta = Ftol32(static_cast<double>(static_cast<unsigned long long>(Delta)) * Multiplier);
     }
     // 06ee6c4a: ftol(FILD qword(u32 Delta) * 0.001f (DAT_06ee949c) * FIMUL int32 word rate).
-    unsigned long Samples =
+    uint32_t Samples =
         Ftol32((static_cast<double>(static_cast<unsigned long long>(Delta)) *
                 static_cast<double>(0.001f)) *
                static_cast<double>(static_cast<int>(Archetype->nSamplesPerSec)));
@@ -2613,9 +2627,9 @@ unsigned char FSoundManager::MixerSetStartOffset(FSoundInstanceNode* Node)
     if (PlayKey->IsLooping() != 0 && Samples > Archetype->LoopEnd)
         Samples = ((Samples - Archetype->LoopStart) % (Archetype->LoopEnd - Archetype->LoopStart)) +
                   Archetype->LoopStart;
-    const unsigned long ByteOffset = static_cast<unsigned long>(Archetype->nBlockAlign) * Samples;
-    const unsigned long MaxBytes =
-        Archetype->NumFrames * static_cast<unsigned long>(Archetype->nBlockAlign);
+    const uint32_t ByteOffset = static_cast<uint32_t>(Archetype->nBlockAlign) * Samples;
+    const uint32_t MaxBytes =
+        Archetype->NumFrames * static_cast<uint32_t>(Archetype->nBlockAlign);
     // 06ee6cac JBE -> 06ee6b9d returns 0 WITHOUT releasing the archetype the lookup AddRef'd:
     // a retail reference leak, reproduced on purpose.
     if (MaxBytes <= ByteOffset)
@@ -2720,7 +2734,7 @@ FSoundInstanceNode* FSoundManager::CreateInstanceFromKey(ISoundSource* PlayKey)
 
     if ((Caps.dwFlags & 0x100) != 0)
     {
-        const unsigned long Align = Archetype->nBlockAlign;
+        const uint32_t Align = Archetype->nBlockAlign;
         Node->Pad18 = Archetype->LoopStart * Align;
         Node->FeatureFlags = Archetype->LoopEnd * Align;
     }
@@ -2755,9 +2769,9 @@ FSoundInstanceNode* FSoundManager::CreateInstanceFromKey(ISoundSource* PlayKey)
     return Node;
 }
 
-int DACOM_API FSoundManager::CreateArchetypePcm(void* Fmt, unsigned long ByteCount,
-                                                unsigned long LoopStart, unsigned long LoopEnd,
-                                                void* Samples, unsigned long ArchFlags)
+int DACOM_API FSoundManager::CreateArchetypePcm(void* Fmt, uint32_t ByteCount,
+                                                uint32_t LoopStart, uint32_t LoopEnd,
+                                                void* Samples, uint32_t ArchFlags)
 {
     // FUN_06ee2be0 RET 0x1C: new 0x30 + FUN_06ee11f0, FUN_06ee1330 fill, FUN_06ee7e10 map insert.
     // A null operator new result is carried on (06ee2c12 EDI = 0) and dereferenced unchecked.
@@ -2773,7 +2787,7 @@ int DACOM_API FSoundManager::CreateArchetypePcm(void* Fmt, unsigned long ByteCou
     return InsertArchetype(Archetype);
 }
 
-int DACOM_API FSoundManager::CreateArchetypeFromSource(void* Source, unsigned long ArchFlags)
+int DACOM_API FSoundManager::CreateArchetypeFromSource(void* Source, uint32_t ArchFlags)
 {
     // LAB_06ee2dc0 RET 0xC: FUN_06ee2be0's sequence with the FUN_06ee1330 arguments read from a
     // PCM descriptor: format = desc+0 (8 bytes), byte count = desc+0x14, loop start = desc+0x8,
@@ -2784,9 +2798,9 @@ int DACOM_API FSoundManager::CreateArchetypeFromSource(void* Source, unsigned lo
     const unsigned char* Desc = static_cast<const unsigned char*>(Source);
     if (DirectSound == nullptr ||
         Archetype->FillFromPcm(reinterpret_cast<const unsigned short*>(Desc),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0x14),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0x8),
-                               *reinterpret_cast<const unsigned long*>(Desc + 0xC),
+                               *reinterpret_cast<const uint32_t*>(Desc + 0x14),
+                               *reinterpret_cast<const uint32_t*>(Desc + 0x8),
+                               *reinterpret_cast<const uint32_t*>(Desc + 0xC),
                                *reinterpret_cast<void* const*>(Desc + 0x18), DirectSound,
                                ArchFlags) != GR_OK)
     {
@@ -2798,7 +2812,7 @@ int DACOM_API FSoundManager::CreateArchetypeFromSource(void* Source, unsigned lo
 }
 
 int DACOM_API FSoundManager::CreateArchetypeFromWav(IDAComponent* FileSystem,
-                                                    unsigned long ArchFlags)
+                                                    uint32_t ArchFlags)
 {
     // LAB_06ee2f90 RET 0xC: new 0x30 + FUN_06ee11f0; device missing or FUN_06ee1240 < 0 ->
     // Release, WARNING 0x5C5 with the unchanged next id, -1; else id = next++, map insert.
@@ -2820,7 +2834,7 @@ GENRESULT DACOM_API FSoundManager::DestroyArchetype(int Id)
     // value, erase the entry (FUN_06ee76d0); a null value -> -1 (after the erase); otherwise
     // FUN_06ee4740(id) removes that archetype's instances, the value is released, 0. No
     // lookup AddRef/Release pair, and the id -1 needs no special case (it is never a key).
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < ArchCount && ArchEntries[Index].Id != Id)
         ++Index;
     if (Index == ArchCount)
@@ -2862,7 +2876,7 @@ GENRESULT DACOM_API FSoundManager::QueryArchetype(int Id, void** Out)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::AttachPlayKey(ISoundSource* PlayKey, unsigned long Index)
+GENRESULT DACOM_API FSoundManager::AttachPlayKey(ISoundSource* PlayKey, uint32_t Index)
 {
     // FUN_06ee32e0 RET 0xC: null key → -1; AddRef; insert before the Index-th node, or before
     // the head when Index >= count (JNC). FUN_06ee7d80 node. The head (+0x110) always exists
@@ -2875,7 +2889,7 @@ GENRESULT DACOM_API FSoundManager::AttachPlayKey(ISoundSource* PlayKey, unsigned
     if (Index < AttachedCount)
     {
         InsertBefore = AttachedSentinel->Next;
-        unsigned long Walk = 0;
+        uint32_t Walk = 0;
         while (Walk < Index && InsertBefore != AttachedSentinel)
         {
             InsertBefore = InsertBefore->Next;
@@ -2928,7 +2942,7 @@ GENRESULT DACOM_API FSoundManager::DetachPlayKey(ISoundSource* PlayKey)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::ReplaceAttachedList(void** Keys, unsigned long Count)
+GENRESULT DACOM_API FSoundManager::ReplaceAttachedList(void** Keys, uint32_t Count)
 {
     // FUN_06ee33b0 RET 0xC: Release+erase attached; Count==0 → destroy all instances
     // (FUN_06ee7590 each) + SetEvent under the lock, 0. Otherwise append each key at the end
@@ -2949,7 +2963,7 @@ GENRESULT DACOM_API FSoundManager::ReplaceAttachedList(void** Keys, unsigned lon
         LeaveCriticalSection(&G_InstanceLock);
         return GR_OK;
     }
-    for (unsigned long Index = 0; Index < Count; ++Index)
+    for (uint32_t Index = 0; Index < Count; ++Index)
     {
         if (Keys[Index] == nullptr)
             return GR_GENERIC;
@@ -2966,12 +2980,12 @@ GENRESULT DACOM_API FSoundManager::ReplaceAttachedList(void** Keys, unsigned lon
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundManager::GetAttachedCount()
+uint32_t DACOM_API FSoundManager::GetAttachedCount()
 {
     return AttachedCount;
 }
 
-unsigned long DACOM_API FSoundManager::GetPlayingCount()
+uint32_t DACOM_API FSoundManager::GetPlayingCount()
 {
     return G_InstanceCount;
 }
@@ -3103,7 +3117,7 @@ GENRESULT FSoundManager::CreateDirectSound()
     Field50 = Caps.dwFreeHwMixingAllBuffers;
     if (Caps.dwFreeHwMixingAllBuffers + Caps.dwFreeHw3DAllBuffers != 0 && MaxChannels == 0)
     {
-        unsigned long Mix = Caps.dwFreeHw3DAllBuffers;
+        uint32_t Mix = Caps.dwFreeHw3DAllBuffers;
         if (Mix < Caps.dwFreeHwMixingAllBuffers)
             Mix = Caps.dwFreeHwMixingAllBuffers;
         MaxChannels = Mix;
@@ -3172,8 +3186,8 @@ GENRESULT FSoundManager::CreateDirectSound()
     if ((PrimaryDesc.dwFlags & DSBCAPS_CTRL3D) != 0)
         Primary->QueryInterface(kIidDirectSound3DListenerRetail, reinterpret_cast<void**>(&Listener));
 
-    unsigned long BlockAlign = (Channels * BitsPerSample) >> 3;
-    unsigned long AvgBytes = SampleRate * BlockAlign;
+    uint32_t BlockAlign = (Channels * BitsPerSample) >> 3;
+    uint32_t AvgBytes = SampleRate * BlockAlign;
     WAVEFORMATEX PrimaryFmt = {};
     PrimaryFmt.wFormatTag = 1;
     PrimaryFmt.nChannels = static_cast<WORD>(Channels);
@@ -3189,7 +3203,7 @@ GENRESULT FSoundManager::CreateDirectSound()
     return GR_OK;
 }
 
-GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlags)
+GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, uint32_t InFlags)
 {
     // LAB_06ee3670 RET 0xC. Parser bind runs before the flags==0 reject.
     if (bParserBound == 0)
@@ -3209,7 +3223,7 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     // One integer and one float stack variable ([ESP+0x10] / [ESP+0x1C] in retail) carry every
     // value. Each block resets them to its default only once a parser was obtained, so a block
     // whose acquisition fails inherits the previous block's value, exactly as retail does.
-    unsigned long Value = 0;
+    uint32_t Value = 0;
     float FloatValue = 0.0f;
     ICOManager* Dacom = DACOM_Acquire();
     IDAComponent* Local = nullptr;
@@ -3332,7 +3346,7 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     ReleaseComPtr(&Local);
     ParseGuidString(DeviceIdString, &DeviceGuid); // FUN_06ee6fd0(+0x0D, +0x38)
 
-    const unsigned long AlgBits = Flags & 0x3C0;
+    const uint32_t AlgBits = Flags & 0x3C0;
     const char* AlgName = "USER";
     if (AlgBits == 0x200)
         AlgName = "FULL";
@@ -3436,7 +3450,7 @@ GENRESULT DACOM_API FSoundManager::StartupDevice(HWND Hwnd, unsigned long InFlag
     // 06ee444a..4506: presence probe of speakerConfiguration into DAT_06eebc00; only when the key
     // exists is it read through FUN_06ee72f0 (default 2) and applied after the device is up.
     unsigned char bSpeakerKey = 0;   // [ESP+0x27]
-    unsigned long SpeakerValue = 0;  // [ESP+0x1C]
+    uint32_t SpeakerValue = 0;  // [ESP+0x1C]
     int SpeakerFound = -1;           // EDI
     if (AcquireParserLocal(Dacom, Parser, &Local))
     {
@@ -3510,7 +3524,7 @@ unsigned char FSoundManager::SetupInstanceNotify(FSoundInstanceNode* Node)
     // FUN_06ee1a40 stdcall RET 4. Arg = payload (node+8).
     if (G_NotifyThread == nullptr)
     {
-        unsigned long Tid = 0;
+        DWORD Tid = 0;
         G_NotifyThread = CreateThread(nullptr, 0, NotifyThreadProc, nullptr, 0, &Tid);
         if (G_NotifyThread == nullptr)
         {
@@ -3624,7 +3638,7 @@ GENRESULT DACOM_API FSoundManager::GetDirectSound(IDirectSound** Out)
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundManager::GetTickCountSlot()
+uint32_t DACOM_API FSoundManager::GetTickCountSlot()
 {
     return GetTickCount();
 }
@@ -3672,8 +3686,8 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
         Node = Next;
     }
 
-    unsigned long Created = 0;
-    unsigned long AttachedIndex = 0;
+    uint32_t Created = 0;
+    uint32_t AttachedIndex = 0;
     {
         // 06ee4c17: the attached head (+0x110) always exists; retail does not test it.
         FAttachedNode* Attached = AttachedSentinel->Next;
@@ -3799,7 +3813,7 @@ GENRESULT DACOM_API FSoundManager::MixerTick(ISoundListenerPose* ListenerPose)
         }
         if (PlayFlags != 0 && (Node->DsCapsFlags & 0x100) != 0)
             SetupInstanceNotify(Node);
-        unsigned long LocFlags = 0;
+        uint32_t LocFlags = 0;
         if ((Node->DsCapsFlags & 0x40000) != 0)
         {
             if ((Node->StatusFlags & 8) != 0)
@@ -3889,7 +3903,7 @@ GENRESULT DACOM_API FSoundManager::PlayInstanceBuffer(ISoundSource* PlayKey)
 GENRESULT DACOM_API FSoundManager::GetArchetypeFormat(void* Id, void* Out)
 {
     // LAB_06ee5530: miss EAX=0; hit GetFormat then return Release's EAX.
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return GR_OK;
     Archetype->GetFormat(Out);
@@ -3899,7 +3913,7 @@ GENRESULT DACOM_API FSoundManager::GetArchetypeFormat(void* Id, void* Out)
 GENRESULT DACOM_API FSoundManager::GetArchetypeSamples(void* Id, void* Out)
 {
     // LAB_06ee5570: miss returns 0, no FDUMP. Hit returns GetSamples EAX after Release.
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return GR_OK;
     const GENRESULT Result = Archetype->GetSamples(Out);
@@ -3907,12 +3921,12 @@ GENRESULT DACOM_API FSoundManager::GetArchetypeSamples(void* Id, void* Out)
     return Result;
 }
 
-unsigned long DACOM_API FSoundManager::GetArchetypeFrames(void* Id)
+uint32_t DACOM_API FSoundManager::GetArchetypeFrames(void* Id)
 {
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return 0;
-    const unsigned long Frames = Archetype->GetNumFrames();
+    const uint32_t Frames = Archetype->GetNumFrames();
     Archetype->Release();
     return Frames;
 }
@@ -3920,7 +3934,7 @@ unsigned long DACOM_API FSoundManager::GetArchetypeFrames(void* Id)
 float DACOM_API FSoundManager::GetArchetypeGain(void* Id)
 {
     // LAB_06ee55f0: FLD arch+0x18 after Release; miss FLD 0.0.
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return 0.0f;
     const float Value = Archetype->Gain;
@@ -3928,13 +3942,13 @@ float DACOM_API FSoundManager::GetArchetypeGain(void* Id)
     return Value;
 }
 
-unsigned long DACOM_API FSoundManager::GetArchetypeChannels(void* Id)
+uint32_t DACOM_API FSoundManager::GetArchetypeChannels(void* Id)
 {
     // LAB_06ee5630: MOVZX arch+4, then Release.
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return 0;
-    const unsigned long Count = Archetype->nChannels;
+    const uint32_t Count = Archetype->nChannels;
     Archetype->Release();
     return Count;
 }
@@ -3946,13 +3960,13 @@ GENRESULT DACOM_API FSoundManager::SetArchetypeSamples(void* /*A*/, void* /*B*/,
     return GR_OK;
 }
 
-unsigned long DACOM_API FSoundManager::GetArchetypeReady(void* Id)
+uint32_t DACOM_API FSoundManager::GetArchetypeReady(void* Id)
 {
     // LAB_06ee56a0: arch vtbl+0x2C, miss AL=0.
-    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(reinterpret_cast<intptr_t>(Id)));
+    FSoundArchetype* Archetype = LookupArchetype(static_cast<int>(fl::PtrToHandle(Id)));
     if (Archetype == nullptr)
         return 0;
-    const unsigned long Ready = Archetype->IsReady();
+    const uint32_t Ready = Archetype->IsReady();
     Archetype->Release();
     return Ready;
 }
@@ -3961,7 +3975,7 @@ GENRESULT DACOM_API FSoundManager::GetInstanceStatus(int Index, void* Out)
 {
     // LAB_06ee3620 RET 0xC: Index in [0, DAT_06eeaf08); walk sentinel→Next Index times;
     // Out+0=node+8, Out+4=node+0x24, Out+8=node+0x28. No Out-null check.
-    if (Index < 0 || static_cast<unsigned long>(Index) >= G_InstanceCount)
+    if (Index < 0 || static_cast<uint32_t>(Index) >= G_InstanceCount)
         return GR_GENERIC;
     FSoundInstanceNode* Node = G_InstanceSentinel.Next;
     int Remain = Index;
@@ -3970,8 +3984,8 @@ GENRESULT DACOM_API FSoundManager::GetInstanceStatus(int Index, void* Out)
         --Remain;
         Node = Node->Next;
     }
-    unsigned long* Dwords = static_cast<unsigned long*>(Out);
-    Dwords[0] = reinterpret_cast<unsigned long>(Node->PlayKey);
+    uint32_t* Dwords = static_cast<uint32_t*>(Out);
+    Dwords[0] = fl::PtrToHandle(Node->PlayKey);
     Dwords[1] = Node->StatusFlags;
     Dwords[2] = Node->DsCapsFlags;
     return GR_OK;

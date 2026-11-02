@@ -9,6 +9,7 @@
 // Agent: cursor:equip-fx-factory.
 
 #include "effect_base.h"
+#include "fl/handles.h"
 
 #include "beam_effect.h"
 #include "effect_type_info.h"      // EffectTypeInfoByIndex (FUN_004fd560)
@@ -235,7 +236,7 @@ namespace
     // carry the same instructions inlined.
     void EffectBakeInstance(FEffectBase* This)
     {
-        void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex));
+        void* const Instance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(This->EngineIndex)));
 
         // IEngine +0x80, then CObject vt+0x54 into a stack Vector, copied to +0x4c.
         float* const Velocity = reinterpret_cast<float*>(This->Pad4C);
@@ -262,7 +263,7 @@ namespace
         {
             FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
                 DALib::Engine->GetInstanceTransform(
-                    reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
+                    static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(This->EngineIndex)))));
             EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
             Source = &Product;
         }
@@ -329,7 +330,7 @@ void EffectGetWorldTransform(FEffectBase const* This, FTransform* Out)
     {
         FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
             DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
+                static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(This->EngineIndex)))));
         FTransform Product;
         EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
         *Out = Product;

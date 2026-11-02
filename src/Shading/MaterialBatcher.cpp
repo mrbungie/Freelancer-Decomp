@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "MaterialBatcher.h"
+#include "fl/handles.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
 #include <algorithm>
@@ -21,7 +22,7 @@ void FMaterialBatcher::ResetScratch()
     PendingFrameValue = 0;
 }
 
-void FMaterialBatcher::InitializeScratch(unsigned long Size)
+void FMaterialBatcher::InitializeScratch(uint32_t Size)
 {
     // FUN_06eca560: queue nodes use native containers; this arena owns stream copies.
     ResetScratch();
@@ -34,7 +35,7 @@ void FMaterialBatcher::InitializeScratch(unsigned long Size)
     PendingFrameValue = 0;
 }
 
-void* FMaterialBatcher::AllocateScratch(unsigned long Size)
+void* FMaterialBatcher::AllocateScratch(uint32_t Size)
 {
     // FUN_06eca620: integer pointer arithmetic and wrapping DWORD cursor.
     const uintptr_t Address = (uintptr_t)ScratchBuffer + FrameValue;
@@ -42,10 +43,10 @@ void* FMaterialBatcher::AllocateScratch(unsigned long Size)
     return (void*)Address;
 }
 
-unsigned short* FMaterialBatcher::CloneIndices(const unsigned short* Source, unsigned long Count)
+unsigned short* FMaterialBatcher::CloneIndices(const unsigned short* Source, uint32_t Count)
 {
     // FUN_06eca3d0: wrap the byte count in a DWORD, then copy every byte.
-    const unsigned long Bytes = Count * 2;
+    const uint32_t Bytes = Count * 2;
     unsigned short* Dest = (unsigned short*)AllocateScratch(Bytes);
     // REP MOVS with zero count performs no memory access.
     if (Bytes != 0)
@@ -54,7 +55,7 @@ unsigned short* FMaterialBatcher::CloneIndices(const unsigned short* Source, uns
 }
 
 void FMaterialBatcher::CloneVertexStream(const FRpVertexStream& Source, FRpVertexStream& Dest,
-                                         unsigned long IndexCount)
+                                         uint32_t IndexCount)
 {
     // FUN_06eca400: test pointers alone; zero-length nonnull arrays stay nonnull.
     Dest.ByteSize = Source.ByteSize;
@@ -62,7 +63,7 @@ void FMaterialBatcher::CloneVertexStream(const FRpVertexStream& Source, FRpVerte
     Dest.Count = Source.Count;
     if (Source.Base != nullptr)
     {
-        const unsigned long Bytes = Source.Count * Source.Stride;
+        const uint32_t Bytes = Source.Count * Source.Stride;
         unsigned char* Copy = (unsigned char*)AllocateScratch(Bytes);
         Dest.Base = Copy;
         std::memcpy(Copy, Source.Base, Bytes);
@@ -71,8 +72,8 @@ void FMaterialBatcher::CloneVertexStream(const FRpVertexStream& Source, FRpVerte
         Dest.Base = nullptr;
     if (Source.IndexArray != nullptr)
     {
-        const unsigned long Bytes = IndexCount * sizeof(unsigned long);
-        unsigned long* Copy = (unsigned long*)AllocateScratch(Bytes);
+        const uint32_t Bytes = IndexCount * sizeof(uint32_t);
+        uint32_t* Copy = (uint32_t*)AllocateScratch(Bytes);
         Dest.IndexArray = Copy;
         std::memcpy(Copy, Source.IndexArray, Bytes);
     }
@@ -116,7 +117,7 @@ FBatchBin::FBatchBin() : Pad0(0), SortKind(0), RecordCount(0) {}
 // Dispatch layout consumed by FUN_06ec9f10; the face is borrowed after flattening.
 struct FBatchDispatch
 {
-    unsigned long MaterialFlags;
+    uint32_t MaterialFlags;
     float Key;
     FBatchRecord* Record;
     IBatchedMaterial* Batched;
@@ -126,7 +127,7 @@ struct FBatchDispatch
 struct FBatchTriangle
 {
     float Key;
-    unsigned long PositionIndices[3];
+    uint32_t PositionIndices[3];
     unsigned short Indices[3];
     unsigned short Padding;
 };
@@ -179,7 +180,7 @@ static float ComputeBatchDepth(const FBatchRecord& Record)
 {
     if ((Record.Flags & 0x20) != 0)
     {
-        const unsigned long Bits = (unsigned long)Record.Unused;
+        const uint32_t Bits = (uint32_t)fl::PtrToHandle(Record.Unused);
         float Depth;
         std::memcpy(&Depth, &Bits, sizeof(Depth));
         return -Depth;
@@ -204,7 +205,7 @@ void FMaterialBatcher::BuildBatchDispatch(FBatchBin* Bin, FBatchDispatch* Dispat
          Group != Bin->Queue.end(); ++Group)
     {
         IMaterial* Material = Group->first;
-        unsigned long MaterialFlags = 0;
+        uint32_t MaterialFlags = 0;
         Material->GetRenderFlags(&MaterialFlags);
         IBatchedMaterial* Batched = nullptr;
         if (Material->QueryInterface(Iids::BatchedMaterial,
@@ -252,17 +253,17 @@ GENRESULT DACOM_API FMaterialBatcherController::QueryInterface(const char* Iid, 
     return GR_OK;
 }
 
-unsigned long DACOM_API FMaterialBatcherController::AddRef()
+uint32_t DACOM_API FMaterialBatcherController::AddRef()
 {
     return ++Owner->RefCount;
 }
 
-unsigned long DACOM_API FMaterialBatcherController::Release()
+uint32_t DACOM_API FMaterialBatcherController::Release()
 {
     // LAB_06ecbb30: saturate at zero, restore one before owner destruction.
     if (Owner->RefCount != 0)
         --Owner->RefCount;
-    const unsigned long Next = Owner->RefCount;
+    const uint32_t Next = Owner->RefCount;
     if (Next == 0)
     {
         FMaterialBatcher* DeleteOwner = Owner;
@@ -292,14 +293,14 @@ FMaterialBatcher::FMaterialBatcher()
 {
     Library.OwnerBatcher = this;
     Library.ControllingUnknown = this;
-    BinOrder[0] = (unsigned long)-1;
-    BinOrder[1] = (unsigned long)-1;
+    BinOrder[0] = (uint32_t)-1;
+    BinOrder[1] = (uint32_t)-1;
 }
 
 FMaterialBatcher::~FMaterialBatcher()
 {
     Library.ClearRuntime();
-    for (unsigned long Index = 0; Index < 2; ++Index)
+    for (uint32_t Index = 0; Index < 2; ++Index)
     {
         ClearBin(Bins[Index].get());
         Bins[Index].reset();
@@ -320,13 +321,13 @@ GENRESULT DACOM_API FMaterialBatcher::QueryInterface(const char* Iid, void** Out
     return ControllingUnknown->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FMaterialBatcher::AddRef()
+uint32_t DACOM_API FMaterialBatcher::AddRef()
 {
     // +90 is selected by the factory before descriptor initialization.
     return ControllingUnknown->AddRef();
 }
 
-unsigned long DACOM_API FMaterialBatcher::Release()
+uint32_t DACOM_API FMaterialBatcher::Release()
 {
     // +90 is selected by the factory before descriptor initialization.
     return ControllingUnknown->Release();
@@ -344,8 +345,8 @@ GENRESULT FMaterialBatcher::InitializeFromDescriptor(const FMaterialAggregateDes
 // The two inlined keyed readers in LAB_06ec85d0 share retail DAT_06ed5860.
 static char GBatcherProfileValue[0x400];
 
-static unsigned long ReadBatcherProfileUnsigned(ICOManager* Manager, IProfileParser* InitialParser,
-                                               const char* Key, unsigned long DefaultValue)
+static uint32_t ReadBatcherProfileUnsigned(ICOManager* Manager, IProfileParser* InitialParser,
+                                               const char* Key, uint32_t DefaultValue)
 {
     IProfileParser* Parser = InitialParser;
     if (Parser != nullptr)
@@ -357,13 +358,13 @@ static unsigned long ReadBatcherProfileUnsigned(ICOManager* Manager, IProfilePar
         // The fallback tests exact zero, unlike the initial startup QI.
         if (Result != 0)
         {
-            const unsigned long Value = (unsigned long)(uintptr_t)Parser;
+            const uint32_t Value = (uint32_t)fl::PtrToHandle(Parser);
             if (Parser != nullptr)
                 Parser->Release();
             return Value;
         }
     }
-    unsigned long Value = DefaultValue;
+    uint32_t Value = DefaultValue;
     void* Section = Parser->OpenSection("MaterialBatcher", 3);
     if (Section != nullptr)
     {
@@ -387,7 +388,7 @@ static unsigned long ReadBatcherProfileUnsigned(ICOManager* Manager, IProfilePar
             {
                 // Retail calls strspn("0123456789+-") but ignores its result.
                 std::strspn(GBatcherProfileValue, "0123456789+-");
-                Value = (unsigned long)MsvcrtAtoi(GBatcherProfileValue);
+                Value = (uint32_t)MsvcrtAtoi(GBatcherProfileValue);
             }
         }
         Parser->CloseSection(Section);
@@ -587,22 +588,22 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
     IBatchedMaterial* Active = nullptr;
     void* PreviousContext = nullptr;
     void* ActiveField78 = nullptr;
-    for (unsigned long Index = 0; Index < Bin->RecordCount; ++Index)
+    for (uint32_t Index = 0; Index < Bin->RecordCount; ++Index)
     {
         FBatchDispatch& Item = Dispatch[Index];
         FBatchRecord& Record = *Item.Record;
         if (bSortTriangles)
         {
-            const unsigned long TriangleCount = Record.Field / 3;
+            const uint32_t TriangleCount = Record.Field / 3;
             const FRpVertexSrcDesc& Source = *Record.Context.SourceVertices;
             const float* Positions = (const float*)Source.Position.Base;
-            const unsigned long* Remap = Source.Position.IndexArray;
+            const uint32_t* Remap = Source.Position.IndexArray;
             FBatchTriangle* Triangles = (FBatchTriangle*)AllocateScratch(TriangleCount * sizeof(FBatchTriangle));
             const unsigned short* Indices = Record.Context.Indices + Record.Zero;
-            for (unsigned long TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
+            for (uint32_t TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
             {
                 FBatchTriangle& Triangle = Triangles[TriangleIndex];
-                for (unsigned long Corner = 0; Corner < 3; ++Corner)
+                for (uint32_t Corner = 0; Corner < 3; ++Corner)
                 {
                     Triangle.Indices[Corner] = Indices[TriangleIndex * 3 + Corner];
                     Triangle.PositionIndices[Corner] = Remap != nullptr ?
@@ -624,7 +625,7 @@ void FMaterialBatcher::ProcessQueuedBin(FBatchBin* Bin)
                 Record.Zero = 0;
             }
             unsigned short* Destination = Record.Context.Indices + Record.Zero;
-            for (unsigned long TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
+            for (uint32_t TriangleIndex = 0; TriangleIndex < TriangleCount; ++TriangleIndex)
             {
                 Destination[TriangleIndex * 3] = Triangles[TriangleIndex].Indices[0];
                 Destination[TriangleIndex * 3 + 1] = Triangles[TriangleIndex].Indices[1];
@@ -676,7 +677,7 @@ GENRESULT DACOM_API FMaterialBatcher::ClearRules()
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::AddRule(unsigned long Kind, const char* Pattern)
+GENRESULT DACOM_API FMaterialBatcher::AddRule(uint32_t Kind, const char* Pattern)
 {
     // 8fa0 duplicates before compiling, then 9050 transfers both owners to the node.
     FBatchRule Rule;
@@ -687,7 +688,7 @@ GENRESULT DACOM_API FMaterialBatcher::AddRule(unsigned long Kind, const char* Pa
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::RemoveRule(unsigned long Kind, const char* Pattern)
+GENRESULT DACOM_API FMaterialBatcher::RemoveRule(uint32_t Kind, const char* Pattern)
 {
     // 9080 removes the first exact Kind/strcmp match, including duplicate rules.
     for (size_t Index = 0; Index < RuleList.size(); ++Index)
@@ -701,7 +702,7 @@ GENRESULT DACOM_API FMaterialBatcher::RemoveRule(unsigned long Kind, const char*
     return (GENRESULT)-1;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::SelectBin(unsigned long Index)
+GENRESULT DACOM_API FMaterialBatcher::SelectBin(uint32_t Index)
 {
     if (Index >= 2)
         return (GENRESULT)-1;
@@ -709,34 +710,34 @@ GENRESULT DACOM_API FMaterialBatcher::SelectBin(unsigned long Index)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::SetBinSortKind(unsigned long Index, void* Value)
+GENRESULT DACOM_API FMaterialBatcher::SetBinSortKind(uint32_t Index, void* Value)
 {
     if (Index >= 2)
         return (GENRESULT)-1;
-    Bins[Index]->SortKind = (unsigned long)(uintptr_t)Value;
+    Bins[Index]->SortKind = (uint32_t)fl::PtrToHandle(Value);
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::SetBinOrder(unsigned long Index, long Key)
+GENRESULT DACOM_API FMaterialBatcher::SetBinOrder(uint32_t Index, int32_t Key)
 {
     if (Index >= 2)
         return (GENRESULT)-1;
 
     Bins[Index]->Pad0 = Key;
-    BinOrder[0] = (unsigned long)-1;
-    BinOrder[1] = (unsigned long)-1;
+    BinOrder[0] = (uint32_t)-1;
+    BinOrder[1] = (uint32_t)-1;
 
-    unsigned long Count = 0;
-    for (unsigned long Candidate = 0; Candidate < 2; ++Candidate)
+    uint32_t Count = 0;
+    for (uint32_t Candidate = 0; Candidate < 2; ++Candidate)
     {
         if (Bins[Candidate]->Pad0 < 0)
             continue;
-        unsigned long Position = 0;
+        uint32_t Position = 0;
         while (Position < Count &&
                Bins[BinOrder[Position]]->Pad0 <=
                    Bins[Index]->Pad0)
             ++Position;
-        for (unsigned long Move = Count; Move > Position; --Move)
+        for (uint32_t Move = Count; Move > Position; --Move)
             BinOrder[Move] = BinOrder[Move - 1];
         BinOrder[Position] = Candidate;
         ++Count;
@@ -744,7 +745,7 @@ GENRESULT DACOM_API FMaterialBatcher::SetBinOrder(unsigned long Index, long Key)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::FlushBin(unsigned long Index, unsigned char Clear)
+GENRESULT DACOM_API FMaterialBatcher::FlushBin(uint32_t Index, unsigned char Clear)
 {
     // Retail indexes exactly the same two descriptors as slots 6/7/8/12.
     if (Index >= 2)
@@ -765,9 +766,9 @@ GENRESULT DACOM_API FMaterialBatcher::FlushBin(unsigned long Index, unsigned cha
 GENRESULT DACOM_API FMaterialBatcher::FlushAll(unsigned char Clear)
 {
     // LAB_06ec9350: order slots carry descriptor indices, including disabled -1.
-    for (unsigned long Position = 0; Position < 2; ++Position)
+    for (uint32_t Position = 0; Position < 2; ++Position)
     {
-        const unsigned long Index = BinOrder[Position];
+        const uint32_t Index = BinOrder[Position];
         if (Index >= 2)
             continue;
         FBatchBin* Bin = Bins[Index].get();
@@ -782,10 +783,10 @@ GENRESULT DACOM_API FMaterialBatcher::FlushAll(unsigned char Clear)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context, unsigned long PrimType,
-                                              unsigned long Start, unsigned long Count,
-                                              unsigned long Zero, unsigned long Field,
-                                              void* Unused, unsigned long Flags)
+GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context, uint32_t PrimType,
+                                              uint32_t Start, uint32_t Count,
+                                              uint32_t Zero, uint32_t Field,
+                                              void* Unused, uint32_t Flags)
 {
     // LAB_06ec9570: mandatory selected descriptor, material and queued context.
     if (SelectedBin->Pad0 < 0)
@@ -830,7 +831,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     if (GBatchMathEngine == nullptr)
     {
         FMathDesc Desc;
-        Desc.Size = sizeof(Desc);
+        Desc.Size = kRetailMathDescSize;
         Desc.InterfaceName = "3DMathEngine";
         Desc.Implementation = nullptr;
         DACOM_Acquire()->CreateInstance((AGGDESC*)&Desc,
@@ -838,7 +839,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
     }
     FTransform Combined;
     GBatchMathEngine->MulTransform(Combined, *MatrixB, *MatrixA);
-    const unsigned long QueuedFlags = Record.Flags;
+    const uint32_t QueuedFlags = Record.Flags;
     std::memcpy(Record.Combined, &Combined, sizeof(Record.Combined));
     // 98fd/990a reread both context fields after the foreign math callback.
     std::memcpy(Record.MatrixDataA,
@@ -876,7 +877,7 @@ GENRESULT DACOM_API FMaterialBatcher::Submit(IMaterial* Material, void* Context,
 
 GENRESULT DACOM_API FMaterialBatcher::ClearBins()
 {
-    for (unsigned long Index = 0; Index < 2; ++Index)
+    for (uint32_t Index = 0; Index < 2; ++Index)
         ClearBin(Bins[Index].get());
     FrameValue = PendingFrameValue;
     return GR_OK;

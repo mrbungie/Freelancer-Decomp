@@ -7,6 +7,7 @@
 // Retail CargoBarControl -- see cargo_bar_control.h for the class, its vftable and layout.
 
 #include "cargo_bar_control.h"
+#include "fl/handles.h"
 
 #include "ids_strings.h"      // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4)
@@ -472,7 +473,7 @@ void CargoBarControl::Update()
             FToolTipHoverInfo Info;
             ToolTipHoverInit(&Info);
             ToolTipHoverSetCaption(&Info, Text);
-            Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this));
+            Info.Ids = static_cast<int>(fl::PtrToHandle(this));
             Info.IdsAlt = 0;
             NnToolTipFeedHover(&Info);
         }
@@ -495,7 +496,7 @@ void CargoBarControl::Update()
             FToolTipHoverInfo Info;
             ToolTipHoverInit(&Info);
             ToolTipHoverSetCaption(&Info, Text);
-            Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this));
+            Info.Ids = static_cast<int>(fl::PtrToHandle(this));
             Info.IdsAlt = 0;
             NnToolTipFeedHover(&Info);
         }

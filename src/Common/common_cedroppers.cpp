@@ -130,7 +130,7 @@ bool CECounterMeasureDropper::Update(float Dt, unsigned Flags)
                 if (Watched == nullptr)
                     continue;
                 // 0629a39c: ESI = Watched - 8 (IObjRW's Watchable base), TEST ESI,ESI.
-                IObjRW* Tracked = (IObjRW*)((char*)Watched - 8);
+                IObjRW* Tracked = static_cast<IObjRW*>(const_cast<Watchable*>(Watched));   // retail: Watched - 8 (Watchable base of IObjRW)
                 if (Tracked == nullptr)
                     continue;
 

@@ -52,7 +52,7 @@ public:
 
     // Slot 0, FUN_06d25808 (thiscall, RET 0x18).
     bool Load(const char* Path, const FRp9Identifier8* Ident, const FRp9Caps8* Caps,
-              unsigned long Ram, unsigned long VideoRam, unsigned long CpuSpeed);
+              uint32_t Ram, uint32_t VideoRam, uint32_t CpuSpeed);
     // Slot 1, FUN_06d27da0: destroy + operator delete.
     void Destroy();
     // Slot 2, FUN_06d27ff0.
@@ -74,11 +74,11 @@ private:
     void SkipWhite();                         // FUN_06d22f4d
     void SetError(const char* Message);       // FUN_06d22f85
     int ReadHexDigit();                       // FUN_06d233dd
-    unsigned long ReadNumber();               // FUN_06d234a6
+    uint32_t ReadNumber();               // FUN_06d234a6
     const char* ReadQuoted();                 // FUN_06d23639
     const char* ReadFlag(FMgsdbRecordSet* Target); // FUN_06d236f4
-    unsigned long ReadGuidWord();             // FUN_06d23cc9
-    unsigned long ReadGuidWordSwapped();      // FUN_06d23d5f
+    uint32_t ReadGuidWord();             // FUN_06d23cc9
+    uint32_t ReadGuidWordSwapped();      // FUN_06d23d5f
     bool Match(const char* Keyword) const;    // FUN_06d23d9b
     const char* EvaluateIf();                 // FUN_06d23e0a
 
@@ -93,15 +93,15 @@ private:
     const char* Cursor_;            // +0x08
     const char* End_;               // +0x0C
     const char* LineStart_;         // +0x10
-    unsigned long Line_;            // +0x14
+    uint32_t Line_;            // +0x14
     FMgsdbRecordSet* Records_;      // +0x18
     bool bError_;                   // +0x1C
     std::string Error_;             // +0x20
     std::string DeviceName_;        // +0x30
     std::string VendorName_;        // +0x40
-    unsigned long CpuSpeed_;        // +0x50
-    unsigned long Ram_;             // +0x54
-    unsigned long VideoRam_;        // +0x58
+    uint32_t CpuSpeed_;        // +0x50
+    uint32_t Ram_;             // +0x54
+    uint32_t VideoRam_;        // +0x58
     FRp9Identifier8 Ident_;         // +0x5C (D3DADAPTER_IDENTIFIER8 shape)
     FRp9Caps8 Caps_;                // +0x488 (D3DCAPS8 shape)
     // +0x55C: propertyset name -> its record set (owned; deleted by the destructor).

@@ -16,13 +16,13 @@
 #include <map>
 #include <vector>
 
-static const unsigned long kRp8ObjectSize = 0x230C;
-static const unsigned long kRp8RegisterPriority = 0x40000000;
+static const uint32_t kRp8ObjectSize = 0x230C;
+static const uint32_t kRp8RegisterPriority = 0x40000000;
 static const unsigned int kAbilityCount = 21;
 
 struct FRp8AggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -52,8 +52,8 @@ struct FRp8Property
 {
     const char* Name;
     int Id;
-    unsigned long Default;
-    unsigned long Value;
+    uint32_t Default;
+    uint32_t Value;
     unsigned char bEnabled;
 };
 
@@ -83,13 +83,13 @@ struct TRp8Slot : TRp8SlotPad<(unsigned int)(Size - sizeof(T))>
 // +0x10 and +0x14 (FUN_06d5cc30(0), the pf index of format 0); nothing in rp8.dll fills the rest.
 struct FRp8AdapterMode
 {
-    unsigned long Field00;
-    unsigned long Field04;
-    unsigned long Field08;
-    unsigned long Field0C;
-    unsigned long PfIndex10;
-    unsigned long PfIndex14;
-    unsigned long Field18;
+    uint32_t Field00;
+    uint32_t Field04;
+    uint32_t Field08;
+    uint32_t Field0C;
+    uint32_t PfIndex10;
+    uint32_t PfIndex14;
+    uint32_t Field18;
 };
 
 static_assert(sizeof(FRp8AdapterMode) == 0x1C, "adapter mode record 0x1C");
@@ -101,10 +101,10 @@ struct FRp8Adapter
     D3DADAPTER_IDENTIFIER8 Identifier; // +0x000 GetAdapterIdentifier(adapter, 2, ..)
     D3DDISPLAYMODE DisplayMode;        // +0x42C GetAdapterDisplayMode
     D3DCAPS8 Caps;                     // +0x43C GetDeviceCaps(adapter, object+0x1AC, ..)
-    unsigned long Field510;            // +0x510 TODO: no writer found in startup
-    unsigned long CanRenderWindowed;   // +0x514 Caps.Caps2 & D3DCAPS2_CANRENDERWINDOWED
+    uint32_t Field510;            // +0x510 TODO: no writer found in startup
+    uint32_t CanRenderWindowed;   // +0x514 Caps.Caps2 & D3DCAPS2_CANRENDERWINDOWED
     FRp8AdapterMode* Modes;            // +0x518 operator new(ModeCount * 0x1C)
-    unsigned long ModeCount;           // +0x51C GetAdapterModeCount
+    uint32_t ModeCount;           // +0x51C GetAdapterModeCount
 };
 
 static_assert(sizeof(FRp8Adapter) == 0x520, "adapter record 0x520");
@@ -116,14 +116,14 @@ struct FRp8Vb
 {
     void ReleaseGpu(); // formerly ReleaseVbGpu
 
-    unsigned long Flags;
-    unsigned long Fvf;
-    unsigned long Count;
-    unsigned long Used;
-    unsigned long Locked;
+    uint32_t Flags;
+    uint32_t Fvf;
+    uint32_t Count;
+    uint32_t Used;
+    uint32_t Locked;
     FRp8Vb* Next;
     FRp8Vb* Prev;
-    unsigned long Field1C;
+    uint32_t Field1C;
     IDirect3DVertexBuffer8* Gpu;
 };
 
@@ -134,13 +134,13 @@ struct FRp8Ib
     HRESULT LockRange(unsigned int Start, unsigned int Count, void** OutBits,
                       unsigned int* OutStart, unsigned char bSysLock); // formerly LockIbRange
 
-    unsigned long Flags;
+    uint32_t Flags;
     IDirect3DIndexBuffer8* Gpu;
     void* LockedBits;
     FRp8Ib* Next;
     FRp8Ib* Prev;
-    unsigned long Cursor;
-    unsigned long Capacity;
+    uint32_t Cursor;
+    uint32_t Capacity;
 };
 
 static_assert(sizeof(FRp8Ib) == 0x1C, "index buffer node");
@@ -160,10 +160,10 @@ struct FRp8StreamDirtyFlags
 struct FRp8StreamCache
 {
     void Reset(); // formerly ResetStreamCache
-    void SelectVertexStream(FRp8Vb* Buffer, unsigned long Fvf); // formerly MarkStreamVb / MarkStreamFvf
+    void SelectVertexStream(FRp8Vb* Buffer, uint32_t Fvf); // formerly MarkStreamVb / MarkStreamFvf
     void SelectIndices(FRp8Ib* Buffer, unsigned int BaseVertex); // formerly MarkStreamScratchIb / SelectIb cache stores
 
-    unsigned long Fvf;
+    uint32_t Fvf;
     FRp8Vb* VertexBuffer;
     FRp8Ib* IndexBuffer;
     unsigned int BaseVertex;
@@ -179,7 +179,7 @@ static_assert(sizeof(FRp8StreamCache) == 0x14, "stream cache");
 
 struct FRp8TextureStageState
 {
-    unsigned long Value;
+    uint32_t Value;
     unsigned char bValid;
     unsigned char Reserved[3];
 };
@@ -210,7 +210,7 @@ struct FRp8DeviceStateCaches
     static const unsigned int StageCount = 8;
     static const unsigned int StateCount = 29;
 
-    unsigned long ReadTextureStageState(IDirect3DDevice8* Device, unsigned long Stage,
+    uint32_t ReadTextureStageState(IDirect3DDevice8* Device, uint32_t Stage,
                                        D3DTEXTURESTAGESTATETYPE Type); // formerly ReadTssCache
 
     FRp8TextureStageState TextureStates[StageCount][StateCount]; // stage stride 0xE8
@@ -253,16 +253,16 @@ static_assert(sizeof(FormatClassNode) == 0xC, "format class node 3 dword");
 struct FRp8LightManager
 {
     void Initialize(); // formerly LightManagerConstruct
-    int FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data); // formerly LightFindOrCreate
-    bool Remove(unsigned long Handle); // formerly LightRemove
-    unsigned char GetEnable(unsigned long Handle); // formerly LightGetEnable
-    bool Update(unsigned long Handle); // formerly LightUpdate
-    bool SetEnable(unsigned long Handle, int Enable); // formerly LightSetEnable
+    int FindOrCreate(uint32_t Handle, const D3DLIGHT8* Data); // formerly LightFindOrCreate
+    bool Remove(uint32_t Handle); // formerly LightRemove
+    unsigned char GetEnable(uint32_t Handle); // formerly LightGetEnable
+    bool Update(uint32_t Handle); // formerly LightUpdate
+    bool SetEnable(uint32_t Handle, int Enable); // formerly LightSetEnable
     void Reset(); // formerly LightReset
     HRESULT Flush(IDirect3DDevice8* Device); // formerly LightFlush
 
-    long EnabledCount; // +0 lights whose LightEnable state on the device is on
-    long Generation;   // +4 flush counter (FUN_06d2d032 increments, FUN_06d2ce6a zeroes)
+    int32_t EnabledCount; // +0 lights whose LightEnable state on the device is on
+    int32_t Generation;   // +4 flush counter (FUN_06d2d032 increments, FUN_06d2ce6a zeroes)
 };
 
 static_assert(sizeof(FRp8LightManager) == 8, "light manager 2 dword");
@@ -272,10 +272,10 @@ class FMgsdbDatabase;
 
 struct FRp8RenderStateEntry
 {
-    unsigned long Cached;
-    unsigned long Pending;
-    unsigned long Generation;
-    unsigned long bEnabled;
+    uint32_t Cached;
+    uint32_t Pending;
+    uint32_t Generation;
+    uint32_t bEnabled;
 };
 
 struct FRp8RenderStateCache
@@ -284,15 +284,15 @@ struct FRp8RenderStateCache
 
     void Initialize(); // formerly InitRsQueue
     void ResetGeneration(); // formerly RsQueueResetGeneration
-    unsigned long GetPending(unsigned int StateId) const; // formerly RsQueueReadPending
-    HRESULT Apply(IDirect3DDevice8* Device, unsigned int StateId, unsigned long Value); // formerly RsQueueApply
-    bool MarkDirty(unsigned int StateId, unsigned long Value); // formerly RsQueueMarkDirty
+    uint32_t GetPending(unsigned int StateId) const; // formerly RsQueueReadPending
+    HRESULT Apply(IDirect3DDevice8* Device, unsigned int StateId, uint32_t Value); // formerly RsQueueApply
+    bool MarkDirty(unsigned int StateId, uint32_t Value); // formerly RsQueueMarkDirty
     void Flush(IDirect3DDevice8* Device); // formerly RsQueueFlush
 
     FRp8RenderStateEntry Entries[StateCount];
-    unsigned long DirtyStates[StateCount];
-    unsigned long DirtyCount;
-    unsigned long Generation;
+    uint32_t DirtyStates[StateCount];
+    uint32_t DirtyCount;
+    uint32_t Generation;
 };
 
 static_assert(sizeof(FRp8RenderStateEntry) == 0x10, "render-state entry");
@@ -306,10 +306,10 @@ public:
     FRp8Inner();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FDirectX8* Owner;
 };
 
@@ -323,11 +323,11 @@ public:
     FRp8Factory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -345,22 +345,22 @@ public:
     ~FDirectX8();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API Startup(const char* SectionName) override;
     GENRESULT DACOM_API ShutdownPipeline() override;
     GENRESULT DACOM_API SetPipelineState(int Id, int Value) override;
     GENRESULT DACOM_API GetPipelineState(int Id, int* Out) override;
     GENRESULT DACOM_API GetDeviceInfo(void* Out520) override;
-    GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, unsigned long* Out) override;
+    GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, uint32_t* Out) override;
     GENRESULT DACOM_API GetDisplayModeCount(unsigned int* Out) override;
     GENRESULT DACOM_API GetDisplayModeEnum(unsigned int Index, void* Out) override;
     GENRESULT DACOM_API SelectMode(int* Mode, unsigned int* OutIndex) override;
     GENRESULT DACOM_API CreateBuffers(HWND Hwnd, int* Mode, int* OutMode) override;
     GENRESULT DACOM_API GetModeBlob(void* OutAdapter, void* OutMode10Dwords) override;
     GENRESULT DACOM_API DestroyGpuResources() override;
-    GENRESULT DACOM_API ClearBuffers(unsigned long Flags, const void* Rects) override;
+    GENRESULT DACOM_API ClearBuffers(uint32_t Flags, const void* Rects) override;
     GENRESULT DACOM_API SwapBuffers() override;
     GENRESULT DACOM_API LockBuffer(void* Out) override;
     GENRESULT DACOM_API UnlockBuffer() override;
@@ -423,16 +423,16 @@ public:
     GENRESULT DACOM_API SetTextureStageTexture(int Stage, void* Handle) override;
     GENRESULT DACOM_API GetTextureStageTexture(int Stage, void** OutHandle) override;
     GENRESULT DACOM_API VerifyState() override;
-    GENRESULT DACOM_API DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
+    GENRESULT DACOM_API DrawPrimitive(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                       unsigned int Count, void* Unused) override;
-    GENRESULT DACOM_API DrawIndexedPrimitiveUp(unsigned long Prim, unsigned int Fvf, const void* Verts,
+    GENRESULT DACOM_API DrawIndexedPrimitiveUp(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                                unsigned int VertCount, const void* Indices,
-                                               unsigned int IndexCount, unsigned long Unused) override;
-    GENRESULT DACOM_API DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
+                                               unsigned int IndexCount, uint32_t Unused) override;
+    GENRESULT DACOM_API DrawPrimitiveVb(uint32_t Prim, void* Vb, unsigned int StartVertex,
                                         unsigned int Count, void* Unused) override;
-    GENRESULT DACOM_API DrawIndexedPrimitiveVb(unsigned long Prim, void* Vb, unsigned int BaseVertex,
+    GENRESULT DACOM_API DrawIndexedPrimitiveVb(uint32_t Prim, void* Vb, unsigned int BaseVertex,
                                                unsigned int NumVerts, const void* Indices,
-                                               unsigned int IndexCount, unsigned long Unused) override;
+                                               unsigned int IndexCount, uint32_t Unused) override;
     GENRESULT DACOM_API AddLight(void* Handle) override;
     GENRESULT DACOM_API RemoveLight(void* Handle) override;
     GENRESULT DACOM_API UpdateLight(void* Handle) override;
@@ -447,7 +447,7 @@ public:
                                       const FRpVertexSrcDesc* Source,
                                       unsigned int StartVertex, unsigned int Count) override;
 
-    GENRESULT DACOM_API DrawIndexedPrimitive(unsigned long Prim, unsigned int MinIndex,
+    GENRESULT DACOM_API DrawIndexedPrimitive(uint32_t Prim, unsigned int MinIndex,
                                              unsigned int NumVertices, unsigned int StartIndex,
                                              unsigned int Count) override;
 
@@ -504,11 +504,11 @@ public:
     void ApplyDeviceCaps(const D3DCAPS8* Caps);
     void ApplyMgsdbFlags(FMgsdbDatabase* Db);
     void ApplyAbilityOverrides();
-    unsigned long QueryVidMem();
+    uint32_t QueryVidMem();
     D3DFORMAT PickDepthFormat(D3DFORMAT AdapterFormat, D3DFORMAT BackBufferFormat, int* WantedZ,
                               int* WantedS);
-    bool CheckTextureFormat(unsigned int Format, unsigned long Usage, D3DRESOURCETYPE RType);
-    unsigned int PrimCountFromVerts(unsigned long Prim, unsigned int Count);
+    bool CheckTextureFormat(unsigned int Format, uint32_t Usage, D3DRESOURCETYPE RType);
+    unsigned int PrimCountFromVerts(uint32_t Prim, unsigned int Count);
     void EnumAdapters();
     // Shared lifetime checks retain the diagnostic and source line of each caller.
     GENRESULT NeedStartup(const char* Message, int Line);
@@ -530,7 +530,7 @@ public:
     FRp8Vb* FindOrInsertPoolVb(unsigned int Fvf);
     void GrowPoolVb(FRp8Vb* Wrapper, unsigned int Fvf, unsigned int Count);
     void ReleasePoolVbs();
-    unsigned long StageCount();
+    uint32_t StageCount();
     int PipelineStateValue(int Id);
 
     // Pixel-format-class catalog (retail FUN_06d04693/FUN_06d046e6/FUN_06d047df).
@@ -552,30 +552,30 @@ public:
     // 06d06552); a startup with the same name skips that block. The ability map is read from
     // this section too (06d07857).
     char LastSection_[0x80];
-    unsigned long CreateFlags_;
-    unsigned long SwapFlags_;
+    uint32_t CreateFlags_;
+    uint32_t SwapFlags_;
     IDirect3D8* D3d_;
     IDirect3DDevice8* Device_;
     IDirect3DSurface8* LockBufferSurf_;
     FRp8StreamCache StreamCache_;
     // +0x14C: first dword (usage flags) of the inline scratch IB node; the constructor writes
     // 0x200|8 (06d01220).
-    unsigned long ScratchIbFlags_;
+    uint32_t ScratchIbFlags_;
     IDirect3DIndexBuffer8* ScratchIb_;
     unsigned char Pad154_[0x160 - 0x154];
-    unsigned long IbUsed_;
-    unsigned long IbCapacity_;
-    unsigned long VidMem_;
+    uint32_t IbUsed_;
+    uint32_t IbCapacity_;
+    uint32_t VidMem_;
     // +0x16C: the VBMgr / create_vb(flags & 1) pool, retail map<FVF, vertex-buffer node>
     // (constructed by FUN_06d1d490, find-or-insert FUN_06d19aa0, node value at node+0x10,
     // erased with FUN_06d1bc60 per value by FUN_06d1a780 in the destructor).
-    TRp8Slot<std::map<unsigned long, FRp8Vb>, 0x14> VbPool_;
+    TRp8Slot<std::map<uint32_t, FRp8Vb>, 0x14> VbPool_;
     // +0x180: bytes held by the pool's vertex buffers (stride * count per entry).
-    unsigned long VbPoolBytes_;
+    uint32_t VbPoolBytes_;
     // bit0: create_buffers .. destroy_buffers window (the "called outside of
     // create_buffers/destroy_buffers" checks). bit1: IGammaControl enable (set_gamma_enable
     // FUN_06d1535d writes it, set_gamma_function / set_gamma_ramp pass it as D3DSGR_CALIBRATE).
-    unsigned long DeviceReady_;
+    uint32_t DeviceReady_;
     // Opaque catalog header; candidates are owned by the begin/end/capacity range.
     unsigned char FormatCatalogHeader_[4];
     FormatClassNode* FormatCatalogBegin_;
@@ -583,11 +583,11 @@ public:
     FormatClassNode* FormatCatalogCap_;
     // +0x198: retail vector<FRp8Adapter> (allocator byte, begin +0x19C, end +0x1A0, cap +0x1A4).
     TRp8Slot<std::vector<FRp8Adapter>, 0x10> Adapters_;
-    unsigned long AdapterIndex_;
-    unsigned long DeviceType_;
+    uint32_t AdapterIndex_;
+    uint32_t DeviceType_;
     char MgsdbPath_[0x80];
-    unsigned long Field230_;
-    unsigned long BbPfIndex_;
+    uint32_t Field230_;
+    uint32_t BbPfIndex_;
     int ModeBlob_[10];
     HWND Hwnd_;
     int WindowX_;
@@ -603,23 +603,23 @@ public:
     // +0x354: pipeline-state slots, 0xC per id {value, set, set-by-startup}.
     unsigned char Pad354_[0x378 - 0x354];
     // Pipeline-state entries are {value, hasDefault, overriddenByIni}.
-    unsigned long TextureAllow8Bit_;   // this+0x378, pipeline-state id 3 value slot
-    unsigned long Field37C_;           // this+0x37C, id 3 hasDefault slot
-    unsigned long Field380_;           // this+0x380, id 3 overriddenByIni slot
-    unsigned long TextureAllow32Bit_;  // this+0x384, pipeline-state id 4 value slot
-    unsigned long Field388_;           // this+0x388, id 4 hasDefault slot ("Bad8888" trigger)
-    unsigned long Field38C_;           // this+0x38C, id 4 overriddenByIni slot
-    unsigned long TextureAllowDxt_;    // this+0x390, pipeline-state id 5 value slot
-    unsigned long Field394_;           // this+0x394, id 5 hasDefault slot ("FL_BAD_DXTN" trigger)
-    unsigned long Field398_;           // this+0x398, id 5 overriddenByIni slot
+    uint32_t TextureAllow8Bit_;   // this+0x378, pipeline-state id 3 value slot
+    uint32_t Field37C_;           // this+0x37C, id 3 hasDefault slot
+    uint32_t Field380_;           // this+0x380, id 3 overriddenByIni slot
+    uint32_t TextureAllow32Bit_;  // this+0x384, pipeline-state id 4 value slot
+    uint32_t Field388_;           // this+0x388, id 4 hasDefault slot ("Bad8888" trigger)
+    uint32_t Field38C_;           // this+0x38C, id 4 overriddenByIni slot
+    uint32_t TextureAllowDxt_;    // this+0x390, pipeline-state id 5 value slot
+    uint32_t Field394_;           // this+0x394, id 5 hasDefault slot ("FL_BAD_DXTN" trigger)
+    uint32_t Field398_;           // this+0x398, id 5 overriddenByIni slot
     unsigned char Pad39C_[0x3F0 - 0x39C];
-    unsigned long BltNotFlip_;
-    unsigned long Field3F4_;
-    unsigned long Field3F8_;
+    uint32_t BltNotFlip_;
+    uint32_t Field3F4_;
+    uint32_t Field3F8_;
     // Preserve the existing overlap between ability 20 and render-state entry 0.
     union
     {
-        unsigned long Ability_[kAbilityCount];
+        uint32_t Ability_[kAbilityCount];
         struct
         {
             unsigned char Pad3FC_[0x44C - 0x3FC];

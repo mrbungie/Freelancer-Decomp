@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "RendComp.h"
+#include "fl/handles.h"
 
 #include <cstdint>
 #include <cstring>
@@ -17,7 +18,7 @@
 // The 0x18 AGGDESC the factory accepts (LAB_06c2f4e0).
 struct FWireAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;       // +0x08
     IDAComponent** InnerOut;   // +0x0C
@@ -30,7 +31,7 @@ class FVmeshWireInstance : public IVMeshWire
 {
 public:
     FVwireDataHeader* Blob;     // +0x04 the whole VWireData leaf, owned
-    unsigned long RefCount;     // +0x08
+    uint32_t RefCount;     // +0x08
 
     // LAB_06c304f0: table {"1.11_IVMeshWire", 0}; hit -> AddRef, *Out = this, 0; miss -> 0, -3.
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override
@@ -46,7 +47,7 @@ public:
     }
 
     // FUN_06c305a0.
-    unsigned long DACOM_API AddRef() override
+    uint32_t DACOM_API AddRef() override
     {
         RefCount += 1;
         return RefCount;
@@ -54,7 +55,7 @@ public:
 
     // FUN_06c305b0: decrement when above 0; at 0 pin the count at 1, free the blob and the
     // object (the base vtable 06c365cc is stored first; there is no destructor body), return 0.
-    unsigned long DACOM_API Release() override
+    uint32_t DACOM_API Release() override
     {
         if (RefCount > 0)
             RefCount -= 1;
@@ -123,12 +124,12 @@ public:
     // +0x1C: vtable PTR_LAB_06c36564.
     struct FInner : public IDAComponent
     {
-        unsigned long RefCount; // +0x20
+        uint32_t RefCount; // +0x20
         FVMeshWire* Owner;      // +0x24
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
     };
 
     // Stored instances retain their own references.
@@ -166,12 +167,12 @@ public:
         return Outer->QueryInterface(Iid, Out);
     }
 
-    unsigned long DACOM_API AddRef() override
+    uint32_t DACOM_API AddRef() override
     {
         return Outer->AddRef();
     }
 
-    unsigned long DACOM_API Release() override
+    uint32_t DACOM_API Release() override
     {
         return Outer->Release();
     }
@@ -232,7 +233,7 @@ GENRESULT DACOM_API FVMeshWire::FInner::QueryInterface(const char* Iid, void** O
 }
 
 // LAB_06c306b0.
-unsigned long DACOM_API FVMeshWire::FInner::AddRef()
+uint32_t DACOM_API FVMeshWire::FInner::AddRef()
 {
     RefCount += 1;
     return RefCount;
@@ -240,7 +241,7 @@ unsigned long DACOM_API FVMeshWire::FInner::AddRef()
 
 // LAB_06c306c0: decrement when above 0; at 0 pin the count at 1, clear the archetype map
 // (releasing every wrapper), free the owner, return 0.
-unsigned long DACOM_API FVMeshWire::FInner::Release()
+uint32_t DACOM_API FVMeshWire::FInner::Release()
 {
     if (RefCount > 0)
         RefCount -= 1;
@@ -277,15 +278,15 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
     const int Handle = File->OpenByDesc(&Desc);
     if (Handle != -1)
     {
-        const unsigned long Size = File->GetSize((unsigned long)Handle, 0);
+        const uint32_t Size = File->GetSize((uint32_t)Handle, 0);
         unsigned char* Buffer = new unsigned char[Size];
-        unsigned long ReadCount = 0;
-        bRead = File->Read((unsigned long)Handle, Buffer, Size, &ReadCount, 0);
+        uint32_t ReadCount = 0;
+        bRead = File->Read((uint32_t)Handle, Buffer, Size, &ReadCount, 0);
         if (bRead != 0)
             Blob = Buffer;
         else
             delete[] Buffer;
-        File->CloseFile((unsigned long)Handle);
+        File->CloseFile((uint32_t)Handle);
     }
     if (bRead == 0)
     {
@@ -299,7 +300,7 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
     Wire->Blob = (FVwireDataHeader*)Blob;
     if (Result >= 0)
     {
-        const int Key = (int)((intptr_t)Archetype);
+        const int Key = (int)fl::PtrToHandle(Archetype);
         std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
             Archetypes.insert(std::make_pair(Key, (FVmeshWireInstance*)nullptr));
         FVmeshWireInstance*& Slot = Inserted.first->second;
@@ -324,12 +325,12 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
 // set on either path in retail; 0 here.
 int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchetype)
 {
-    const int OldKey = (int)((intptr_t)OldArchetype);
+    const int OldKey = (int)fl::PtrToHandle(OldArchetype);
     std::map<int, FVmeshWireInstance*>::iterator Found = Archetypes.find(OldKey);
     if (Found == Archetypes.end())
         return 0;
     FVmeshWireInstance* Shared = Found->second;
-    const int NewKey = (int)((intptr_t)NewArchetype);
+    const int NewKey = (int)fl::PtrToHandle(NewArchetype);
     std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
         Archetypes.insert(std::make_pair(NewKey, (FVmeshWireInstance*)nullptr));
     FVmeshWireInstance*& Slot = Inserted.first->second;
@@ -348,7 +349,7 @@ int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchet
 // retail; 0 here.
 int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
 {
-    EraseArchetype((int)((intptr_t)Archetype));
+    EraseArchetype((int)fl::PtrToHandle(Archetype));
     return 0;
 }
 
@@ -359,7 +360,7 @@ int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void
     if (std::strcmp(Name, Iids::VMeshWire) != 0)
         return -1;
     std::map<int, FVmeshWireInstance*>::iterator Found =
-        Archetypes.find((int)((intptr_t)Archetype));
+        Archetypes.find((int)fl::PtrToHandle(Archetype));
     if (Found == Archetypes.end())
         return -1;
     Found->second->AddRef();

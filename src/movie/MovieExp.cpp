@@ -16,22 +16,22 @@ extern int GMovieGraphCode;
 void* __stdcall Movie_AllocateBlock(unsigned int Size);
 void __stdcall Movie_FreeBlock(void* Block);
 unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, int Count);
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-long __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+int32_t __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
+int32_t __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall Movie_AddLimbsCarry(unsigned int* Left, unsigned int* Right, int Dest, int Count);
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
 
 int __stdcall LimbBitLength(int Limbs, int Count);
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
-long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
-long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
-long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int Slot, unsigned int* Context, unsigned int Sign);
+int32_t __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
+int32_t __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
+int32_t __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
+int32_t __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int Slot, unsigned int* Context, unsigned int Sign);
 void __stdcall Movie_RecordWindowSumDiff(unsigned int* SumSlot, unsigned int* DiffSlot, int First, int Second, int* State);
-long __stdcall Movie_SeedAndMultiplyLimbs(unsigned int* Left, unsigned int* Value, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
-long __stdcall Movie_ScalePairByTail(unsigned int* First, unsigned int* Second, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_SeedAndMultiplyLimbs(unsigned int* Left, unsigned int* Value, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_ScalePairByTail(unsigned int* First, unsigned int* Second, int* FieldHolder, unsigned int* Scratch);
 
 // High limb first. -1 when Left < Right, 0 when equal, 1 when Left > Right.
 // SBB EAX,EAX / OR EAX,1 after the first differing limb. 06ac45fb and 06ac481d.
@@ -99,7 +99,7 @@ static unsigned int* AlignOddSlot(unsigned int* Slot, unsigned char* Reference)
 // Any other mode uses the factors at +0xA74 and then +0x120.
 // Count above LimbCount+2*Dispatch[0], or equal and not strictly below the modulus, stores 0x1F and returns 0.
 // A nonzero carry/borrow accumulator stores 0x20. Returns 1 only when that accumulator is 0.
-long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch)
+int32_t __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsigned int Mode, unsigned int* Dest, unsigned int* Modulus, void* Scratch)
 {
     unsigned char* Context = (unsigned char*)Modulus;
     unsigned int* Dispatch = (unsigned int*)Modulus[0x43];
@@ -160,7 +160,7 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
     if (Mode == 0u)
     {
         unsigned int Difference;
-        long Borrow;
+        int32_t Borrow;
         if (Shift == 0u)
         {
             Accumulator = 0u;
@@ -182,7 +182,7 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
         Borrow = SubtractLimbs(Input, TempA, (int)Input, (int)Span);
         if (Borrow != 0)
         {
-            long Added = Movie_AddLimbsCarry(Input + Second, Modulus, (int)(Input + Second), (int)LimbCount);
+            int32_t Added = Movie_AddLimbsCarry(Input + Second, Modulus, (int)(Input + Second), (int)LimbCount);
             Difference = (unsigned int)Borrow - (unsigned int)Added;
         }
         else
@@ -230,8 +230,8 @@ long __stdcall ReduceLimbsModulo(unsigned int* Source, unsigned int Count, unsig
     else
     {
         unsigned int* Mid;
-        long FirstBorrow;
-        long SecondBorrow;
+        int32_t FirstBorrow;
+        int32_t SecondBorrow;
         Aligned = AlignOddSlot(PairBase, Context + 0xa74 + 0x1c4);
         Movie_EvaluateWindow(Input, Second, Aligned, (unsigned char*)PairTail, Dispatch);
         Movie_MultiplyWindows((unsigned int*)Aligned, (unsigned int*)PairTail, (unsigned int*)(Context + 0xa74), (unsigned int*)(Context + 0xc28), Product, (unsigned int*)Dispatch);
@@ -312,7 +312,7 @@ static unsigned int* WindowFlag(unsigned char* Frame, int Index)
 // State at +0x2C is the object FUN_06ac6a90, FUN_06ac7680, FUN_06ac61a0 and FUN_06ac69a0 index:
 // +0 success, +4 kind-is-2-or-3, +8 refill counter, +0xC window half, +0x10 field holder.
 // +0x11184 is the depth counter at state+0x11158.
-long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Extra, void* FieldHolder)
+int32_t __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Extra, void* FieldHolder)
 {
     unsigned char Frame[0x11578];
     unsigned int* State = (unsigned int*)(Frame + 0x2c);
@@ -640,5 +640,5 @@ long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void*
             Slot = Slot + 1;
         }
     }
-    return (long)State[0];
+    return (int32_t)State[0];
 }

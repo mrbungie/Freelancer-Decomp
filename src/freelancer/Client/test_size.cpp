@@ -6,7 +6,7 @@
 
 #include <cstddef>
 #include <stdio.h>
-struct FCockpitMeshHolder { void* a; long b; void* c; void* d; };
+struct FCockpitMeshHolder { void* a; int32_t b; void* c; void* d; };
 struct FWatchableStub { void* Self; void* Next; };
 struct FPlayerShipManager {
     void* VtablePrimary;

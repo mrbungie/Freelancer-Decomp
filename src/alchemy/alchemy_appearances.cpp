@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "alchemy_appearances.h"
+#include "fl/handles.h"
 
 #include "alchemy_common.h"
 #include "alchemy_math.h"
@@ -228,7 +229,7 @@ namespace AlchemyImpl
         // 1e-8.
         float PerpAxisParallelEpsilon()
         {
-            const unsigned long Bits = 0x358637BEu;
+            const uint32_t Bits = 0x358637BEu;
             float Value = 0.0f;
             std::memcpy(&Value, &Bits, sizeof(Value));
             return Value;
@@ -252,7 +253,7 @@ namespace AlchemyImpl
             if (Pipeline == nullptr)
                 return;
             Pipeline->SetTextureStageTexture(
-                Stage, reinterpret_cast<void*>(static_cast<ptrdiff_t>(Handle)));
+                Stage, static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Handle))));
         }
 
         void CallRenderPipelineSetTransform(IRenderPipeline* Pipeline, const float* Xform12)
@@ -292,7 +293,7 @@ namespace AlchemyImpl
 
         // ---- FxBasicAppearance fill helpers (FUN_06216550 / FUN_06216f20) ----
 
-        float FloatFromBits(unsigned long Bits)
+        float FloatFromBits(uint32_t Bits)
         {
             float Value = 0.0f;
             std::memcpy(&Value, &Bits, sizeof(Value));
@@ -316,9 +317,9 @@ namespace AlchemyImpl
         // subtract from 0x5f3759df, then y * (1.5 - y*y*x*0.5) in that operand order.
         float RetailInverseSqrt(float Value)
         {
-            long Bits = 0;
+            int32_t Bits = 0;
             std::memcpy(&Bits, &Value, sizeof(Bits));
-            const long GuessBits = 0x5f3759dfL - (Bits >> 1);
+            const int32_t GuessBits = 0x5f3759dfL - (Bits >> 1);
             float Guess = 0.0f;
             std::memcpy(&Guess, &GuessBits, sizeof(Guess));
             return (1.5f - ((Guess * Guess) * Value) * 0.5f) * Guess;
@@ -349,14 +350,14 @@ namespace AlchemyImpl
         //         when C > B, otherwise B is reloaded -> C > B ? C : B.
         //   Beam (0x0620512f..0x06205183): no scale ramp at all; A = P+0x78 @ (node+0x8c,
         //     t), B = P+0x7c @ (node+0x8c, t); radius = (B * A) * 0.5f (DAT_0624bab8).
-        const unsigned long kBoundsRadiusPrimary = 0;
-        const unsigned long kBoundsRadiusRectSides = 1;
-        const unsigned long kBoundsRadiusOrientedSides = 2;
-        const unsigned long kBoundsRadiusBeam = 3;
+        const uint32_t kBoundsRadiusPrimary = 0;
+        const uint32_t kBoundsRadiusRectSides = 1;
+        const uint32_t kBoundsRadiusOrientedSides = 2;
+        const uint32_t kBoundsRadiusBeam = 3;
 
         struct FListBoundsShape
         {
-            unsigned long RadiusKind;
+            uint32_t RadiusKind;
             // The peeled tail pass reads the tail's own t (basic) instead of the first's.
             bool bTailOwnAge;
             // Merge length through FUN_06206ad0, (x*x + y*y) + z*z, instead of the inline
@@ -366,7 +367,7 @@ namespace AlchemyImpl
         };
 
         float ListBoundsRadius(const FAppearanceRampDescriptor* Descriptor, float OuterTime,
-                               float InnerTime, float Scale, unsigned long RadiusKind)
+                               float InnerTime, float Scale, uint32_t RadiusKind)
         {
             if (RadiusKind == kBoundsRadiusBeam)
             {
@@ -518,7 +519,7 @@ namespace AlchemyImpl
         // Frame block {texture, U0, V0, U1, V1}: descriptor flag 0x1000 swaps U0/U1, 0x2000
         // swaps V0/V1 (0x06216645 / 0x06216825 in the quad, 0x06217003 / 0x06217319 in the
         // triangle).
-        void FlipBasicAppearanceFrame(unsigned long Flags, float* FrameBlock)
+        void FlipBasicAppearanceFrame(uint32_t Flags, float* FrameBlock)
         {
             if ((Flags & 0x1000u) != 0)
             {
@@ -536,7 +537,7 @@ namespace AlchemyImpl
             }
         }
 
-        void ApplyFrameFlips(unsigned long Flags, float* FrameBlock)
+        void ApplyFrameFlips(uint32_t Flags, float* FrameBlock)
         {
             if ((Flags & 0x1000u) != 0)
             {
@@ -554,7 +555,7 @@ namespace AlchemyImpl
 
         // FUN_06216f20's per-corner UV table (0x06217042 / 0x06217371): flag 1 selects
         // DAT_06255cc4.. (U 0,0,1  V 1,0,1), otherwise DAT_06255cdc.. (U 0.5,0,1  V 0,1,1).
-        void LoadTriangleUvTable(unsigned long Flags, float* TriU, float* TriV)
+        void LoadTriangleUvTable(uint32_t Flags, float* TriU, float* TriV)
         {
             if ((Flags & 1u) != 0)
             {
@@ -606,7 +607,7 @@ namespace AlchemyImpl
         // the counter before the increment -- or the requested count when the store was
         // skipped (AlSubmitVertex = FUN_06208aa0).
         unsigned short StoreDrawVertex(FAlDrawContext& Context, float X, float Y, float Z,
-                                       unsigned long Diffuse, float U, float V)
+                                       uint32_t Diffuse, float U, float V)
         {
             return AlSubmitVertex(Context, X, Y, Z, Diffuse, U, V);
         }
@@ -848,8 +849,8 @@ namespace AlchemyImpl
             {nullptr, 0, 0, 0.0f, 0.0f},
         };
 
-        template <typename T, unsigned long N>
-        constexpr unsigned long CountOf(const T (&)[N])
+        template <typename T, uint32_t N>
+        constexpr uint32_t CountOf(const T (&)[N])
         {
             return N;
         }
@@ -881,21 +882,21 @@ namespace AlchemyImpl
             kBeamPropertyRows};
 
         // Particle FUN_06231930 / FUN_06231980 and the names FUN_06231ad0 / FUN_06231b20.
-        const unsigned long kParticleUseDynamicRotationHash = 0xE34C3C55u;
-        const unsigned long kParticleSmoothRotationHash = 0x049A6DBEu;
-        const unsigned long kParticleLifeNameHash = 0x0EC7A290u;
-        const unsigned long kParticleDeathNameHash = 0x03B76E6Cu;
+        const uint32_t kParticleUseDynamicRotationHash = 0xE34C3C55u;
+        const uint32_t kParticleSmoothRotationHash = 0x049A6DBEu;
+        const uint32_t kParticleLifeNameHash = 0x0EC7A290u;
+        const uint32_t kParticleDeathNameHash = 0x03B76E6Cu;
         // The billboard sets' shared hashes.
-        const unsigned long kBillboardTexNameHash = 0x1BA23359u;
-        const unsigned long kBillboardBlendInfoHash = 0x1506EB6Cu;
-        const unsigned long kBillboardColorHash = 0x048767E8u;
+        const uint32_t kBillboardTexNameHash = 0x1BA23359u;
+        const uint32_t kBillboardBlendInfoHash = 0x1506EB6Cu;
+        const uint32_t kBillboardColorHash = 0x048767E8u;
         // DAT_06255804: the name every texture key and the TexName getter hand out.
         const char kTexNameUnknown[] = "???";
         // Mesh FUN_06226b80.. (set 0x0624dff0).
-        const unsigned long kMeshUseParticleTransformHash = 0x001FC112u;
-        const unsigned long kMeshIdHash = 0x0B7EE41Cu;
-        const unsigned long kMeshNameHash = 0x18DADCA8u;
-        const unsigned long kMeshParticleTransformHash = 0xF0004D58u;
+        const uint32_t kMeshUseParticleTransformHash = 0x001FC112u;
+        const uint32_t kMeshIdHash = 0x0B7EE41Cu;
+        const uint32_t kMeshNameHash = 0x18DADCA8u;
+        const uint32_t kMeshParticleTransformHash = 0xF0004D58u;
     } // namespace
 
     // ---- FFxBillboardPropertySet ----
@@ -911,9 +912,9 @@ namespace AlchemyImpl
     // into the byte (`SHR; AND CL,1`) or sets / clears it on the value's low byte (`TEST
     // AL,AL`), returning 0; no row -8. A row with mask 0 (the beam's 0x03503B61 /
     // 0xE2F60EEB / 0x0ABE0402) reads 0 and ignores a set.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropBool(unsigned long Hash, unsigned char* Out)
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropBool(uint32_t Hash, unsigned char* Out)
     {
-        for (unsigned long Index = 0; Index < PropertyClass_->FlagCount; ++Index)
+        for (uint32_t Index = 0; Index < PropertyClass_->FlagCount; ++Index)
         {
             const FDescriptorFlagBit& Row = PropertyClass_->Flags[Index];
             if (Row.Hash != Hash)
@@ -924,9 +925,9 @@ namespace AlchemyImpl
         return GR_ALE_CREATE_FAIL;
     }
 
-    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropBool(unsigned long Hash, unsigned char Value)
+    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropBool(uint32_t Hash, unsigned char Value)
     {
-        for (unsigned long Index = 0; Index < PropertyClass_->FlagCount; ++Index)
+        for (uint32_t Index = 0; Index < PropertyClass_->FlagCount; ++Index)
         {
             const FDescriptorFlagBit& Row = PropertyClass_->Flags[Index];
             if (Row.Hash != Hash)
@@ -943,7 +944,7 @@ namespace AlchemyImpl
     // Basic FUN_06218b60 / FUN_06218b90 (beam 0620dc00 / 0620dc30, dust 06211f50 /
     // 06211f80, oriented 0622e770 / 0622e7a0, perp 06235410 / 06235440, rect 0623a9d0 /
     // 0623aa00): BlendInfo -> copy the two dwords, 0; else -8.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropPair(unsigned long Hash, unsigned long* Out2)
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropPair(uint32_t Hash, uint32_t* Out2)
     {
         if (Hash != kBillboardBlendInfoHash)
             return GR_ALE_CREATE_FAIL;
@@ -952,8 +953,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropPair(unsigned long Hash,
-                                                             const unsigned long* In2)
+    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropPair(uint32_t Hash,
+                                                             const uint32_t* In2)
     {
         if (Hash != kBillboardBlendInfoHash)
             return GR_ALE_CREATE_FAIL;
@@ -965,7 +966,7 @@ namespace AlchemyImpl
     // Basic FUN_06218c60 (0x06218c60..0x06218c89; beam 0620dd00, dust 062120c0, oriented
     // 0622e870, perp 06235580, rect 0623aad0): TexName -> *Out = "???", 0; else
     // FUN_0623f9a0.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropName(unsigned long Hash, const char** Out)
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropName(uint32_t Hash, const char** Out)
     {
         if (Hash == kBillboardTexNameHash)
         {
@@ -977,7 +978,7 @@ namespace AlchemyImpl
 
     // Basic FUN_06218c90 (and 0x06204da4, 0x0620f454, 0x0622ba84, 0x062328c4, 0x06237f14):
     // TexName -> [+0x64] = DACOM_CRC::GetCRC32(Name), 0; else FUN_0623f9e0.
-    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropName(unsigned long Hash, const char* Text)
+    GENRESULT DACOM_API FFxBillboardPropertySet::SetPropName(uint32_t Hash, const char* Text)
     {
         if (Hash == kBillboardTexNameHash)
         {
@@ -989,7 +990,7 @@ namespace AlchemyImpl
 
     // Basic FUN_06218bf0 (0x06218bf0..0x06218c17; beam 0620dc90, dust 06211fe0, oriented
     // 0622e800, perp 062354a0, rect 0623aa60): Color -> *Out = [+0x74], AddRef, 0; else -8.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropColorRampRamp(unsigned long Hash,
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropColorRampRamp(uint32_t Hash,
                                                                       IRampColorRamp** Out)
     {
         if (Hash != kBillboardColorHash)
@@ -1002,10 +1003,10 @@ namespace AlchemyImpl
     // The class's 0x200 getter: `CMP EAX,hash; JNZ next` per case, the hit copies the
     // field to *Out and AddRefs it (+4), returns 0; past the last case it jumps to
     // FUN_06244330.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropSingleRampRamp(unsigned long Hash,
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropSingleRampRamp(uint32_t Hash,
                                                                        INestedSingleRamp** Out)
     {
-        for (unsigned long Index = 0; Index < PropertyClass_->SingleRampCount; ++Index)
+        for (uint32_t Index = 0; Index < PropertyClass_->SingleRampCount; ++Index)
         {
             const FBillboardRampSlot& Slot = PropertyClass_->SingleRamps[Index];
             if (Slot.Hash != Hash)
@@ -1019,10 +1020,10 @@ namespace AlchemyImpl
 
     // The class's 0x202 getter (basic FUN_06215900): the one hash -> field AddRef'd, 0;
     // else -8.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropAnimatedSingleRamp(unsigned long Hash,
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropAnimatedSingleRamp(uint32_t Hash,
                                                                            INestedSingleRamp** Out)
     {
-        for (unsigned long Index = 0; Index < PropertyClass_->AnimatedRampCount; ++Index)
+        for (uint32_t Index = 0; Index < PropertyClass_->AnimatedRampCount; ++Index)
         {
             const FBillboardRampSlot& Slot = PropertyClass_->AnimatedRamps[Index];
             if (Slot.Hash != Hash)
@@ -1036,7 +1037,7 @@ namespace AlchemyImpl
 
     // Beam FUN_0620db40 (0x0620db40..0x0620db72; oriented FUN_0622e640): the class hash ->
     // [inner+0x88] (LocalTransform) AddRef'd, 0; any other hash JMPs FUN_0623fb50.
-    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropTransform(unsigned long Hash,
+    GENRESULT DACOM_API FFxBillboardPropertySet::GetPropTransform(uint32_t Hash,
                                                                   IAnimatedTransform** Out)
     {
         if (PropertyClass_->LocalTransformHash != 0 && Hash == PropertyClass_->LocalTransformHash)
@@ -1143,7 +1144,7 @@ namespace AlchemyImpl
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(Texture_.Handle,
-                    static_cast<int>(Frame), reinterpret_cast<unsigned long*>(Texture_.Frame));
+                    static_cast<int>(Frame), reinterpret_cast<uint32_t*>(Texture_.Frame));
             }
         }
         else if (Texture_.FrameCount != 1)
@@ -1257,8 +1258,8 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_BasicDrawContext, 4, VertCount, IndexCount))
@@ -1278,8 +1279,8 @@ namespace AlchemyImpl
     // LAB_06217940 (inner) / FUN_06219390 (outer +0x9C), RET 0xc:
     // FUN_06240f50(DAT_062579dc, 4, Verts, Indices),
     // true -> 0, false -> -1 (`NEG AL; SBB EAX,EAX; NEG EAX; DEC EAX`).
-    GENRESULT DACOM_API FxBasicAppearance::BeginBatchedDraw(unsigned long Verts,
-                                                           unsigned long Indices)
+    GENRESULT DACOM_API FxBasicAppearance::BeginBatchedDraw(uint32_t Verts,
+                                                           uint32_t Indices)
     {
         return AlDrawContextBegin(G_BasicDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
@@ -1399,10 +1400,10 @@ namespace AlchemyImpl
                 Descriptor_->PrimarySizeRamp, AppearanceOuterTime_, InnerTime) * Scale);
             if (Alpha < FloatFromBits(0x3c23d70au))
                 continue;
-            const unsigned long Color = ForwardAppearanceColorEval(
+            const uint32_t Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0);
-            const unsigned long Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
+            const uint32_t Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
             const float Angle = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->TexFrameRamp, AppearanceOuterTime_, InnerTime));
             const float Aspect = static_cast<float>(ForwardAppearanceSingleEval(
@@ -1481,19 +1482,19 @@ namespace AlchemyImpl
                 Uy = static_cast<float>(static_cast<double>(Trig[1]) * Size);
             }
             unsigned short Indices[4];
-            for (unsigned long Corner = 0; Corner < 4; ++Corner)
+            for (uint32_t Corner = 0; Corner < 4; ++Corner)
             {
-                const unsigned long UIndex = bStreak ? (Corner < 2 ? 3 : 1) :
+                const uint32_t UIndex = bStreak ? (Corner < 2 ? 3 : 1) :
                     ((Corner == 0 || Corner == 2) ? 3 : 1);
-                const unsigned long VIndex = bStreak ? ((Corner == 0 || Corner == 2) ? 2 : 4) :
+                const uint32_t VIndex = bStreak ? ((Corner == 0 || Corner == 2) ? 2 : 4) :
                     (Corner < 2 ? 2 : 4);
                 double V = 0.0;
                 if (Corner == 0)
                     V = LoadAppearanceScalar(FrameBlock[VIndex]);
                 const double U = LoadAppearanceScalar(FrameBlock[UIndex]);
-                const long Count = G_BasicDrawContext.VertCount;
+                const int32_t Count = G_BasicDrawContext.VertCount;
                 Indices[Corner] = static_cast<unsigned short>(G_BasicDrawContext.RequestedVerts);
-                if (Count > static_cast<long>(G_BasicDrawContext.RequestedVerts))
+                if (Count > static_cast<int32_t>(G_BasicDrawContext.RequestedVerts))
                     continue;
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BasicDrawContext.LockedVerts);
                 double X;
@@ -1595,10 +1596,10 @@ namespace AlchemyImpl
             G_BasicGeometry3DMath->TransformXform(*reinterpret_cast<FVector*>(C),
                 *reinterpret_cast<const FTransform*>(ViewWorld),
                 *reinterpret_cast<const FVector*>(&Particle->PosX));
-            const unsigned long Color = ForwardAppearanceColorEval(
+            const uint32_t Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0);
-            const unsigned long Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
+            const uint32_t Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
             const double DoubledSize = static_cast<double>(Size) + Size;
             const volatile float Size2 = static_cast<float>(DoubledSize);
             // The next trig output overwrites this stored product in retail.
@@ -1631,20 +1632,20 @@ namespace AlchemyImpl
                 }
             }
             unsigned short Indices[3];
-            for (unsigned long Corner = 0; Corner < 3; ++Corner)
+            for (uint32_t Corner = 0; Corner < 3; ++Corner)
             {
                 double ThirdY = 0.0;
                 if (Corner == 2)
                     ThirdY = static_cast<double>(Trig[0]) * Alpha + C[1];
-                const long Count = G_BasicDrawContext.VertCount;
+                const int32_t Count = G_BasicDrawContext.VertCount;
                 Indices[Corner] = static_cast<unsigned short>(G_BasicDrawContext.RequestedVerts);
-                if (Count > static_cast<long>(G_BasicDrawContext.RequestedVerts))
+                if (Count > static_cast<int32_t>(G_BasicDrawContext.RequestedVerts))
                     continue;
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BasicDrawContext.LockedVerts);
                 const double X = Corner == 0 ? (static_cast<double>(C[0]) + Xa) - Yb :
                     Corner == 1 ? (static_cast<double>(C[0]) - Xa) - Yb :
                                   static_cast<double>(Trig[1]) * Alpha + C[0];
-                const unsigned long UvIndex = 2 - Corner;
+                const uint32_t UvIndex = 2 - Corner;
                 Vertex->Diffuse = Diffuse;
                 std::memcpy(&Vertex->U, &TriU[UvIndex], sizeof(float));
                 std::memcpy(&Vertex->V, &TriV[UvIndex], sizeof(float));
@@ -1809,7 +1810,7 @@ namespace AlchemyImpl
                 ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(G_TextureLibrary);
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 Library->GetFrame(Handle, static_cast<int>(Frame),
-                    reinterpret_cast<unsigned long*>(Texture_.Frame));
+                    reinterpret_cast<uint32_t*>(Texture_.Frame));
             }
         }
         else if (Texture_.FrameCount != 1)
@@ -1918,8 +1919,8 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_RectDrawContext, 4, VertCount, IndexCount))
@@ -1932,8 +1933,8 @@ namespace AlchemyImpl
 
     // LAB_0623b140 (outer +0x9C, RET 0xc): FUN_06240f50(DAT_06257b40, 4, Verts, Indices)
     // folded to 0 / -1 (see FxPerpAppearance::BeginBatchedDraw on the single context).
-    GENRESULT DACOM_API FxRectAppearance::BeginBatchedDraw(unsigned long Verts,
-                                                          unsigned long Indices)
+    GENRESULT DACOM_API FxRectAppearance::BeginBatchedDraw(uint32_t Verts,
+                                                          uint32_t Indices)
     {
         return AlDrawContextBegin(G_RectDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
@@ -1949,11 +1950,11 @@ namespace AlchemyImpl
             return GR_OK;
         ++G_DrawCounters[1];
 
-        const unsigned long* const Blend = Descriptor_->BlendInfo;
+        const uint32_t* const Blend = Descriptor_->BlendInfo;
         CallSetRenderState(G_RenderPipeline, 0x13, static_cast<int>(Blend[0]));
         CallSetRenderState(G_RenderPipeline, 0x14, static_cast<int>(Blend[1]));
 
-        unsigned long FrameTexture = 0;
+        uint32_t FrameTexture = 0;
         std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
         CallRenderPipelineSetTexture(G_RenderPipeline, 0, static_cast<int>(FrameTexture));
 
@@ -2105,10 +2106,10 @@ namespace AlchemyImpl
                 if (Alpha <= TinyAlpha)
                     continue;
             }
-            const unsigned long Color = ForwardAppearanceColorEval(
+            const uint32_t Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0f);
-            const unsigned long Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
+            const uint32_t Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
             if (bFrameLookup)
             {
                 const double FramePosition = ForwardAppearanceSingleEval(
@@ -2203,7 +2204,7 @@ namespace AlchemyImpl
             unsigned short IndexA;
             const double VA = FrameBlock[2];
             const double UA = FrameBlock[3];
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexA = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2221,7 +2222,7 @@ namespace AlchemyImpl
             unsigned short IndexB;
             const double VB = FrameBlock[2];
             const double UB = FrameBlock[1];
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexB = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2239,7 +2240,7 @@ namespace AlchemyImpl
             unsigned short IndexC;
             const double VC = FrameBlock[4];
             const double UC = FrameBlock[3];
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexC = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2257,7 +2258,7 @@ namespace AlchemyImpl
             unsigned short IndexD;
             const double VD = FrameBlock[4];
             const double UD = FrameBlock[1];
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexD = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2327,7 +2328,7 @@ namespace AlchemyImpl
                 ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(G_TextureLibrary);
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 Library->GetFrame(Handle, static_cast<int>(Frame),
-                    reinterpret_cast<unsigned long*>(Texture_.Frame));
+                    reinterpret_cast<uint32_t*>(Texture_.Frame));
             }
         }
         else if (Texture_.FrameCount != 1)
@@ -2441,8 +2442,8 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_PerpDrawContext, 4, VertCount, IndexCount))
@@ -2459,8 +2460,8 @@ namespace AlchemyImpl
     // folded to 0 / -1. The perp appearance has its own draw context DAT_06257aec; the
     // port keeps one context, which is equivalent because no two draw contexts are ever
     // open at once (each Begin is closed by its End before the next list or appearance).
-    GENRESULT DACOM_API FxPerpAppearance::BeginBatchedDraw(unsigned long Verts,
-                                                          unsigned long Indices)
+    GENRESULT DACOM_API FxPerpAppearance::BeginBatchedDraw(uint32_t Verts,
+                                                          uint32_t Indices)
     {
         return AlDrawContextBegin(G_PerpDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
@@ -2654,10 +2655,10 @@ namespace AlchemyImpl
                 if (Alpha <= TinyLength)
                     continue;
             }
-            const unsigned long PackedColor = ForwardAppearanceColorEval(
+            const uint32_t PackedColor = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0f);
-            const unsigned long Diffuse = PackedColor | (static_cast<unsigned long>(AlphaInteger) << 24);
+            const uint32_t Diffuse = PackedColor | (static_cast<uint32_t>(AlphaInteger) << 24);
             if (bFrameLookup)
             {
                 const double FramePosition = ForwardAppearanceSingleEval(
@@ -2729,7 +2730,7 @@ namespace AlchemyImpl
             const double V0 = FrameBlock[2];
             const double U1 = FrameBlock[3];
             unsigned short IndexA;
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexA = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2747,7 +2748,7 @@ namespace AlchemyImpl
             const double VertexBY = static_cast<double>(Position.Y) - SumY;
             const float VertexBZ = static_cast<float>(static_cast<double>(Position.Z) - SumZ);
             unsigned short IndexB;
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexB = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2765,7 +2766,7 @@ namespace AlchemyImpl
             const double VertexCY = static_cast<double>(SumY) + Position.Y;
             const float VertexCZ = static_cast<float>(static_cast<double>(SumZ) + Position.Z);
             unsigned short IndexC;
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexC = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2781,7 +2782,7 @@ namespace AlchemyImpl
                 Context.VertCount = static_cast<unsigned short>(Context.VertCount + 1);
             }
             unsigned short IndexD;
-            if (static_cast<long>(Context.VertCount) > static_cast<long>(Context.RequestedVerts))
+            if (static_cast<int32_t>(Context.VertCount) > static_cast<int32_t>(Context.RequestedVerts))
                 IndexD = static_cast<unsigned short>(Context.RequestedVerts);
             else
             {
@@ -2815,14 +2816,14 @@ namespace AlchemyImpl
     }
 
     // LAB_0622e950: four vertices per node-local particle.
-    GENRESULT DACOM_API FxOrientedAppearance::GetQueuedVertCount(unsigned long* Out)
+    GENRESULT DACOM_API FxOrientedAppearance::GetQueuedVertCount(uint32_t* Out)
     {
         *Out = LiveInstanceCount_ << 2;
         return GR_OK;
     }
 
     // LAB_0622e970: six indices per node-local particle.
-    GENRESULT DACOM_API FxOrientedAppearance::GetQueuedIndexCount(unsigned long* Out)
+    GENRESULT DACOM_API FxOrientedAppearance::GetQueuedIndexCount(uint32_t* Out)
     {
         *Out = LiveInstanceCount_ * 6U;
         return GR_OK;
@@ -2865,7 +2866,7 @@ namespace AlchemyImpl
                 const std::uint32_t Span = Texture_.FrameCount - 1u;
                 const std::int64_t Frame = static_cast<std::int64_t>(static_cast<double>(Span) * Position);
                 static_cast<ITextureLibrary2*>(G_TextureLibrary)->GetFrame(Texture_.Handle,
-                    static_cast<int>(Frame), reinterpret_cast<unsigned long*>(Texture_.Frame));
+                    static_cast<int>(Frame), reinterpret_cast<uint32_t*>(Texture_.Frame));
             }
         }
         else if (Texture_.FrameCount != 1)
@@ -3010,8 +3011,8 @@ namespace AlchemyImpl
         if (Particle == nullptr)
             return GR_OK;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_OrientedDrawContext, 4, VertCount, IndexCount))
@@ -3056,8 +3057,8 @@ namespace AlchemyImpl
             float M[12];
             if (static_cast<unsigned char>(Descriptor_->LocalTransform->IsIdentity()) == 0)
             {
-                unsigned long OuterBits;
-                unsigned long InnerBits;
+                uint32_t OuterBits;
+                uint32_t InnerBits;
                 std::memcpy(&OuterBits, &AppearanceOuterTime_, sizeof(OuterBits));
                 std::memcpy(&InnerBits, &InnerTime, sizeof(InnerBits));
                 Descriptor_->LocalTransform->Evaluate(OuterBits, InnerBits, M);
@@ -3131,10 +3132,10 @@ namespace AlchemyImpl
                 if (!IsNonzeroParticleField(Alpha))
                     continue;
             }
-            const unsigned long Color = ForwardAppearanceColorEval(
+            const uint32_t Color = ForwardAppearanceColorEval(
                 Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
             const std::int64_t AlphaInteger = static_cast<std::int64_t>(static_cast<double>(Alpha) * 255.0);
-            const unsigned long Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
+            const uint32_t Diffuse = Color | (static_cast<std::uint32_t>(AlphaInteger) << 24);
             if (bFrameLookup)
             {
                 const double FramePosition = ForwardAppearanceSingleEval(
@@ -3193,7 +3194,7 @@ namespace AlchemyImpl
             for (int Axis = 2; Axis >= 0; --Axis)
                 Corners[0][Axis] = static_cast<float>(static_cast<double>(PlusA[Axis]) + B[Axis]);
             unsigned short Indices[4];
-            for (unsigned long Corner = 0; Corner < 4; ++Corner)
+            for (uint32_t Corner = 0; Corner < 4; ++Corner)
             {
                 double Y = 0.0;
                 double Z = 0.0;
@@ -3208,9 +3209,9 @@ namespace AlchemyImpl
                 }
                 else if (Corner != 3)
                     Y = LoadAppearanceScalar(Corners[Corner][1]);
-                const long Count = G_OrientedDrawContext.VertCount;
+                const int32_t Count = G_OrientedDrawContext.VertCount;
                 Indices[Corner] = static_cast<unsigned short>(G_OrientedDrawContext.RequestedVerts);
-                if (Count > static_cast<long>(G_OrientedDrawContext.RequestedVerts))
+                if (Count > static_cast<int32_t>(G_OrientedDrawContext.RequestedVerts))
                     continue;
                 FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_OrientedDrawContext.LockedVerts);
                 if (Corner == 0)
@@ -3290,14 +3291,14 @@ namespace AlchemyImpl
     }
 
     // FUN_062125e0: outer +0xf0 is the node's own live-instance count.
-    GENRESULT DACOM_API FLDustAppearance::GetQueuedVertCount(unsigned long* Out)
+    GENRESULT DACOM_API FLDustAppearance::GetQueuedVertCount(uint32_t* Out)
     {
         *Out = LiveInstanceCount_ << 2;
         return GR_OK;
     }
 
     // FUN_06212600: the same count contributes six indices per dust particle.
-    GENRESULT DACOM_API FLDustAppearance::GetQueuedIndexCount(unsigned long* Out)
+    GENRESULT DACOM_API FLDustAppearance::GetQueuedIndexCount(uint32_t* Out)
     {
         *Out = LiveInstanceCount_ * 6U;
         return GR_OK;
@@ -3357,14 +3358,14 @@ namespace AlchemyImpl
                 const int Handle = Texture_.Handle;
                 if (Handle != -1)
                 {
-                    const unsigned long Span = static_cast<unsigned long>(FrameCount) - 1U;
+                    const uint32_t Span = static_cast<uint32_t>(FrameCount) - 1U;
                     const std::int64_t SpanWide = static_cast<std::int64_t>(Span);
                     const double WideSpan = ComputeAlchemyFpuWideInteger(SpanWide);
                     IDAComponent* const volatile& LibrarySlot = G_TextureLibrary;
                     ITextureLibrary2* const Library = static_cast<ITextureLibrary2*>(LibrarySlot);
                     const std::int64_t Frame = ConvertAlchemyFpuInteger(WideSpan * Position);
                     Library->GetFrame(Handle, static_cast<int>(Frame),
-                                      reinterpret_cast<unsigned long*>(Texture_.Frame));
+                                      reinterpret_cast<uint32_t*>(Texture_.Frame));
                 }
             }
         }
@@ -3488,8 +3489,8 @@ namespace AlchemyImpl
         const float* CameraView = Camera->GetViewTransform();
         ComposeTransform(ViewXform_, CameraView, NodeWorldXform_);
 
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
 
@@ -3548,7 +3549,7 @@ namespace AlchemyImpl
         {
             float FrameBlock[5];
             std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
-            const unsigned long Flags = Descriptor_->Flags;
+            const uint32_t Flags = Descriptor_->Flags;
             if ((Flags & 0x1000u) != 0)
             {
                 const double Swap = LoadAppearanceScalar(FrameBlock[1]);
@@ -3667,14 +3668,14 @@ namespace AlchemyImpl
 
                     if (Alpha > kMinAlpha)
                     {
-                        const unsigned long Color = ForwardAppearanceColorEval(
+                        const uint32_t Color = ForwardAppearanceColorEval(
                             Descriptor_->ColorRamp, AppearanceOuterTime_, InnerTime);
                         const std::int64_t AlphaInteger = ConvertAlchemyFpuInteger(static_cast<double>(Alpha) * 255.0f);
-                        const unsigned long Diffuse = Color | (static_cast<unsigned long>(AlphaInteger) << 24);
+                        const uint32_t Diffuse = Color | (static_cast<uint32_t>(AlphaInteger) << 24);
                         const double FirstZ = static_cast<double>(C[2]) - Dz;
                         const double FirstY = static_cast<double>(C[1]) - Dy;
                         unsigned short I0 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
-                        if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
+                        if (static_cast<int32_t>(G_DustDrawContext.VertCount) <= static_cast<int32_t>(G_DustDrawContext.RequestedVerts))
                         {
                             FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) - Dx);
@@ -3688,7 +3689,7 @@ namespace AlchemyImpl
                             G_DustDrawContext.LockedVerts = Vert + 1;
                         }
                         unsigned short I1 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
-                        if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
+                        if (static_cast<int32_t>(G_DustDrawContext.VertCount) <= static_cast<int32_t>(G_DustDrawContext.RequestedVerts))
                         {
                             FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) + SideX);
@@ -3703,7 +3704,7 @@ namespace AlchemyImpl
                             G_DustDrawContext.LockedVerts = Vert + 1;
                         }
                         unsigned short I2 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
-                        if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
+                        if (static_cast<int32_t>(G_DustDrawContext.VertCount) <= static_cast<int32_t>(G_DustDrawContext.RequestedVerts))
                         {
                             FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) - SideX);
@@ -3721,7 +3722,7 @@ namespace AlchemyImpl
                         float LastZ;
                         StoreAlchemyFpuFloat(LastZ, static_cast<double>(C[2]) + Bz);
                         unsigned short I3 = static_cast<unsigned short>(G_DustDrawContext.RequestedVerts);
-                        if (static_cast<long>(G_DustDrawContext.VertCount) <= static_cast<long>(G_DustDrawContext.RequestedVerts))
+                        if (static_cast<int32_t>(G_DustDrawContext.VertCount) <= static_cast<int32_t>(G_DustDrawContext.RequestedVerts))
                         {
                             FAlchemyVertex* const Vert = static_cast<FAlchemyVertex*>(G_DustDrawContext.LockedVerts);
                             StoreAlchemyFpuFloat(Vert->X, static_cast<double>(C[0]) + Bx);
@@ -3746,7 +3747,7 @@ namespace AlchemyImpl
                 ++G_DrawCounters[1];
                 CallSetRenderState(G_RenderPipeline, 0x13, static_cast<int>(Descriptor_->BlendInfo[0]));
                 CallSetRenderState(G_RenderPipeline, 0x14, static_cast<int>(Descriptor_->BlendInfo[1]));
-                unsigned long FrameTexture = 0;
+                uint32_t FrameTexture = 0;
                 std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
                 CallRenderPipelineSetTexture(G_RenderPipeline, 0, static_cast<int>(FrameTexture));
                 float Identity[12];
@@ -3825,7 +3826,7 @@ namespace AlchemyImpl
             Particle->Age = Age;
             Particle->Duration = Duration;
             Particle->InvDuration = 1.0f / Duration;
-            *reinterpret_cast<unsigned long*>(reinterpret_cast<unsigned char*>(Particle) + 0x30) = 0;
+            *reinterpret_cast<uint32_t*>(reinterpret_cast<unsigned char*>(Particle) + 0x30) = 0;
             ++LiveInstanceCount_;
         }
         PrependParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
@@ -4121,8 +4122,8 @@ namespace AlchemyImpl
             return GR_OK;
         }
 
-        unsigned long VertCount = 0;
-        unsigned long IndexCount = 0;
+        uint32_t VertCount = 0;
+        uint32_t IndexCount = 0;
         GetQueuedVertCount(&VertCount);
         GetQueuedIndexCount(&IndexCount);
         if (!AlDrawContextBegin(G_BeamDrawContext, 4, VertCount, IndexCount))
@@ -4140,8 +4141,8 @@ namespace AlchemyImpl
 
     // LAB_062069c0 (node vtable +0x4c, outer +0x9C): FUN_06240f50(&DAT_0625792c, 4, V, I),
     // folded to 0 / -1 by NEG/SBB/NEG/DEC.
-    GENRESULT DACOM_API FLBeamAppearance::BeginBatchedDraw(unsigned long Verts,
-                                                           unsigned long Indices)
+    GENRESULT DACOM_API FLBeamAppearance::BeginBatchedDraw(uint32_t Verts,
+                                                           uint32_t Indices)
     {
         return AlDrawContextBegin(G_BeamDrawContext, 4, Verts, Indices) ? GR_OK : GR_GENERIC;
     }
@@ -4167,9 +4168,9 @@ namespace AlchemyImpl
 
     // LAB_06206a30 (node vtable +0x7c, outer +0xD0): *Out = [node+0xb4] * 5, then
     // *Out += 5 when (desc+0x60 & 0x100) == 0x100. No null check on Out.
-    GENRESULT DACOM_API FLBeamAppearance::GetQueuedVertCount(unsigned long* Out)
+    GENRESULT DACOM_API FLBeamAppearance::GetQueuedVertCount(uint32_t* Out)
     {
-        unsigned long Count = ResolveLiveInstanceCount() * 5;
+        uint32_t Count = ResolveLiveInstanceCount() * 5;
         *Out = Count;
         if ((GetAppearanceRampDescriptor()->Flags & 0x100u) == 0x100u)
             *Out = Count + 5;
@@ -4178,9 +4179,9 @@ namespace AlchemyImpl
 
     // LAB_06206a70 (node vtable +0x80, outer +0xD4): *Out = [node+0xb4] * 0x18, then
     // *Out += 0x18 when (desc+0x60 & 0x100) == 0x100.
-    GENRESULT DACOM_API FLBeamAppearance::GetQueuedIndexCount(unsigned long* Out)
+    GENRESULT DACOM_API FLBeamAppearance::GetQueuedIndexCount(uint32_t* Out)
     {
-        unsigned long Count = ResolveLiveInstanceCount() * 0x18;
+        uint32_t Count = ResolveLiveInstanceCount() * 0x18;
         *Out = Count;
         if ((GetAppearanceRampDescriptor()->Flags & 0x100u) == 0x100u)
             *Out = Count + 0x18;
@@ -4207,7 +4208,7 @@ namespace AlchemyImpl
         G_RenderPipeline->SetRenderState(D3DRS_DESTBLEND, static_cast<int>(Descriptor_->BlendInfo[1]));
 
         int FillMode = 0;
-        unsigned long Texture = 0;
+        uint32_t Texture = 0;
         if ((GetAppearanceRampDescriptor()->Flags & 0x400u) == 0x400u)
         {
             FillMode = 2;
@@ -4352,10 +4353,10 @@ namespace AlchemyImpl
         // 08aa0's cap arguments are raw words. 06020's inline writer converts them
         // through x87 only after its capacity gate (V, U, Z, Y, X, in that order).
         __declspec(noinline) unsigned short StoreBeamRawVertex(const float* Pos,
-            unsigned long Diffuse, const float& U, const float& V)
+            uint32_t Diffuse, const float& U, const float& V)
         {
-            const long Count = G_BeamDrawContext.VertCount;
-            if (Count > static_cast<long>(G_BeamDrawContext.RequestedVerts))
+            const int32_t Count = G_BeamDrawContext.VertCount;
+            if (Count > static_cast<int32_t>(G_BeamDrawContext.RequestedVerts))
                 return static_cast<unsigned short>(G_BeamDrawContext.RequestedVerts);
             FAlchemyVertex* const Vertex = static_cast<FAlchemyVertex*>(G_BeamDrawContext.LockedVerts);
             std::memcpy(&Vertex->X, Pos, 3 * sizeof(float));
@@ -4367,10 +4368,10 @@ namespace AlchemyImpl
             return static_cast<unsigned short>(Count);
         }
         __declspec(noinline) unsigned short StoreBeamConvertedVertex(const float* Pos,
-            unsigned long Diffuse, const float& U, const float& V)
+            uint32_t Diffuse, const float& U, const float& V)
         {
-            const long Count = G_BeamDrawContext.VertCount;
-            if (Count > static_cast<long>(G_BeamDrawContext.RequestedVerts))
+            const int32_t Count = G_BeamDrawContext.VertCount;
+            if (Count > static_cast<int32_t>(G_BeamDrawContext.RequestedVerts))
                 return static_cast<unsigned short>(G_BeamDrawContext.RequestedVerts);
             FAlchemyVertex Words;
             Words.V = static_cast<float>(LoadAppearanceScalar(V));
@@ -4400,8 +4401,8 @@ namespace AlchemyImpl
         float Tip[3] = {0.0f, 0.0f, 0.0f};
         bool bHaveTip = false;
         bool bFieldTip = false;
-        const long FieldTotal = static_cast<long>(FieldCount_);
-        for (long FieldIndex = 0; FieldIndex < FieldTotal; ++FieldIndex)
+        const int32_t FieldTotal = static_cast<int32_t>(FieldCount_);
+        for (int32_t FieldIndex = 0; FieldIndex < FieldTotal; ++FieldIndex)
         {
             IGenericFx* Field = AsFxNode(AssociatedFields_[FieldIndex]);
             const char* Name = Field->GetFxFactoryName();
@@ -4438,7 +4439,7 @@ namespace AlchemyImpl
 
         if (!bFieldTip)
         {
-            if (static_cast<long>(LiveInstanceCount_) < 2)
+            if (static_cast<int32_t>(LiveInstanceCount_) < 2)
                 return;
             const FPooledParticle* Next = Head->Next;
             if ((Descriptor_->Flags & 0x200u) != 0x200u)
@@ -4484,7 +4485,7 @@ namespace AlchemyImpl
                 float Rgba[4] = {0.0f, 0.0f, 0.0f, 0.0f};
                 float V = 0.0f;
                 EvalRingParams(State, Head, &HalfWidth, Rgba, &V);
-                const unsigned long Diffuse = PackRingColor(Rgba);
+                const uint32_t Diffuse = PackRingColor(Rgba);
                 unsigned short NewIdx[4];
                 float BasisColumn[3];
                 float Side[3];
@@ -4572,7 +4573,7 @@ namespace AlchemyImpl
         OutRgba[0] = static_cast<float>(Red);
         std::memcpy(&OutRgba[3], &Alpha, sizeof(float));
         const FLBeamAppearance* const Node = State.Node;
-        const long Parity = Node->bRibbonParity_ ? 1 : 0;
+        const int32_t Parity = Node->bRibbonParity_ ? 1 : 0;
         const float* const V = ((State.Counter & 1) == Parity)
             ? &Node->Texture_.Frame[2] : &Node->Texture_.Frame[4];
         std::memcpy(OutV, V, sizeof(float));
@@ -4584,15 +4585,15 @@ namespace AlchemyImpl
     // 255) & 0xff`. Alpha is not masked; its high bits shift out.
     #pragma optimize("", off)
     #pragma float_control(except, on, push)
-    __declspec(noinline) unsigned long FLBeamAppearance::PackRingColor(const float* Rgba)
+    __declspec(noinline) uint32_t FLBeamAppearance::PackRingColor(const float* Rgba)
     {
-        unsigned long Packed = static_cast<unsigned long>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[3]) * 255.0f));
+        uint32_t Packed = static_cast<uint32_t>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[3]) * 255.0f));
         Packed = (Packed << 8) |
-                 (static_cast<unsigned long>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[0]) * 255.0f)) & 0xffu);
+                 (static_cast<uint32_t>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[0]) * 255.0f)) & 0xffu);
         Packed = (Packed << 8) |
-                 (static_cast<unsigned long>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[1]) * 255.0f)) & 0xffu);
+                 (static_cast<uint32_t>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[1]) * 255.0f)) & 0xffu);
         Packed = (Packed << 8) |
-                 (static_cast<unsigned long>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[2]) * 255.0f)) & 0xffu);
+                 (static_cast<uint32_t>(ConvertAlchemyFpuInteger(static_cast<double>(Rgba[2]) * 255.0f)) & 0xffu);
         return Packed;
     }
     #pragma float_control(pop)
@@ -4635,7 +4636,7 @@ namespace AlchemyImpl
         const float* const VWord = ((State.Counter & 1) == (Node->bRibbonParity_ ? 1 : 0))
             ? &Node->Texture_.Frame[2] : &Node->Texture_.Frame[4];
         std::memcpy(&V, VWord, sizeof(float));
-        const unsigned long Diffuse = PackRingColor(Rgba);
+        const uint32_t Diffuse = PackRingColor(Rgba);
 
         unsigned short NewIdx[4];
         float BasisColumn[3];
@@ -4680,7 +4681,7 @@ namespace AlchemyImpl
     // ((Pos + PrevPos) * 0.5, colour, U = V = 0.5) and eight triangles; else two quads.
     #pragma float_control(except, on, push)
     void FLBeamAppearance::JoinRing(const FBeamRingState& State, const float* Pos,
-                                    unsigned long Diffuse, const unsigned short* NewIdx)
+                                    uint32_t Diffuse, const unsigned short* NewIdx)
     {
         if ((State.Node->Descriptor_->Flags & 2u) == 2u)
         {
@@ -4745,7 +4746,7 @@ namespace AlchemyImpl
     // FUN_06225000: list order, point spheres, then the node transform even if empty.
     GENRESULT DACOM_API FxMeshAppearance::GetBoundingSphere(float* OutSphere)
     {
-        unsigned long Count = 0;
+        uint32_t Count = 0;
         FPooledParticle* Particle = InstanceListHead_;
         while (Particle != nullptr)
         {
@@ -4779,7 +4780,7 @@ namespace AlchemyImpl
     // itself, inherited from FFxAppearancePropertySet) ----
 
     // FUN_06226b80: *Out = the byte +0x80 as stored, 0; else -8.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropBool(unsigned long Hash,
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropBool(uint32_t Hash,
                                                                   unsigned char* Out)
     {
         if (Hash != kMeshUseParticleTransformHash)
@@ -4789,7 +4790,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06226bb0: the byte stored as passed, 0; else -8.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropBool(unsigned long Hash,
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropBool(uint32_t Hash,
                                                                   unsigned char Value)
     {
         if (Hash != kMeshUseParticleTransformHash)
@@ -4799,8 +4800,8 @@ namespace AlchemyImpl
     }
 
     // FUN_06226be0 / FUN_06226c10: MeshId.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropInt(unsigned long Hash,
-                                                                 unsigned long* Out)
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropInt(uint32_t Hash,
+                                                                 uint32_t* Out)
     {
         if (Hash != kMeshIdHash)
             return GR_ALE_CREATE_FAIL;
@@ -4808,8 +4809,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropInt(unsigned long Hash,
-                                                                 unsigned long Value)
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropInt(uint32_t Hash,
+                                                                 uint32_t Value)
     {
         if (Hash != kMeshIdHash)
             return GR_ALE_CREATE_FAIL;
@@ -4818,7 +4819,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06226cf0: MeshName -> its buffer, 0; else FUN_0623f9a0.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropName(unsigned long Hash,
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropName(uint32_t Hash,
                                                                   const char** Out)
     {
         if (Hash != kMeshNameHash)
@@ -4829,7 +4830,7 @@ namespace AlchemyImpl
 
     // FUN_06226d20 (0x06226d20..0x06226e00): MeshName -> the hashed-string assignment
     // (FFxHashedName::Assign), 0; else FUN_0623f9e0.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropName(unsigned long Hash,
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::SetPropName(uint32_t Hash,
                                                                   const char* Text)
     {
         if (Hash != kMeshNameHash)
@@ -4839,7 +4840,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06226b40: MeshApp_ParticleTransform -> [+0x84] AddRef'd, 0; else FUN_0623fb50.
-    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropTransform(unsigned long Hash,
+    GENRESULT DACOM_API FFxMeshAppearancePropertySet::GetPropTransform(uint32_t Hash,
                                                                        IAnimatedTransform** Out)
     {
         if (Hash != kMeshParticleTransformHash)
@@ -4862,7 +4863,7 @@ namespace AlchemyImpl
     // FUN_06224c20 (alchemy.dll.txt 75997-76268), RET 0x10: (this, Six, Age, Duration),
     // always returns 0. Reached through vtable 0x0624dd90 +0x68 and the this+0xc adjustor
     // thunk FUN_06227330.
-    GENRESULT DACOM_API FxMeshAppearance::EmitOne(const float* Six, unsigned long Extra,
+    GENRESULT DACOM_API FxMeshAppearance::EmitOne(const float* Six, uint32_t Extra,
                                                   float Duration)
     {
         float Age = 0.0f;
@@ -4941,8 +4942,8 @@ namespace AlchemyImpl
                                0.0f, 0.0f, 0.0f };
             {
                 const float Phase = Age / Duration;
-                unsigned long TimeA = 0;
-                unsigned long TimeB = 0;
+                uint32_t TimeA = 0;
+                uint32_t TimeB = 0;
                 std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                 std::memcpy(&TimeB, &Phase, sizeof(TimeB));
                 Set->ParticleTransform->Evaluate(TimeA, TimeB, Anim);
@@ -5047,7 +5048,7 @@ namespace AlchemyImpl
             ++Field;
         }
 
-        unsigned long DtBits = 0;
+        uint32_t DtBits = 0;
         std::memcpy(&DtBits, &Dt, sizeof(DtBits));
         FPooledParticle* Particle = InstanceListHead_;
         while (Particle != nullptr)
@@ -5122,8 +5123,8 @@ namespace AlchemyImpl
                                        0.0f, 0.0f, 0.0f };
                     {
                         const float Phase = Item->Age / Item->Duration;
-                        unsigned long TimeA = 0;
-                        unsigned long TimeB = 0;
+                        uint32_t TimeA = 0;
+                        uint32_t TimeB = 0;
                         std::memcpy(&TimeA, &AppearanceOuterTime_, sizeof(TimeA));
                         std::memcpy(&TimeB, &Phase, sizeof(TimeB));
                         Set->ParticleTransform->Evaluate(TimeA, TimeB, Anim);
@@ -5211,7 +5212,7 @@ namespace AlchemyImpl
 
     // FUN_06231930: UseDynamicRotation -> the low bit of the byte +0xa0 (`AND AL,1`),
     // SmoothRotation -> bit 1 (`SHR EDX,1; AND DL,1`), 0; else -8.
-    GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropBool(unsigned long Hash,
+    GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropBool(uint32_t Hash,
                                                                       unsigned char* Out)
     {
         if (Hash == kParticleUseDynamicRotationHash)
@@ -5229,10 +5230,10 @@ namespace AlchemyImpl
 
     // FUN_06231980: the bit set (`OR 1` / `OR 2`) when the byte is non-zero (`TEST CL,CL`),
     // cleared otherwise, 0; else -8.
-    GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropBool(unsigned long Hash,
+    GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropBool(uint32_t Hash,
                                                                       unsigned char Value)
     {
-        unsigned long Mask = 0;
+        uint32_t Mask = 0;
         if (Hash == kParticleUseDynamicRotationHash)
             Mask = 1u;
         else if (Hash == kParticleSmoothRotationHash)
@@ -5247,7 +5248,7 @@ namespace AlchemyImpl
     }
 
     // FUN_06231ad0: LifeName / DeathName -> the buffer, 0; else FUN_0623f9a0.
-    GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropName(unsigned long Hash,
+    GENRESULT DACOM_API FFxParticleAppearancePropertySet::GetPropName(uint32_t Hash,
                                                                       const char** Out)
     {
         if (Hash == kParticleLifeNameHash)
@@ -5265,7 +5266,7 @@ namespace AlchemyImpl
 
     // FUN_06231b20 (0x06231b20..0x06231cdf): the hashed-string assignment on either name,
     // 0; else FUN_0623f9e0.
-    GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropName(unsigned long Hash,
+    GENRESULT DACOM_API FFxParticleAppearancePropertySet::SetPropName(uint32_t Hash,
                                                                       const char* Text)
     {
         if (Hash == kParticleLifeNameHash)
@@ -5527,7 +5528,7 @@ namespace AlchemyImpl
         FillIdentity3x3(M);
         std::memcpy(M + 9, &Record->PosX, 3 * sizeof(float));
 
-        const unsigned long Flags = ParticleProps()->Flags; // [[node+0xc0]+0xa0]
+        const uint32_t Flags = ParticleProps()->Flags; // [[node+0xc0]+0xa0]
         if ((Flags & 1) != 0)
         {
             float N[3];
@@ -5679,7 +5680,7 @@ namespace AlchemyImpl
         {
             IAlchemy* const Alchemy = static_cast<IAlchemy*>(G_RuntimeAlchemy);
             IFxEffectLibrary* const Library = static_cast<IFxEffectLibrary*>(G_RuntimeEffectLibrary);
-            const unsigned long Key = Alchemy->HashNodeName(LifeName);
+            const uint32_t Key = Alchemy->HashNodeName(LifeName);
             if (Library->CreateEffect(static_cast<IGenericFx*>(this),
                                       reinterpret_cast<void*>(static_cast<std::uintptr_t>(Key)),
                                       &Child.Value) == GR_OK)
@@ -5803,7 +5804,7 @@ namespace AlchemyImpl
                     IAlchemy* const Alchemy = static_cast<IAlchemy*>(G_RuntimeAlchemy);
                     IFxEffectLibrary* const Library =
                         static_cast<IFxEffectLibrary*>(G_RuntimeEffectLibrary);
-                    const unsigned long Key = Alchemy->HashNodeName(ParticleProps()->DeathName.Buffer);
+                    const uint32_t Key = Alchemy->HashNodeName(ParticleProps()->DeathName.Buffer);
                     if (Library->CreateEffect(
                             static_cast<IGenericFx*>(this),
                             reinterpret_cast<void*>(static_cast<std::uintptr_t>(Key)),
@@ -5849,7 +5850,7 @@ namespace AlchemyImpl
     // No sphere at all -> -1, otherwise 0.
     GENRESULT DACOM_API FxParticleAppearance::GetBoundingSphere(float* OutSphere)
     {
-        unsigned long Merged = 0;
+        uint32_t Merged = 0;
         FPooledParticle* Record = InstanceListHead_;
         while (Record != nullptr)
         {

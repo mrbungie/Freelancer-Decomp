@@ -10,6 +10,7 @@
 // Interface methods are __stdcall (this on the stack). C helpers are __cdecl.
 
 #include "dacom.h"
+#include "fl/handles.h"
 #include "luaprofile.h"
 #include "engine/engbase.h"
 #include "x86math.h"
@@ -70,64 +71,64 @@ static const char* const G_NameChildName = "Child name";
 static const char* const G_NameRootHeight = "Root height";
 
 // ChannelArchetype Header flags (LAB_0661d8d0 stride).
-static const unsigned long G_ChannelFlagScalar = 0x1;
-static const unsigned long G_ChannelFlagPosition = 0x2;
-static const unsigned long G_ChannelFlagQuat = 0x4;
-static const unsigned long G_ChannelFlagScalarOnly = 0x8;
-static const unsigned long G_ChannelFlagZeroPos = 0x10;
-static const unsigned long G_ChannelFlagIdentQuat = 0x20;
-static const unsigned long G_ChannelFlagCompQuat3 = 0x40;
-static const unsigned long G_ChannelFlagCompAxis = 0x80;
-static const unsigned long G_ChannelFlagCompQuat4 = 0x100;
-static const unsigned long G_ChannelCompressMask = 0x1F0;
-static const unsigned long G_MixKindScalar = 1;
-static const unsigned long G_MixKindVec3 = 3;
-static const unsigned long G_MixKindQuat = 4;
-static const unsigned long G_MixKindPosQuat = 7;
+static const uint32_t G_ChannelFlagScalar = 0x1;
+static const uint32_t G_ChannelFlagPosition = 0x2;
+static const uint32_t G_ChannelFlagQuat = 0x4;
+static const uint32_t G_ChannelFlagScalarOnly = 0x8;
+static const uint32_t G_ChannelFlagZeroPos = 0x10;
+static const uint32_t G_ChannelFlagIdentQuat = 0x20;
+static const uint32_t G_ChannelFlagCompQuat3 = 0x40;
+static const uint32_t G_ChannelFlagCompAxis = 0x80;
+static const uint32_t G_ChannelFlagCompQuat4 = 0x100;
+static const uint32_t G_ChannelCompressMask = 0x1F0;
+static const uint32_t G_MixKindScalar = 1;
+static const uint32_t G_MixKindVec3 = 3;
+static const uint32_t G_MixKindQuat = 4;
+static const uint32_t G_MixKindPosQuat = 7;
 static const float G_ShortToUnit = 3.051851e-05f;
-static const unsigned long G_MixerTypeLeaf = 0;
-static const unsigned long G_MixerTypeBlend = 1;
-static const unsigned long G_MixerTypeOverlay = 2;
-static const unsigned long G_MixerFlagKeep = 0x1;
-static const unsigned long G_MixerFlagPose = 0x2;
-static const unsigned long G_ChannelPlayFlag = 0x1;
-static const unsigned long G_ChannelBlendFlag = 0x2;
-static const unsigned long G_ChannelHoldFlag = 0x4;
+static const uint32_t G_MixerTypeLeaf = 0;
+static const uint32_t G_MixerTypeBlend = 1;
+static const uint32_t G_MixerTypeOverlay = 2;
+static const uint32_t G_MixerFlagKeep = 0x1;
+static const uint32_t G_MixerFlagPose = 0x2;
+static const uint32_t G_ChannelPlayFlag = 0x1;
+static const uint32_t G_ChannelBlendFlag = 0x2;
+static const uint32_t G_ChannelHoldFlag = 0x4;
 
 // FUN_06616c10 06616d32: the first playback id IAnimation2::PlayScript hands out.
-static const unsigned long G_AnimFirstPlaybackId = 0xED;
+static const uint32_t G_AnimFirstPlaybackId = 0xED;
 
-static const unsigned long G_EngineInstanceSize = 0xEC;
-static const unsigned long G_TransformObjectSize = 0x48;
-static const unsigned long G_InstanceFlagOwnedTransform = 2;
-static const unsigned long G_AggDescSizeMath = 0xC;
+static const uint32_t G_EngineInstanceSize = 0xEC;
+static const uint32_t G_TransformObjectSize = 0x48;
+static const uint32_t G_InstanceFlagOwnedTransform = 2;
+static const uint32_t G_AggDescSizeMath = 0xC;
 
-static const unsigned long G_PriorityEngine = 0x40000000;
-static const unsigned long G_PriorityAnimation = 0x40000000;
-static const unsigned long G_PriorityHardpoint = 0x80000000;
-static const unsigned long G_PriorityChannelArchetype = 0x80000000;
+static const uint32_t G_PriorityEngine = 0x40000000;
+static const uint32_t G_PriorityAnimation = 0x40000000;
+static const uint32_t G_PriorityHardpoint = 0x80000000;
+static const uint32_t G_PriorityChannelArchetype = 0x80000000;
 
-static const unsigned long G_AggDescSizeEngine = 0x8;
-static const unsigned long G_AggDescSizeSearchPath = 0x8;
-static const unsigned long G_AggDescSizeChannelArchetype = 0x8;
-static const unsigned long G_AggDescSizeAnimation = 0x18;
-static const unsigned long G_AggDescSizeHardpoint = 0x18;
+static const uint32_t G_AggDescSizeEngine = 0x8;
+static const uint32_t G_AggDescSizeSearchPath = 0x8;
+static const uint32_t G_AggDescSizeChannelArchetype = 0x8;
+static const uint32_t G_AggDescSizeAnimation = 0x18;
+static const uint32_t G_AggDescSizeHardpoint = 0x18;
 
-static const unsigned long G_EngineObjectSize = 0x64;
-static const unsigned long G_AnimationObjectSize = 0x60;
-static const unsigned long G_HardpointObjectSize = 0x44;
-static const unsigned long G_ChannelArchetypeObjectSize = 0x20;
+static const uint32_t G_EngineObjectSize = 0x64;
+static const uint32_t G_AnimationObjectSize = 0x60;
+static const uint32_t G_HardpointObjectSize = 0x44;
+static const uint32_t G_ChannelArchetypeObjectSize = 0x20;
 
 struct FAggDesc8
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
 };
 
 // load_engine_components stack @ 0661fac5–0661fad9 + factory FUN_0661a750 / FUN_06627c40.
 struct FAggDesc18
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     void* Inner;
     void** Outer;
@@ -137,12 +138,12 @@ struct FAggDesc18
 
 struct FDacomFactory : IComponentFactory
 {
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 };
 
 // Nondelegating inner unknowns own the aggregate lifetime.
@@ -151,22 +152,22 @@ struct FHardpointObject;
 
 struct FAnimationInner : IDAComponent
 {
-    unsigned long RefCount;      // +0x04
+    uint32_t RefCount;      // +0x04
     FAnimationObject* Object;    // +0x08
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;  // LAB_0661a880
-    unsigned long DACOM_API AddRef() override;                                 // LAB_06627ef0
-    unsigned long DACOM_API Release() override;                                // LAB_0661a940
+    uint32_t DACOM_API AddRef() override;                                 // LAB_06627ef0
+    uint32_t DACOM_API Release() override;                                // LAB_0661a940
 };
 
 struct FHardpointInner : IDAComponent
 {
-    unsigned long RefCount;      // +0x04
+    uint32_t RefCount;      // +0x04
     FHardpointObject* Object;    // +0x08
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;  // LAB_06627e30
-    unsigned long DACOM_API AddRef() override;                                 // LAB_06627ef0
-    unsigned long DACOM_API Release() override;                                // LAB_06627f00
+    uint32_t DACOM_API AddRef() override;                                 // LAB_06627ef0
+    uint32_t DACOM_API Release() override;                                // LAB_06627f00
 };
 
 // Node 0x3C: circular list. QI target / IEngineComponent* at +0x38 (Engine QI, pass 2/3).
@@ -191,7 +192,7 @@ using FArchetypeName = FEngineName;
 struct FArchetypeChild
 {
     char Name[0x40];
-    unsigned long Crc;
+    uint32_t Crc;
     struct FArchetypeHandle* Handle;
 };
 
@@ -201,15 +202,15 @@ struct FConstraintRecord
 {
     FArchetypeChild* ChildPart;
     FArchetypeChild* ParentPart;
-    unsigned long Payload[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
+    uint32_t Payload[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
 };
 
 // Pooled archetype handle; destroy members before returning storage.
 struct FArchetypeHandle
 {
     std::string Name;                          // +0x00
-    unsigned long Crc;                         // +0x10
-    unsigned long RefCount;                    // +0x14
+    uint32_t Crc;                         // +0x10
+    uint32_t RefCount;                    // +0x14
     std::vector<FArchetypeChild> Children;     // +0x18
     std::vector<FConstraintRecord> Constraints; // +0x28
 
@@ -217,30 +218,30 @@ struct FArchetypeHandle
 };
 
 // Archetype handles indexed by name CRC.
-typedef std::map<unsigned long, FArchetypeHandle*> FArchetypeMap;
+typedef std::map<uint32_t, FArchetypeHandle*> FArchetypeMap;
 
 // Cached blocks are uninitialized; the first word links free entries.
 struct FEngBaseFreeList
 {
-    unsigned long ElementSize;
+    uint32_t ElementSize;
     void* FreeHead;
-    long FreeLimit;
-    long FreeCount;
+    int32_t FreeLimit;
+    int32_t FreeCount;
 };
 
 struct FEngineInstance;
 
 // Root instances indexed by signed pointer keys.
-typedef std::map<long, FEngineInstance*> FEngineInstanceMap;
+typedef std::map<int32_t, FEngineInstance*> FEngineInstanceMap;
 
 // Owns a lowercase name and the hardpoint's 0x48-byte payload.
 struct FHardpointRecord
 {
-    unsigned long Crc;
+    uint32_t Crc;
     char* Name;
     unsigned char Data[0x48];
 
-    FHardpointRecord(unsigned long InCrc, char const* InName);
+    FHardpointRecord(uint32_t InCrc, char const* InName);
     FHardpointRecord(FHardpointRecord const& Other);
     ~FHardpointRecord();
     FHardpointRecord& operator=(FHardpointRecord const& Other) = delete;
@@ -249,7 +250,7 @@ struct FHardpointRecord
 // Retail keeps one std::list of records per archetype handle, in a std::map keyed by the
 // handle as a signed int (FUN_06612e70 compares with JGE; the dtor prints it with %d).
 typedef std::list<FHardpointRecord> FHardpointList;
-typedef std::map<long, FHardpointList> FHardpointMap;
+typedef std::map<int32_t, FHardpointList> FHardpointMap;
 
 // Engine-owned transform; only User is initialized by the constructor.
 struct FInstanceTransform : IInstanceTransform
@@ -267,14 +268,14 @@ struct FInstanceTransform : IInstanceTransform
     float* DACOM_API GetMatrix(void* Instance) override;                                // LAB_0661f3d0
     GENRESULT DACOM_API GetExtra(void* Instance, float* OutExtra, float* OutVec) override; // LAB_0661f400
     GENRESULT DACOM_API SetExtra(void* Instance, float Extra, const float* Vec) override; // LAB_0661f430
-    GENRESULT DACOM_API SetUser(void* Instance, unsigned long User) override;            // LAB_0661f460
-    unsigned long DACOM_API GetUser(void* Instance) override;                           // LAB_0661f470
-    unsigned long DACOM_API MarkWorldDirty(void* Instance) override; // formerly Slot13
+    GENRESULT DACOM_API SetUser(void* Instance, uint32_t User) override;            // LAB_0661f460
+    uint32_t DACOM_API GetUser(void* Instance) override;                           // LAB_0661f470
+    uint32_t DACOM_API MarkWorldDirty(void* Instance) override; // formerly Slot13
 
     float Matrix[12];        // +0x04
     float Extra;             // +0x34
     float ExtraVec[3];       // +0x38
-    unsigned long User;      // +0x44
+    uint32_t User;      // +0x44
 };
 
 // FUN_0661eb80 / pool DAT_0662b158 size 0xEC.
@@ -282,7 +283,7 @@ struct FInstanceTransform : IInstanceTransform
 // Part record @ +0xE8 (FUN_06622860). 3x4 identity @ +0x2C.
 struct FEngineInstance
 {
-    unsigned long Flags;
+    uint32_t Flags;
     IInstanceTransform* Transform;   // +0x04: owned FInstanceTransform (flag 2) or a caller's
     FArchetypeHandle* Archetype;
     FArchetypeHandle* ParentArchetype;
@@ -291,11 +292,11 @@ struct FEngineInstance
     FEngineInstance* PrevSibling;
     FEngineInstance* FirstChild;
     FEngineInstance* LastChild;
-    unsigned long ChildCount;
+    uint32_t ChildCount;
     void* UserData;
     float Matrix[12];
     // FUN_06625560: type[0], rest pos[1..3], T[4..6], 3x3[7..15], axis[16..18].
-    unsigned long Relative[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
+    uint32_t Relative[G_EngineJointPayloadDwords];  // 0x17, engine/engbase.h
     float JointState[7];
     unsigned char bWorldDirty;
     unsigned char PadD5[3];
@@ -306,49 +307,49 @@ struct FEngineInstance
 
 struct FAggDescC
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
-    unsigned long Extra;
+    uint32_t Extra;
 };
 
 // Engine component lists, archetype map and root-instance cache.
 struct FEngineObject : IEngine
 {
     IDAComponent* SearchPath;                       // retail +0x04
-    unsigned long InstanceLookupCount;              // retail +0x08
-    unsigned long InstanceCacheHits;                // retail +0x0C
+    uint32_t InstanceLookupCount;              // retail +0x08
+    uint32_t InstanceCacheHits;                // retail +0x0C
     FEngineInstanceMap Instances;                   // retail +0x10
     FEngineInstanceMap::iterator CachedInstance;    // retail +0x28
     unsigned char bInstanceCacheValid;              // retail +0x2C
     FArchetypeMap Archetypes;                       // retail +0x30
     unsigned char bInitialized;                     // retail +0x44
     FEngineChildNode* ComponentList;                // retail +0x4C (list +0x48)
-    unsigned long ComponentCount;                   // retail +0x50
+    uint32_t ComponentCount;                   // retail +0x50
     FEngineChildNode* EngineComponentList;          // retail +0x58 (list +0x54)
-    unsigned long EngineComponentCount;             // retail +0x5C
-    unsigned long RefCount;                         // retail +0x60
+    uint32_t EngineComponentCount;             // retail +0x5C
+    uint32_t RefCount;                         // retail +0x60
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API LoadEngineComponents(IDAComponent* SystemContainer) override;
-    unsigned long DACOM_API EnumerateEngineComponents(
+    uint32_t DACOM_API EnumerateEngineComponents(
         int(__cdecl* Callback)(const char*, void*)) override;
     GENRESULT DACOM_API NotifyEngineComponents(void* Arg) override;
     GENRESULT DACOM_API SetSearchPath(const char* Path) override;
-    GENRESULT DACOM_API QuerySearchPath(char* Dest, unsigned long MaxChars) override;
+    GENRESULT DACOM_API QuerySearchPath(char* Dest, uint32_t MaxChars) override;
     GENRESULT DACOM_API SetFilesystem(IDAComponent* NewPath) override;
     GENRESULT DACOM_API GetSearchPath(void** Out) override;
     GENRESULT DACOM_API CreateFileSystem(const char* Path, void** Out, void* Factory) override;
     void* DACOM_API CreateCompoundArchetype(FEngineName* Name) override;
     void* DACOM_API CreateArchetypeHandle(FEngineName* Name, void* FileSystem) override;
     void* DACOM_API DuplicateArchetype(void* ArchIn, FEngineName* Name) override;
-    unsigned long DACOM_API AddRefHandle(void* Handle) override;
-    unsigned long DACOM_API ReleaseHandle(void* Handle) override;
+    uint32_t DACOM_API AddRefHandle(void* Handle) override;
+    uint32_t DACOM_API ReleaseHandle(void* Handle) override;
     FEngineName* DACOM_API GetArchetypeName(FEngineName* Out, void* Handle) override;
     void* DACOM_API FindArchetype(FEngineName* Name) override;
     GENRESULT DACOM_API QueryEngineComponent(int Id, void* Name, void** Out) override;
-    unsigned long DACOM_API IsCompoundArchetype(void* Handle) override;
+    uint32_t DACOM_API IsCompoundArchetype(void* Handle) override;
     GENRESULT DACOM_API EnumerateArchetypeConstraints(
         void* Handle, int(__cdecl* Callback)(void*, void*, void*, void*),
         void* Context) override;
@@ -361,15 +362,15 @@ struct FEngineObject : IEngine
     GENRESULT DACOM_API DestroyInstance(void* Instance) override;
     void* DACOM_API GetInstanceArchetype(void* Instance) override;
     FEngineName* DACOM_API GetInstanceName(FEngineName* Out, void* Instance) override;
-    GENRESULT DACOM_API UpdateInstance(void* Instance, unsigned long Flags, void* Arg) override;
+    GENRESULT DACOM_API UpdateInstance(void* Instance, uint32_t Flags, void* Arg) override;
     GENRESULT DACOM_API SetInstanceTransform(void* Instance, void* Transform) override;
     GENRESULT DACOM_API GetInstanceTransformObject(void* Instance, void** Out) override;
     GENRESULT DACOM_API QueryInstance(void* Instance, const char* Iid, void** Out) override;
     GENRESULT DACOM_API SetInstanceUserData(void* Instance, void* Value) override;
     void* DACOM_API GetInstanceUserData(void* Instance) override;
-    GENRESULT DACOM_API SetInstanceExtent(void* Instance, unsigned long Flags, float Extent,
+    GENRESULT DACOM_API SetInstanceExtent(void* Instance, uint32_t Flags, float Extent,
                                           const float* Vec) override;
-    GENRESULT DACOM_API GetInstanceExtent(void* Instance, unsigned long Flags, float* OutExtent,
+    GENRESULT DACOM_API GetInstanceExtent(void* Instance, uint32_t Flags, float* OutExtent,
                                           float* OutVec) override;
     GENRESULT DACOM_API SetInstancePosition(void* Instance, void* Position) override;
     float* DACOM_API GetInstancePosition(void* Instance) override;
@@ -381,30 +382,30 @@ struct FEngineObject : IEngine
     float* DACOM_API GetIdentityMatrix(void* Unused) override;
     GENRESULT DACOM_API NoOp43(void* A, void* B) override; // formerly UnusedSlot43; TODO: original operation purpose.
     float* DACOM_API GetIdentityMatrix2(void* Unused) override;
-    GENRESULT DACOM_API SetTransformUser(void* Instance, unsigned long User) override;
-    unsigned long DACOM_API GetTransformUser(void* Instance) override;
-    unsigned long DACOM_API CreateJoint(void* Parent, void* Child,
-                                         const unsigned long* Payload) override;
-    unsigned long DACOM_API DestroyJoint(void* Parent, void* Child) override;
-    unsigned long* DACOM_API GetInstanceRelative(void* Instance) override;
-    unsigned long DACOM_API SetJointParams(void* Instance, unsigned long Index,
+    GENRESULT DACOM_API SetTransformUser(void* Instance, uint32_t User) override;
+    uint32_t DACOM_API GetTransformUser(void* Instance) override;
+    uint32_t DACOM_API CreateJoint(void* Parent, void* Child,
+                                         const uint32_t* Payload) override;
+    uint32_t DACOM_API DestroyJoint(void* Parent, void* Child) override;
+    uint32_t* DACOM_API GetInstanceRelative(void* Instance) override;
+    uint32_t DACOM_API SetJointParams(void* Instance, uint32_t Index,
                                             const float* Values) override;
-    unsigned long DACOM_API GetJointParams(void* Instance, unsigned long Index,
+    uint32_t DACOM_API GetJointParams(void* Instance, uint32_t Index,
                                             float* Out) override;
     void* DACOM_API FindMappedInstance(void* Instance) override;
     void* DACOM_API GetInstanceParent(void* Instance) override;
-    void* DACOM_API GetRelatedInstance(void* From, unsigned long Flags, void* Cursor) override;
+    void* DACOM_API GetRelatedInstance(void* From, uint32_t Flags, void* Cursor) override;
     void* DACOM_API GetInstanceRoot(void* Instance) override;
     void* DACOM_API FindArchetypeChild(void* Handle, void* ChildHandle) override;
-    unsigned long DACOM_API RejectOperation(void* A, void* B) override; // formerly UnusedSlot57; TODO: original operation purpose.
+    uint32_t DACOM_API RejectOperation(void* A, void* B) override; // formerly UnusedSlot57; TODO: original operation purpose.
 };
 
 // Track copies retain the channel and duplicate names; destruction releases them.
 struct FAnimTrack
 {
     struct FChannelArchetypeObject* Channel = nullptr; // +0x00
-    unsigned long ParentCrc = 0;                       // +0x04
-    unsigned long ChildCrc = 0;                        // +0x08
+    uint32_t ParentCrc = 0;                       // +0x04
+    uint32_t ChildCrc = 0;                        // +0x08
     char* ParentName = nullptr;                        // +0x0C (malloc'd by FUN_06611290)
     char* ChildName = nullptr;                         // +0x10
 
@@ -422,7 +423,7 @@ struct FAnimNameEntry
     // GetScriptDuration (06615160) through IChannelArchetype::GetDuration.
     struct FChannelArchetypeObject* LongestChannel = nullptr;
     // Retail value +4: set to 1 once a "Root height" file was read (06611568).
-    unsigned long bHasRootHeight = 0;
+    uint32_t bHasRootHeight = 0;
     // Retail value +8: the "Root height" float (06611551..59), read back by
     // GetNamedDurationOut (06615076..7d) and GetDurationIfNamed (06615264..6b).
     float RootHeight = 0.0f;
@@ -438,7 +439,7 @@ struct FAnimNameEntry
 // The script's name map, keyed by CRC32 of the name and compared unsigned (JC at 06614813 /
 // 0661505a / 06616bdf); every walk over it (EnumScriptNames 06614cf0, GetFirstInstanceField
 // 066151b0) visits the keys in ascending order, as std::map does.
-using FAnimNameMap = std::map<unsigned long, FAnimNameEntry>;
+using FAnimNameMap = std::map<uint32_t, FAnimNameEntry>;
 
 // Private reference-counted script handle; public callers use it opaquely.
 class FAnimScript
@@ -446,14 +447,14 @@ class FAnimScript
 public:
     // LAB_06612df0 (vtable +0x00): OR EAX,-1 / RET 0xC -- two arguments ignored, answers -1.
     // The same body is also referenced from 06629714 (ICF fold); its name is not recovered.
-    virtual unsigned long DACOM_API RejectOperation(void* ArgA, void* ArgB); // formerly Slot00
+    virtual uint32_t DACOM_API RejectOperation(void* ArgA, void* ArgB); // formerly Slot00
     // LAB_06612d20 (vtable +0x04).
-    virtual unsigned long DACOM_API AddRef();
+    virtual uint32_t DACOM_API AddRef();
     // FUN_06612d30 (vtable +0x08); deletes the script at zero.
-    virtual unsigned long DACOM_API Release();
+    virtual uint32_t DACOM_API Release();
 
     FAnimNameMap Names;                      // retail +0x04..+0x17
-    unsigned long RefCount = 1;              // retail +0x18
+    uint32_t RefCount = 1;              // retail +0x18
 
 protected:
     // Only Release destroys a script (the inlined destructor at 06612d55..dd: vtable reset,
@@ -464,7 +465,7 @@ protected:
 // Bind descriptor: kind, sink, context token and target instance.
 struct FAnimBindOut
 {
-    unsigned long Kind;
+    uint32_t Kind;
     void* Extra;
     void* Typed;
     FEngineInstance* Instance;
@@ -476,38 +477,38 @@ struct FTypedChannel
     explicit FTypedChannel(IChannelOwner* NewOwner); // FUN_0661ad50
     explicit FTypedChannel(struct FChannelArchetypeObject* NewArchetype);    // FUN_0661acf0
 
-    virtual unsigned long Interpolate(float* Out, const float* Left, const float* Right, double Alpha);
-    virtual unsigned long BindHeader(unsigned long* Header);
-    virtual unsigned long Apply(const float* Left, const float* Right, double Alpha);
-    virtual unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha);
-    virtual unsigned long SetTime(float Time);
-    virtual unsigned long GetType();
-    virtual unsigned long CopySampled(float* Out);
-    virtual unsigned long BindMap(unsigned long* Map, void* Bind);
-    virtual unsigned long SetOverlayPos(const float* Pos);
-    virtual unsigned long SetOverlayExtra(const float* Extra);
-    virtual unsigned long AddOverlayPos(const float* Delta);
+    virtual uint32_t Interpolate(float* Out, const float* Left, const float* Right, double Alpha);
+    virtual uint32_t BindHeader(uint32_t* Header);
+    virtual uint32_t Apply(const float* Left, const float* Right, double Alpha);
+    virtual uint32_t InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha);
+    virtual uint32_t SetTime(float Time);
+    virtual uint32_t GetType();
+    virtual uint32_t CopySampled(float* Out);
+    virtual uint32_t BindMap(uint32_t* Map, void* Bind);
+    virtual uint32_t SetOverlayPos(const float* Pos);
+    virtual uint32_t SetOverlayExtra(const float* Extra);
+    virtual uint32_t AddOverlayPos(const float* Delta);
     virtual float* GetSampled();
-    virtual unsigned long TouchMapped(void* ArgA, void* ArgB);
-    virtual unsigned long UpdateDeltaRate(float Dt); // formerly Slot13
-    virtual unsigned long Step(float* Out, float Dt);
+    virtual uint32_t TouchMapped(void* ArgA, void* ArgB);
+    virtual uint32_t UpdateDeltaRate(float Dt); // formerly Slot13
+    virtual uint32_t Step(float* Out, float Dt);
 
     IChannelOwner* Owner;                            // +0x04
-    unsigned long Kind;                              // +0x08
-    unsigned long Field0C;                           // +0x0C
-    unsigned long Field10;                           // +0x10
-    unsigned long Field14;                           // +0x14
+    uint32_t Kind;                              // +0x08
+    uint32_t Field0C;                           // +0x0C
+    uint32_t Field10;                           // +0x10
+    uint32_t Field14;                           // +0x14
     void* Bind;                                      // +0x18
     float Time;                                      // +0x1C
     // Retail +0x20: header[1] as FUN_0661af30 stores it (0661af37..3a); bit 1 loop, bit 2
     // ping-pong (FUN_0661b120 0661b325 / 0661b38c, FUN_0661b420 0661b5a0 / 0661b71a).
-    unsigned long LoopFlags;                         // +0x20
+    uint32_t LoopFlags;                         // +0x20
     struct FChannelArchetypeObject* Archetype;       // +0x24
     float Weight;                                    // +0x28 (header[2])
     float Scale;                                     // +0x2C (header[4])
     // TODO: name this play-header position factor when its purpose is known.
     float Field_0x30;                                // +0x30
-    unsigned long PlayFlags;                         // +0x34
+    uint32_t PlayFlags;                         // +0x34
     // Retail +0x38, a byte: bit 0 is set from FUN_0661ad90's result by IChannel::Play
     // (066164a0..a7), tested by IChannel::StopGraph (06616527) and by the standalone pass of
     // LAB_066157f0 (066158f8), cleared by FUN_06611f90 (AND byte[+0x38],0xFE).
@@ -520,18 +521,18 @@ struct FScalarTypedChannel : FTypedChannel
     explicit FScalarTypedChannel(IChannelOwner* NewOwner);
     explicit FScalarTypedChannel(struct FChannelArchetypeObject* NewArchetype);
 
-    unsigned long Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
-    unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661b8a0
-    unsigned long GetType() override;                                                         // LAB_0661b870
-    unsigned long CopySampled(float* Out) override;                                           // LAB_06612190
-    unsigned long BindMap(unsigned long* Map, void* Bind) override;                           // FUN_0661b830
+    uint32_t Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
+    uint32_t InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661b8a0
+    uint32_t GetType() override;                                                         // LAB_0661b870
+    uint32_t CopySampled(float* Out) override;                                           // LAB_06612190
+    uint32_t BindMap(uint32_t* Map, void* Bind) override;                           // FUN_0661b830
     float* GetSampled() override;                                                             // LAB_066121a0
 
     float Sampled[1];                                // +0x3C
     // Retail +0x40: 0xFFFFFFFF at construction (06612080 / 06615998), the bound instance's
     // joint type (IEngine+0xC4 result [0]) after slot 7 FUN_0661b830, tested `== 2` by the
     // slot 3 wrap-lerp LAB_0661b8a0.
-    unsigned long JointType;                         // +0x40
+    uint32_t JointType;                         // +0x40
 };
 
 // Type 2, operator new 0x48, table 06629168: a three-float vector sampled at +0x3C.
@@ -540,10 +541,10 @@ struct FVectorTypedChannel : FTypedChannel
     explicit FVectorTypedChannel(IChannelOwner* NewOwner);
     explicit FVectorTypedChannel(struct FChannelArchetypeObject* NewArchetype);
 
-    unsigned long Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
-    unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661cfa0
-    unsigned long GetType() override;                                                         // LAB_0661d040
-    unsigned long CopySampled(float* Out) override;                                           // LAB_066121d0
+    uint32_t Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
+    uint32_t InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661cfa0
+    uint32_t GetType() override;                                                         // LAB_0661d040
+    uint32_t CopySampled(float* Out) override;                                           // LAB_066121d0
     float* GetSampled() override;                                                             // LAB_066121a0
 
     float Sampled[3];                                // +0x3C
@@ -555,10 +556,10 @@ struct FQuatTypedChannel : FTypedChannel
     explicit FQuatTypedChannel(IChannelOwner* NewOwner);
     explicit FQuatTypedChannel(struct FChannelArchetypeObject* NewArchetype);
 
-    unsigned long Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
-    unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661b950
-    unsigned long GetType() override;                                                         // LAB_0661b940
-    unsigned long CopySampled(float* Out) override;                                           // LAB_066121b0
+    uint32_t Apply(const float* Left, const float* Right, double Alpha) override;          // LAB_0661b880
+    uint32_t InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override; // LAB_0661b950
+    uint32_t GetType() override;                                                         // LAB_0661b940
+    uint32_t CopySampled(float* Out) override;                                           // LAB_066121b0
     float* GetSampled() override;                                                             // LAB_066121a0
 
     float Sampled[4];                                // +0x3C
@@ -570,19 +571,19 @@ struct FPosQuatTypedChannel : FTypedChannel
     explicit FPosQuatTypedChannel(IChannelOwner* NewOwner);
     explicit FPosQuatTypedChannel(struct FChannelArchetypeObject* NewArchetype);
 
-    unsigned long Interpolate(float* Out, const float* Left, const float* Right, double Alpha) override;
-    unsigned long BindHeader(unsigned long* Header) override;
-    unsigned long Apply(const float* Left, const float* Right, double Alpha) override;
-    unsigned long InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override;
-    unsigned long GetType() override;
-    unsigned long CopySampled(float* Out) override;
-    unsigned long SetOverlayPos(const float* Pos) override;
-    unsigned long SetOverlayExtra(const float* Extra) override;
-    unsigned long AddOverlayPos(const float* Delta) override;
+    uint32_t Interpolate(float* Out, const float* Left, const float* Right, double Alpha) override;
+    uint32_t BindHeader(uint32_t* Header) override;
+    uint32_t Apply(const float* Left, const float* Right, double Alpha) override;
+    uint32_t InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) override;
+    uint32_t GetType() override;
+    uint32_t CopySampled(float* Out) override;
+    uint32_t SetOverlayPos(const float* Pos) override;
+    uint32_t SetOverlayExtra(const float* Extra) override;
+    uint32_t AddOverlayPos(const float* Delta) override;
     float* GetSampled() override;
-    unsigned long TouchMapped(void* ArgA, void* ArgB) override;
-    unsigned long UpdateDeltaRate(float Dt) override; // formerly Slot13
-    unsigned long Step(float* Out, float Dt) override;
+    uint32_t TouchMapped(void* ArgA, void* ArgB) override;
+    uint32_t UpdateDeltaRate(float Dt) override; // formerly Slot13
+    uint32_t Step(float* Out, float Dt) override;
 
     float Matrix[9];                                 // +0x3C
     float Delta[3];                                  // +0x60
@@ -620,7 +621,7 @@ struct FMixerNode;
 struct FMixerStack
 {
     FMixerNode* Nodes[0x100];
-    unsigned long Count;
+    uint32_t Count;
 };
 
 // The value of the inner map (node +0x1C): head, tail, count, and at +0xC the blend
@@ -629,7 +630,7 @@ struct FMixerList
 {
     FMixerNode* Head;
     FMixerNode* Tail;
-    unsigned long Count;
+    uint32_t Count;
     float BlendDuration;
 };
 
@@ -637,7 +638,7 @@ struct FMixerList
 struct FMixerNode
 {
     // Slot 0 (+0x00), thiscall RET 4: advance by Dt; 1 means "finished".
-    virtual unsigned long Tick(float Dt) = 0;
+    virtual uint32_t Tick(float Dt) = 0;
     // Slot 1 (+0x04), thiscall RET 8: write this node's value into Out, popping any inputs it
     // needs from Stack. FUN_0661d0f0 enters it with a tail jump.
     virtual void Evaluate(float* Out, FMixerStack* Stack) = 0;
@@ -646,7 +647,7 @@ struct FMixerNode
     // Sample displacement into Out and return its address.
     virtual float* SampleDisplacement(float* Out, float Dt) = 0; // formerly Slot03
 
-    unsigned long Type;     // +0x04: 0 leaf, 1 blend, 2 overlay
+    uint32_t Type;     // +0x04: 0 leaf, 1 blend, 2 overlay
     FMixerNode* Prev;       // +0x08
     FMixerNode* Next;       // +0x0C
     unsigned char bRemove;  // +0x10: FUN_066152d0's third pass unlinks and frees these
@@ -657,7 +658,7 @@ struct FMixerLeaf : FMixerNode
 {
     FTypedChannel* Typed;   // +0x14
 
-    unsigned long Tick(float Dt) override;                    // LAB_0661d110
+    uint32_t Tick(float Dt) override;                    // LAB_0661d110
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d120
     void UpdateDeltaRate(float Dt) override; // formerly Slot02
     float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
@@ -677,7 +678,7 @@ struct FMixerBlend : FMixerNode
     float PoseRate[3];      // +0x30: predecessor's slot 3 over the duration, times InvDuration
     float PoseCtrl[3];      // +0x3C: new leaf's slot 3 times InvDuration, minus PoseRate
 
-    unsigned long Tick(float Dt) override;                    // LAB_0661d130
+    uint32_t Tick(float Dt) override;                    // LAB_0661d130
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d160
     void UpdateDeltaRate(float Dt) override; // formerly Slot02
     float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
@@ -687,12 +688,12 @@ struct FMixerBlend : FMixerNode
 // the first blend was attached, replayed as the bottom of the stack.
 struct FMixerOverlay : FMixerNode
 {
-    unsigned long Count;    // +0x14: dwords LAB_0661d710 copies (1/2/3/4/7, 0 = none)
+    uint32_t Count;    // +0x14: dwords LAB_0661d710 copies (1/2/3/4/7, 0 = none)
     float Values[7];        // +0x18
 
     explicit FMixerOverlay(const FAnimBindOut* Desc);         // FUN_0661d5b0
 
-    unsigned long Tick(float Dt) override;                    // FUN_0661d700
+    uint32_t Tick(float Dt) override;                    // FUN_0661d700
     void Evaluate(float* Out, FMixerStack* Stack) override;   // LAB_0661d710
     void UpdateDeltaRate(float Dt) override; // formerly Slot02
     float* SampleDisplacement(float* Out, float Dt) override; // formerly Slot03
@@ -706,7 +707,7 @@ struct FAnimBindLess
 
 using FMixerDescMap = std::map<FAnimBindOut, FMixerList, FAnimBindLess>;
 // Retail compares the outer key as a signed int (FUN_06614f70: `(int)param_1 < (int)node[3]`).
-using FMixerKeyMap = std::map<long, FMixerDescMap>;
+using FMixerKeyMap = std::map<int32_t, FMixerDescMap>;
 
 // Playback value: track channels, root instance, longest channel and retained script.
 struct FAnimPlayback
@@ -722,43 +723,43 @@ struct FAnimPlayback
 
 // Retail Animation+0x14: playback id -> record. FUN_06614580 / FUN_06612e70 compare the key
 // signed (`CMP ECX,EDX; JL` at 066145a9..ab).
-using FAnimPlaybackMap = std::map<long, FAnimPlayback>;
+using FAnimPlaybackMap = std::map<int32_t, FAnimPlayback>;
 
 // Animation exposes four facets sharing the aggregate's controlling unknown.
 struct FAnimation2Facet : IAnimation2
 {
-    unsigned long DACOM_API SetOverlayPos(unsigned long PlaybackId, float* Pos) override;
-    unsigned long DACOM_API SetOverlayExtra(unsigned long PlaybackId, float* Extra) override;
-    unsigned long DACOM_API AddOverlayPos(unsigned long PlaybackId, float* Delta) override;
+    uint32_t DACOM_API SetOverlayPos(uint32_t PlaybackId, float* Pos) override;
+    uint32_t DACOM_API SetOverlayExtra(uint32_t PlaybackId, float* Extra) override;
+    uint32_t DACOM_API AddOverlayPos(uint32_t PlaybackId, float* Delta) override;
 };
 
 // IChannel @ Animation +8 (slots 3..18 of 06629370: LAB_06615950 .. LAB_06616a80).
 struct FAnimationChannelFacet : IChannel
 {
-    unsigned long DACOM_API CreateTyped(void* Owner, unsigned long Type, void* BindA,
+    uint32_t DACOM_API CreateTyped(void* Owner, uint32_t Type, void* BindA,
                                         void* BindB) override;
-    unsigned long DACOM_API CreateFromObject(void* Object, void* BindA, void* BindB) override;
-    unsigned long DACOM_API Destroy(unsigned long Key) override;
-    unsigned long DACOM_API GetObject(unsigned long Key, void** Out) override;
-    unsigned long DACOM_API Play(unsigned long Key, float* Time) override;
-    unsigned long DACOM_API StopGraph(unsigned long Key) override;
-    float DACOM_API GetDuration(unsigned long Key) override;
-    unsigned long DACOM_API Blend(unsigned long Key, float Duration) override;
-    GENRESULT DACOM_API SetUser(unsigned long Key, unsigned long User) override;
-    float DACOM_API GetUser(unsigned long Key) override;
-    GENRESULT DACOM_API SetOverlayPos(unsigned long Key, float* Pos) override;
-    GENRESULT DACOM_API SetOverlayExtra(unsigned long Key, float* Extra) override;
-    unsigned long DACOM_API InMixer(unsigned long Key) override;
-    unsigned long* DACOM_API GetHeader(unsigned long* Out, unsigned long Key) override;
-    GENRESULT DACOM_API AddOverlayPos(unsigned long Key, float* Delta) override;
-    GENRESULT DACOM_API GetMapped(unsigned long Key, unsigned char* Out) override;
+    uint32_t DACOM_API CreateFromObject(void* Object, void* BindA, void* BindB) override;
+    uint32_t DACOM_API Destroy(uint32_t Key) override;
+    uint32_t DACOM_API GetObject(uint32_t Key, void** Out) override;
+    uint32_t DACOM_API Play(uint32_t Key, float* Time) override;
+    uint32_t DACOM_API StopGraph(uint32_t Key) override;
+    float DACOM_API GetDuration(uint32_t Key) override;
+    uint32_t DACOM_API Blend(uint32_t Key, float Duration) override;
+    GENRESULT DACOM_API SetUser(uint32_t Key, uint32_t User) override;
+    float DACOM_API GetUser(uint32_t Key) override;
+    GENRESULT DACOM_API SetOverlayPos(uint32_t Key, float* Pos) override;
+    GENRESULT DACOM_API SetOverlayExtra(uint32_t Key, float* Extra) override;
+    uint32_t DACOM_API InMixer(uint32_t Key) override;
+    uint32_t* DACOM_API GetHeader(uint32_t* Out, uint32_t Key) override;
+    GENRESULT DACOM_API AddOverlayPos(uint32_t Key, float* Delta) override;
+    GENRESULT DACOM_API GetMapped(uint32_t Key, unsigned char* Out) override;
 };
 
 struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChannelFacet, IRootData
 {
     // Retail +0x10: the next playback id. FUN_06616c10 seeds it with 0xED (06616d32);
     // LAB_06614920 hands out the current value and increments it (066149d3..e5).
-    unsigned long NextPlaybackId;
+    uint32_t NextPlaybackId;
     // Retail +0x14: the playback map (VC6 _Tree, 0x14 bytes). Held through a pointer for the
     // same reason as Channels and Mixers; allocated by AnimationFactoryCreateInstance.
     FAnimPlaybackMap* Playbacks;
@@ -776,8 +777,8 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     FAnimationInner Inner;       // +0x54
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     void* DACOM_API OpenScript(void* FileSystem) override;
     GENRESULT DACOM_API CloseScript(void* Script) override;
     float DACOM_API GetScriptDuration(void* Script) override;
@@ -785,42 +786,42 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
     GENRESULT DACOM_API EnumScriptNames(void* Callback, void* Script, void* Context) override;
     GENRESULT DACOM_API FindScriptName(void* Callback, void* Script, const char* Name,
                                         void* Context) override;
-    unsigned long DACOM_API PlayScript(void* Script, void* Root, const char* Name, void* ArgD,
+    uint32_t DACOM_API PlayScript(void* Script, void* Root, const char* Name, void* ArgD,
                                          void* ArgE) override;
     GENRESULT DACOM_API DestroyScript(void* Script) override;
-    unsigned long DACOM_API EvalPlayback(unsigned long PlaybackId, unsigned long Flags, float Time,
+    uint32_t DACOM_API EvalPlayback(uint32_t PlaybackId, uint32_t Flags, float Time,
                                          float Scale, void* A, void* B, void* C, void* D) override;
-    unsigned long DACOM_API EvalStored(unsigned long PlaybackId) override;
-    unsigned long DACOM_API ApplyChannels(unsigned long PlaybackId) override;
-    unsigned long DACOM_API StopPlayback(unsigned long PlaybackId) override;
-    unsigned long DACOM_API StopChannels(unsigned long PlaybackId, void* Unused) override;
-    float DACOM_API GetStoredDuration(unsigned long PlaybackId) override;
-    unsigned long DACOM_API FilterObjects(void* Filter) override;
-    unsigned long DACOM_API HasObject(unsigned long PlaybackId, void* Object) override;
-    unsigned long DACOM_API TouchMapped(unsigned long PlaybackId, float* Pos, float* Extra) override;
-    unsigned long DACOM_API GetFirstInstanceField(unsigned long PlaybackId, unsigned long* Out) override;
-    unsigned long DACOM_API GetDurationIfNamed(unsigned long PlaybackId, float* Out) override;
-    unsigned long DACOM_API GetNamedDurationOut(void* Script, const char* Name, float* Out) override;
-    unsigned long DACOM_API FindObject(unsigned long PlaybackId, void* Query) override;
-    unsigned long DACOM_API MixerWalk(unsigned long PlaybackId, float Time) override;
-    unsigned long DACOM_API MixerWalkAll(float Time) override;
+    uint32_t DACOM_API EvalStored(uint32_t PlaybackId) override;
+    uint32_t DACOM_API ApplyChannels(uint32_t PlaybackId) override;
+    uint32_t DACOM_API StopPlayback(uint32_t PlaybackId) override;
+    uint32_t DACOM_API StopChannels(uint32_t PlaybackId, void* Unused) override;
+    float DACOM_API GetStoredDuration(uint32_t PlaybackId) override;
+    uint32_t DACOM_API FilterObjects(void* Filter) override;
+    uint32_t DACOM_API HasObject(uint32_t PlaybackId, void* Object) override;
+    uint32_t DACOM_API TouchMapped(uint32_t PlaybackId, float* Pos, float* Extra) override;
+    uint32_t DACOM_API GetFirstInstanceField(uint32_t PlaybackId, uint32_t* Out) override;
+    uint32_t DACOM_API GetDurationIfNamed(uint32_t PlaybackId, float* Out) override;
+    uint32_t DACOM_API GetNamedDurationOut(void* Script, const char* Name, float* Out) override;
+    uint32_t DACOM_API FindObject(uint32_t PlaybackId, void* Query) override;
+    uint32_t DACOM_API MixerWalk(uint32_t PlaybackId, float Time) override;
+    uint32_t DACOM_API MixerWalkAll(float Time) override;
     void* DACOM_API CreateEmptyScript() override;
-    unsigned long DACOM_API AddScriptNames(void* Script, void* FileSystem, const char** Names,
+    uint32_t DACOM_API AddScriptNames(void* Script, void* FileSystem, const char** Names,
                                            int Count) override;
-    unsigned long DACOM_API RemoveScriptNames(void* Script, const char** Names, int Count) override;
-    unsigned long DACOM_API EnumFsScripts(void* Callback, void* FileSystem, void* Context) override;
-    unsigned long DACOM_API HasScriptName(void* Script, const char* Name) override;
-    unsigned long DACOM_API GetScriptNameCount(void* Script, unsigned long* Out) override;
-    unsigned long DACOM_API EnumObjects(void* Callback, unsigned long PlaybackId,
+    uint32_t DACOM_API RemoveScriptNames(void* Script, const char** Names, int Count) override;
+    uint32_t DACOM_API EnumFsScripts(void* Callback, void* FileSystem, void* Context) override;
+    uint32_t DACOM_API HasScriptName(void* Script, const char* Name) override;
+    uint32_t DACOM_API GetScriptNameCount(void* Script, uint32_t* Out) override;
+    uint32_t DACOM_API EnumObjects(void* Callback, uint32_t PlaybackId,
                                          void* Context) override;
-    unsigned long DACOM_API RegisterHandle(unsigned long Key) override;
-    unsigned long DACOM_API HasHandle(unsigned long Key, unsigned char* Out) override;
-    unsigned long DACOM_API HasAnyHandle(unsigned long Key) override;
+    uint32_t DACOM_API RegisterHandle(uint32_t Key) override;
+    uint32_t DACOM_API HasHandle(uint32_t Key, unsigned char* Out) override;
+    uint32_t DACOM_API HasAnyHandle(uint32_t Key) override;
 
     // IAggregateComponent @ +4, slot 3 (LAB_06616d40).
     GENRESULT DACOM_API Initialize() override;
     // IRootData @ +0xC, slot 3 (LAB_06614b30).
-    unsigned char DACOM_API Eval(unsigned long PlaybackId, void* TouchArg, unsigned long Flags,
+    unsigned char DACOM_API Eval(uint32_t PlaybackId, void* TouchArg, uint32_t Flags,
                                  float Time, float Scale, void* Arg6, void* Arg7,
                                  float Arg8) override;
 };
@@ -828,10 +829,10 @@ struct FAnimationObject : FAnimation2Facet, IAggregateComponent, FAnimationChann
 // Hardpoint and EngineComponent facets share a cache and nondelegating inner unknown.
 struct FHardpointObject : IHardpoint, IEngineComponent
 {
-    unsigned long LookupCount;
-    unsigned long CacheHits;
+    uint32_t LookupCount;
+    uint32_t CacheHits;
     FHardpointMap Archetypes;
-    unsigned long Field_0x24; // TODO: meaning unknown; retail ctor stores 0, nothing else found
+    uint32_t Field_0x24; // TODO: meaning unknown; retail ctor stores 0, nothing else found
     FHardpointMap::iterator CachedNode;
     unsigned char bCacheValid;
     IEngine* Engine;
@@ -839,17 +840,17 @@ struct FHardpointObject : IHardpoint, IEngineComponent
     FHardpointInner Inner;
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
-    unsigned long DACOM_API GetHardpoint(void* Handle, FHardpointKey const* Key,
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
+    uint32_t DACOM_API GetHardpoint(void* Handle, FHardpointKey const* Key,
                                          void* Out) override;
-    unsigned long DACOM_API AddHardpoint(void* Handle, FHardpointKey const* Key,
+    uint32_t DACOM_API AddHardpoint(void* Handle, FHardpointKey const* Key,
                                          const void* Data) override;
     GENRESULT DACOM_API EnumerateHardpoints(FHardpointEnumProc Callback, void* Handle,
                                           void* Context) override;
-    unsigned long DACOM_API ConnectHardpoints(void* InstA, FHardpointKey const* KeyA, void* InstB,
+    uint32_t DACOM_API ConnectHardpoints(void* InstA, FHardpointKey const* KeyA, void* InstB,
                                               FHardpointKey const* KeyB) override;
-    char const* DACOM_API FindHardpoint(void* Handle, unsigned long const* Crc) override;
+    char const* DACOM_API FindHardpoint(void* Handle, uint32_t const* Crc) override;
     int DACOM_API Initialize() override;
     int DACOM_API CreateArchetype(void* Arg1, void* Arg2) override;
     int DACOM_API DuplicateArchetype(void* Arg1, void* Arg2) override;
@@ -866,20 +867,20 @@ struct FHardpointObject : IHardpoint, IEngineComponent
 // Slots 3–6 load/duration/flags/sample; 7–10 pair/get-frame/range/exact (not IK).
 struct FChannelArchetypeObject : IChannelArchetype
 {
-    unsigned long FrameCount;
+    uint32_t FrameCount;
     float SampleRate;
-    unsigned long Flags;
+    uint32_t Flags;
     unsigned char* Frames;
-    unsigned long Stride;
+    uint32_t Stride;
     float Duration;
-    unsigned long RefCount;
+    uint32_t RefCount;
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API Load(void* FileSystem) override;
     GENRESULT DACOM_API GetDuration(float* Out) override;
-    GENRESULT DACOM_API GetFlags(unsigned long* Out) override;
+    GENRESULT DACOM_API GetFlags(uint32_t* Out) override;
     GENRESULT DACOM_API Sample(float Time, const unsigned char** OutA, const unsigned char** OutB,
                                 float* Alpha) override;
     GENRESULT DACOM_API SamplePair(float Time, const unsigned char** OutLo,
@@ -887,17 +888,17 @@ struct FChannelArchetypeObject : IChannelArchetype
                                     float* Alpha) override;
     GENRESULT DACOM_API GetFrame(unsigned char bLast, const unsigned char** Out) override;
     GENRESULT DACOM_API CollectRange(float Time0, float Time1, float* OutKeys,
-                                        unsigned long Capacity, unsigned long* Count) override;
-    GENRESULT DACOM_API CollectAt(float Time, float* OutKeys, unsigned long Capacity,
-                                     unsigned long* Count) override;
+                                        uint32_t Capacity, uint32_t* Count) override;
+    GENRESULT DACOM_API CollectAt(float Time, float* OutKeys, uint32_t Capacity,
+                                     uint32_t* Count) override;
 };
 
 void EngBaseFdump(int Flags, const char* File, int Line, const char* Kind, const char* Message);
 bool EngBaseIidEqual(const char* Left, const char* Right);
 
 GENRESULT DACOM_API FactoryQueryInterface(FDacomFactory* This, const char* Iid, void** Out);
-unsigned long DACOM_API FactoryAddRef(FDacomFactory* This);
-unsigned long DACOM_API FactoryRelease(FDacomFactory* This);
+uint32_t DACOM_API FactoryAddRef(FDacomFactory* This);
+uint32_t DACOM_API FactoryRelease(FDacomFactory* This);
 
 GENRESULT DACOM_API EngineFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc, void** Out);
 GENRESULT DACOM_API AnimationFactoryCreateInstance(FDacomFactory* This, AGGDESC* Desc, void** Out);
@@ -920,12 +921,12 @@ I3DMathEngine* Acquire3DMathEngine();
 
 // Typed-channel members the mixer drives (EngBase.cpp).
 void TypedApplyFromArchetype(FTypedChannel* This);                 // FUN_0661b070
-unsigned long TypedTick(FTypedChannel* This, float Dt);            // FUN_0661b420
+uint32_t TypedTick(FTypedChannel* This, float Dt);            // FUN_0661b420
 
 // The mixer-map key of a typed channel: typed+0x18 read as a signed int (FUN_06614f70).
-inline long TypedMixerKey(FTypedChannel* This)
+inline int32_t TypedMixerKey(FTypedChannel* This)
 {
-    return (long)(ptrdiff_t)(This->Bind);
+    return (int32_t)fl::PtrToHandle((This->Bind));
 }
 
 // Mixer list primitives (EngBaseMixer.cpp).
@@ -936,16 +937,16 @@ void MixerUnlinkParentBlend(FMixerList* List, FMixerNode* Node, unsigned char bO
 void MixerFreeNode(FMixerNode* Node);                                             // FUN_066281d0
 
 // Mixer maps on the Animation object (EngBaseMixer.cpp).
-FMixerDescMap* MixerFindKey(FAnimationObject* Animation, long Key);               // FUN_06614f70
-FMixerDescMap* MixerFindOrAddKey(FAnimationObject* Animation, long Key);          // FUN_06614e20
+FMixerDescMap* MixerFindKey(FAnimationObject* Animation, int32_t Key);               // FUN_06614f70
+FMixerDescMap* MixerFindOrAddKey(FAnimationObject* Animation, int32_t Key);          // FUN_06614e20
 void MixerDestroyAll(FAnimationObject* Animation);                                // FUN_06616d90 (+0x3C part)
 void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FMixerList* List,
                        float Dt);                                                 // FUN_066152d0
 void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float Duration,
-                      unsigned long Flags);                                       // FUN_06616090
+                      uint32_t Flags);                                       // FUN_06616090
 void MixerUnbindTyped(FAnimationObject* Animation, FTypedChannel* Typed);         // FUN_06615ec0
 unsigned char MixerHasLeaf(FAnimationObject* Animation, FTypedChannel* Typed);    // FUN_066168f0 tail
-void MixerWalkKey(FAnimationObject* Animation, long Key, float Dt);               // LAB_06616800 body
+void MixerWalkKey(FAnimationObject* Animation, int32_t Key, float Dt);               // LAB_06616800 body
 void MixerWalkAll(FAnimationObject* Animation, float Dt);                         // LAB_066157f0 body
 
 // Playback overlay writers (EngBaseMixer.cpp). Inner is the playback root's entry in the

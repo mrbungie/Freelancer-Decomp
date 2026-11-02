@@ -24,10 +24,10 @@ public:
     FInnerUnknown();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FLuaObject* Owner;
 };
 
@@ -38,8 +38,8 @@ public:
     ~FLuaObject();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API InvokeGlobal(const char* Name, FLuaTaggedValue* OutValue,
                                      int Argc, FLuaTaggedValue* const* Argv) override;
@@ -81,11 +81,11 @@ public:
     FLuaFactory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -114,7 +114,10 @@ static const int kFdumpLine = 0x167;
 static const int kFdumpError = 0x100001;
 
 // LAB_06801120: FDUMP is called through the import with no null test.
-extern "C" static void LuaErrorMessage(void)
+#if defined(_MSC_VER)
+extern "C"
+#endif
+static void LuaErrorMessage(void)
 {
     lua_Object Param = lua_getparam(1);
     if (lua_isstring(Param) == 0)
@@ -244,17 +247,17 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
     return GR_OK;
 }
 
-unsigned long DACOM_API FInnerUnknown::AddRef()
+uint32_t DACOM_API FInnerUnknown::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
-unsigned long DACOM_API FInnerUnknown::Release()
+uint32_t DACOM_API FInnerUnknown::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    unsigned long Remaining = RefCount;
+    uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         // LAB_06801b00: the back-pointer is read but not cleared; the object dies with it.
@@ -345,12 +348,12 @@ GENRESULT DACOM_API FLuaObject::QueryInterface(const char* Iid, void** Out)
     return Controlling->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FLuaObject::AddRef()
+uint32_t DACOM_API FLuaObject::AddRef()
 {
     return Controlling->AddRef();
 }
 
-unsigned long DACOM_API FLuaObject::Release()
+uint32_t DACOM_API FLuaObject::Release()
 {
     return Controlling->Release();
 }
@@ -624,17 +627,17 @@ GENRESULT DACOM_API FLuaFactory::QueryInterface(const char* Iid, void** Out)
     return GR_OK;
 }
 
-unsigned long DACOM_API FLuaFactory::AddRef()
+uint32_t DACOM_API FLuaFactory::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
-unsigned long DACOM_API FLuaFactory::Release()
+uint32_t DACOM_API FLuaFactory::Release()
 {
     if (RefCount > 0)
         --RefCount;
-    unsigned long Remaining = RefCount;
+    uint32_t Remaining = RefCount;
     if (Remaining == 0)
     {
         RefCount = 1;

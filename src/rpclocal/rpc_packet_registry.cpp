@@ -54,7 +54,7 @@ namespace {
 // A field at a packet-relative offset, exactly as the retail bodies address it.
 template<typename T>
 inline T& RpcPacketField(FPacketBase* Packet, unsigned int Offset) {
-    return *reinterpret_cast<T*>(reinterpret_cast<unsigned char*>(Packet) + Offset);
+    return *reinterpret_cast<T*>(reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
 }
 
 // One node of an MSVCP60 std::list<T*> embedded in a packet: { _Next, _Prev, _Myval }.
@@ -156,7 +156,7 @@ public:
                         unsigned int* OutLength) override {   // 06da5550
         return RpcDecodeCommonFireWeapon(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x20];   // +0x20
+    unsigned char Body[0x60];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_FIREWEAPON) == 0x40u, "FLPACKET_COMMON_FIREWEAPON is operator new(0x40)");
 
@@ -182,7 +182,7 @@ public:
                         unsigned int* OutLength) override {   // 06da4ca0
         return RpcDecodeCommonUpdateObject(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x2c];   // +0x20
+    unsigned char Body[0x78];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_UPDATEOBJECT) == 0x4cu, "FLPACKET_COMMON_UPDATEOBJECT is operator new(0x4c)");
 
@@ -211,7 +211,7 @@ public:
                         unsigned int* OutLength) override {   // 06da65d0
         return RpcDecodeCommonChatMsg(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_CHATMSG) == 0x30u, "FLPACKET_COMMON_CHATMSG is operator new(0x30)");
 
@@ -231,7 +231,7 @@ public:
                         unsigned int* OutLength) override {   // 06da68f0
         return RpcDecodeCommonActivateEquip(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_ACTIVATEEQUIP) == 0x28u, "FLPACKET_COMMON_ACTIVATEEQUIP is operator new(0x28)");
 
@@ -252,7 +252,7 @@ public:
                         unsigned int* OutLength) override {   // 06da8cd0
         return RpcDecodeWireDwordDwordWordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_SETTARGET) == 0x2cu, "FLPACKET_COMMON_SETTARGET is operator new(0x2c)");
 
@@ -271,7 +271,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6a50
         return RpcDecodeWireDwordTwoBytes(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_ACTIVATECRUISE) == 0x28u, "FLPACKET_COMMON_ACTIVATECRUISE is operator new(0x28)");
 
@@ -290,7 +290,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf230
         return RpcDecodeWireDwordByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_ACTIVATETHRUSTERS) == 0x28u, "FLPACKET_COMMON_ACTIVATETHRUSTERS is operator new(0x28)");
 
@@ -309,7 +309,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6cf0
         return RpcDecodeCommonGoTradelane(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_GOTRADELANE) == 0x30u, "FLPACKET_COMMON_GOTRADELANE is operator new(0x30)");
 
@@ -331,7 +331,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_STOPTRADELANE) == 0x2cu, "FLPACKET_COMMON_STOPTRADELANE is operator new(0x2c)");
 
@@ -363,7 +363,7 @@ public:
                         unsigned int* OutLength) override {   // 06da5bc0
         return RpcDecodeWireOwnedString(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_WEAPON_GROUP) == 0x2cu, "FLPACKET_COMMON_SET_WEAPON_GROUP is operator new(0x2c)");
 
@@ -390,7 +390,7 @@ public:
                         unsigned int* OutLength) override {   // 06da7430
         return RpcDecodeCommonPlayerTrade(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x24];   // +0x20
+    unsigned char Body[0x68];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_PLAYER_TRADE) == 0x44u, "FLPACKET_COMMON_PLAYER_TRADE is operator new(0x44)");
 
@@ -422,7 +422,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_VISITED_STATE) == 0x2cu, "FLPACKET_COMMON_SET_VISITED_STATE is operator new(0x2c)");
 
@@ -444,7 +444,7 @@ public:
                         unsigned int* OutLength) override {   // 06da78d0
         return RpcDecodeWireDwordWordDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_JETTISONCARGO) == 0x2cu, "FLPACKET_COMMON_JETTISONCARGO is operator new(0x2c)");
 
@@ -476,7 +476,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_BEST_PATH) == 0x2cu, "FLPACKET_COMMON_REQUEST_BEST_PATH is operator new(0x2c)");
 
@@ -508,7 +508,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_PLAYER_STATS) == 0x2cu, "FLPACKET_COMMON_REQUEST_PLAYER_STATS is operator new(0x2c)");
 
@@ -542,7 +542,7 @@ public:
                         unsigned int* OutLength) override {   // 06da5fe0
         return RpcDecodeCommonPopUpDialog(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0x48];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_POP_UP_DIALOG) == 0x34u, "FLPACKET_COMMON_POP_UP_DIALOG is operator new(0x34)");
 
@@ -574,7 +574,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_GROUP_POSITIONS) == 0x2cu, "FLPACKET_COMMON_REQUEST_GROUP_POSITIONS is operator new(0x2c)");
 
@@ -606,7 +606,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_MISSION_LOG) == 0x2cu, "FLPACKET_COMMON_SET_MISSION_LOG is operator new(0x2c)");
 
@@ -638,7 +638,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_REQUEST_RANK_LEVEL) == 0x2cu, "FLPACKET_COMMON_REQUEST_RANK_LEVEL is operator new(0x2c)");
 
@@ -670,7 +670,7 @@ public:
                         unsigned int* OutLength) override {   // 06da62d0
         return RpcDecodeWireOwnedBuffer(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_SET_INTERFACE_STATE) == 0x2cu, "FLPACKET_COMMON_SET_INTERFACE_STATE is operator new(0x2c)");
 
@@ -703,7 +703,7 @@ public:
                         unsigned int* OutLength) override {   // 06da7b90
         return RpcDecodeCommonTractorObjects(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x18];   // +0x20
+    unsigned char Body[0x50];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_COMMON_TRACTOROBJECTS) == 0x38u, "FLPACKET_COMMON_TRACTOROBJECTS is operator new(0x38)");
 
@@ -730,7 +730,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06da8240
         RpcDumpServerConnectResponse(*this, Out);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CONNECTRESPONSE) == 0x24u, "FLPACKET_SERVER_CONNECTRESPONSE is operator new(0x24)");
 
@@ -753,7 +753,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06da84a0
         RpcDumpServerLoginResponse(*this, Out);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_LOGINRESPONSE) == 0x24u, "FLPACKET_SERVER_LOGINRESPONSE is operator new(0x24)");
 
@@ -800,7 +800,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf230
         return RpcDecodeWireDwordByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_DESTROYOBJECT) == 0x28u, "FLPACKET_SERVER_DESTROYOBJECT is operator new(0x28)");
 
@@ -878,7 +878,7 @@ public:
                         unsigned int* OutLength) override {   // 06daa990
         return RpcDecodeServerRequestReturned(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUEST_RETURNED) == 0x28u, "FLPACKET_SERVER_REQUEST_RETURNED is operator new(0x28)");
 
@@ -888,7 +888,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUEST_RETURNED) == 0x28u, "FLPACK
 class FPacket_FLPACKET_SERVER_CHARACTERINFO : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CHARACTERINFO() : FPacketBase(0x20003u) {
-        RpcPacketBuildListSentinel(this, 0x24u, 0x0cu);   // 06d9d549 operator new(0xc), Head
+        RpcPacketBuildListSentinel(this, 0x28u, 0x0cu);   // 06d9d549 operator new(0xc), Head (host layout: Records is 8-aligned at payload+8)
     }
     // FUN_06d93350
     ~FPacket_FLPACKET_SERVER_CHARACTERINFO() override {
@@ -896,7 +896,7 @@ public:
         // equipment handle, the two strings, the record), then 06d93472..06d934ab the
         // nodes through FUN_06d901f0 and the sentinel.
         RpcCharacterInfoWireListRelease(
-            reinterpret_cast<FRpcCharacterInfoWireList*>(Payload() + 0x04));
+            reinterpret_cast<FRpcCharacterInfoWireList*>(Payload() + 0x08));
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d949d0
@@ -909,7 +909,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06d93310
         RpcDumpServerCharacterInfo(*this, Out);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0xa0];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CHARACTERINFO) == 0x30u, "FLPACKET_SERVER_CHARACTERINFO is operator new(0x30)");
 
@@ -938,7 +938,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daaee0
         RpcDumpServerLaunch(*this, Out);
     }
-    unsigned char Body[0x28];   // +0x20
+    unsigned char Body[0x70];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_LAUNCH) == 0x48u, "FLPACKET_SERVER_LAUNCH is operator new(0x48)");
 
@@ -960,7 +960,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06dac020
         RpcDumpServerCharSelectVerified(*this, Out);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CHARSELECTVERIFIED) == 0x30u, "FLPACKET_SERVER_CHARSELECTVERIFIED is operator new(0x30)");
 
@@ -979,7 +979,7 @@ public:
                         unsigned int* OutLength) override {   // 06da8f80
         return RpcDecodeServerActivateObject(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_ACTIVATEOBJECT) == 0x2cu, "FLPACKET_SERVER_ACTIVATEOBJECT is operator new(0x2c)");
 
@@ -998,7 +998,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_LAND) == 0x2cu, "FLPACKET_SERVER_LAND is operator new(0x2c)");
 
@@ -1017,7 +1017,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST) == 0x24u, "FLPACKET_SERVER_GFCOMPLETENEWSBROADCASTLIST is operator new(0x24)");
 
@@ -1036,7 +1036,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST) == 0x24u, "FLPACKET_SERVER_GFCOMPLETEMISSIONCOMPUTERLIST is operator new(0x24)");
 
@@ -1055,7 +1055,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFCOMPLETECHARLIST) == 0x24u, "FLPACKET_SERVER_GFCOMPLETECHARLIST is operator new(0x24)");
 
@@ -1074,7 +1074,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST) == 0x24u, "FLPACKET_SERVER_GFCOMPLETESCRIPTBEHAVIORLIST is operator new(0x24)");
 
@@ -1093,7 +1093,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST) == 0x24u, "FLPACKET_SERVER_GFCOMPLETEAMBIENTSCRIPTLIST is operator new(0x24)");
 
@@ -1112,7 +1112,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_OUT) == 0x28u, "FLPACKET_SERVER_SYSTEM_SWITCH_OUT is operator new(0x28)");
 
@@ -1138,7 +1138,7 @@ public:
                         unsigned int* OutLength) override {   // 06da9430
         return RpcDecodeServerSystemSwitchIn(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x24];   // +0x20
+    unsigned char Body[0x68];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SYSTEM_SWITCH_IN) == 0x44u, "FLPACKET_SERVER_SYSTEM_SWITCH_IN is operator new(0x44)");
 
@@ -1158,7 +1158,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETSHIPARCH) == 0x24u, "FLPACKET_SERVER_SETSHIPARCH is operator new(0x24)");
 
@@ -1223,7 +1223,7 @@ public:
                         unsigned int* OutLength) override {   // 06da8100
         return RpcDecodeServerRequestCreateShipResp(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUESTCREATESHIPRESP) == 0x28u, "FLPACKET_SERVER_REQUESTCREATESHIPRESP is operator new(0x28)");
 
@@ -1242,7 +1242,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETSTARTROOM) == 0x28u, "FLPACKET_SERVER_SETSTARTROOM is operator new(0x28)");
 
@@ -1261,7 +1261,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYCHARACTER) == 0x28u, "FLPACKET_SERVER_GFDESTROYCHARACTER is operator new(0x28)");
 
@@ -1280,7 +1280,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYNEWSBROADCAST) == 0x28u, "FLPACKET_SERVER_GFDESTROYNEWSBROADCAST is operator new(0x28)");
 
@@ -1299,7 +1299,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER) == 0x28u, "FLPACKET_SERVER_GFDESTROYMISSIONCOMPUTER is operator new(0x28)");
 
@@ -1318,7 +1318,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR) == 0x28u, "FLPACKET_SERVER_GFDESTROYSCRIPTBEHAVIOR is operator new(0x28)");
 
@@ -1337,7 +1337,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT) == 0x28u, "FLPACKET_SERVER_GFDESTROYAMBIENTSCRIPT is operator new(0x28)");
 
@@ -1364,7 +1364,7 @@ public:
                         unsigned int* OutLength) override {   // 06d978f0
         return RpcDecodeWireBlobSizeFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFSCRIPTBEHAVIOR) == 0x28u, "FLPACKET_SERVER_GFSCRIPTBEHAVIOR is operator new(0x28)");
 
@@ -1391,7 +1391,7 @@ public:
                         unsigned int* OutLength) override {   // 06d97730
         return RpcDecodeWireBlobBufferFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT) == 0x28u, "FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT is operator new(0x28)");
 
@@ -1410,7 +1410,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_MISSIONSAVEA) == 0x24u, "FLPACKET_SERVER_MISSIONSAVEA is operator new(0x24)");
 
@@ -1437,7 +1437,7 @@ public:
                         unsigned int* OutLength) override {   // 06d978f0
         return RpcDecodeWireBlobSizeFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER) == 0x28u, "FLPACKET_SERVER_GFUPDATEMISSIONCOMPUTER is operator new(0x28)");
 
@@ -1464,7 +1464,7 @@ public:
                         unsigned int* OutLength) override {   // 06d978f0
         return RpcDecodeWireBlobSizeFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATENEWSBROADCAST) == 0x28u, "FLPACKET_SERVER_GFUPDATENEWSBROADCAST is operator new(0x28)");
 
@@ -1491,7 +1491,7 @@ public:
                         unsigned int* OutLength) override {   // 06d978f0
         return RpcDecodeWireBlobSizeFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE) == 0x28u, "FLPACKET_SERVER_GFMISSIONVENDORACCEPTANCE is operator new(0x28)");
 
@@ -1510,7 +1510,7 @@ public:
                         unsigned int* OutLength) override {   // 06da83c0
         return RpcDecodeWireByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY) == 0x24u, "FLPACKET_SERVER_GFMISSIONVENDORWHYEMPTY is operator new(0x24)");
 
@@ -1537,7 +1537,7 @@ public:
                         unsigned int* OutLength) override {   // 06d978f0
         return RpcDecodeWireBlobSizeFirst(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_GFUPDATECHAR) == 0x28u, "FLPACKET_SERVER_GFUPDATECHAR is operator new(0x28)");
 
@@ -1564,7 +1564,7 @@ public:
                         unsigned int* OutLength) override {   // 06d92d20
         return RpcDecodeServerCreateLoot(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0xa8];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATELOOT) == 0x34u, "FLPACKET_SERVER_CREATELOOT is operator new(0x34)");
 
@@ -1622,7 +1622,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06d92860
         RpcDumpServerSetReputation(*this, Out);
     }
-    unsigned char Body[0x48];   // +0x20
+    unsigned char Body[0x110];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETREPUTATION) == 0x68u, "FLPACKET_SERVER_SETREPUTATION is operator new(0x68)");
 
@@ -1641,7 +1641,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_ADJUSTATTITUDE) == 0x28u, "FLPACKET_SERVER_ADJUSTATTITUDE is operator new(0x28)");
 
@@ -1677,7 +1677,7 @@ public:
                         unsigned int* OutLength) override {   // 06d91a40
         return RpcDecodeServerSetGroupFeelings(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0xa8];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETGROUPFEELINGS) == 0x34u, "FLPACKET_SERVER_SETGROUPFEELINGS is operator new(0x34)");
 
@@ -1714,7 +1714,7 @@ public:
                         unsigned int* OutLength) override {   // 06da98d0
         return RpcDecodeServerCreateMine(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x48];   // +0x20
+    unsigned char Body[0xb0];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATEMINE) == 0x68u, "FLPACKET_SERVER_CREATEMINE is operator new(0x68)");
 
@@ -1751,7 +1751,7 @@ public:
                         unsigned int* OutLength) override {   // 06da9e40
         return RpcDecodeServerCreateCounter(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x48];   // +0x20
+    unsigned char Body[0xb0];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATECOUNTER) == 0x68u, "FLPACKET_SERVER_CREATECOUNTER is operator new(0x68)");
 
@@ -1774,7 +1774,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad820
         return RpcDecodeWireDwordBlock12(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_EXPLODEASTEROIDMINE) == 0x30u, "FLPACKET_SERVER_EXPLODEASTEROIDMINE is operator new(0x30)");
 
@@ -1803,7 +1803,7 @@ public:
                         unsigned int* OutLength) override {   // 06d90ba0
         return RpcDecodeServerLoadHint(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_LOADHINT) == 0x2cu, "FLPACKET_SERVER_LOADHINT is operator new(0x2c)");
 
@@ -1861,7 +1861,7 @@ public:
                         unsigned int* OutLength) override {   // 06d90f70
         return RpcDecodeServerSetDirective(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x94];   // +0x20
+    unsigned char Body[0x148];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETDIRECTIVE) == 0xb4u, "FLPACKET_SERVER_SETDIRECTIVE is operator new(0xb4)");
 
@@ -1887,7 +1887,7 @@ public:
                         unsigned int* OutLength) override {   // 06da8810
         return RpcDecodeServerCreateGuided(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x38];   // +0x20
+    unsigned char Body[0x90];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CREATEGUIDED) == 0x58u, "FLPACKET_SERVER_CREATEGUIDED is operator new(0x58)");
 
@@ -1910,7 +1910,7 @@ public:
                         unsigned int* OutLength) override {   // 06da8cd0
         return RpcDecodeWireDwordDwordWordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_ITEMTRACTORED) == 0x2cu, "FLPACKET_SERVER_ITEMTRACTORED is operator new(0x2c)");
 
@@ -1936,7 +1936,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETREMOVEITEM) == 0x2cu, "FLPACKET_SERVER_SETREMOVEITEM is operator new(0x2c)");
 
@@ -1964,7 +1964,7 @@ public:
                         unsigned int* OutLength) override {   // 06d97210
         return RpcDecodeServerSetAddItem(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x20];   // +0x20
+    unsigned char Body[0x60];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETADDITEM) == 0x40u, "FLPACKET_SERVER_SETADDITEM is operator new(0x40)");
 
@@ -1983,7 +1983,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCASH) == 0x24u, "FLPACKET_SERVER_SETCASH is operator new(0x24)");
 
@@ -2014,7 +2014,7 @@ public:
                         unsigned int* OutLength) override {   // 06d98850
         return RpcDecodeServerRequestSpaceScript(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x1c];   // +0x20
+    unsigned char Body[0x58];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUESTSPACESCRIPT) == 0x3cu, "FLPACKET_SERVER_REQUESTSPACESCRIPT is operator new(0x3c)");
 
@@ -2033,7 +2033,7 @@ public:
                         unsigned int* OutLength) override {   // 06dacea0
         return RpcDecodeWireDwordDwordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE) == 0x2cu, "FLPACKET_SERVER_SETMISSIONOBJECTIVESTATE is operator new(0x2c)");
 
@@ -2052,7 +2052,7 @@ public:
                         unsigned int* OutLength) override {   // 06dab350
         return RpcDecodeServerCfgInterfaceNotification(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_CFGINTERFACENOTIFICATION) == 0x2cu, "FLPACKET_SERVER_CFGINTERFACENOTIFICATION is operator new(0x2c)");
 
@@ -2071,7 +2071,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf230
         return RpcDecodeWireDwordByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_MARKOBJ) == 0x28u, "FLPACKET_SERVER_MARKOBJ is operator new(0x28)");
 
@@ -2118,7 +2118,7 @@ public:
                         unsigned int* OutLength) override {   // 06d8ffd0
         return RpcDecodeServerSetMissionObjectives(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x28];   // +0x20
+    unsigned char Body[0xd0];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONOBJECTIVES) == 0x48u, "FLPACKET_SERVER_SETMISSIONOBJECTIVES is operator new(0x48)");
 
@@ -2145,7 +2145,7 @@ public:
                         unsigned int* OutLength) override {   // 06dab630
         return RpcDecodeServerReplaceMissionObjective(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE) == 0x30u, "FLPACKET_SERVER_REPLACEMISSIONOBJECTIVE is operator new(0x30)");
 
@@ -2164,7 +2164,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_STORY_CUE) == 0x24u, "FLPACKET_SERVER_SET_STORY_CUE is operator new(0x24)");
 
@@ -2190,7 +2190,7 @@ public:
                         unsigned int* OutLength) override {   // 06dab960
         return RpcDecodeServerSetCamera(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x24];   // +0x20
+    unsigned char Body[0x68];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_CAMERA) == 0x44u, "FLPACKET_SERVER_SET_CAMERA is operator new(0x44)");
 
@@ -2235,7 +2235,7 @@ public:
                         unsigned int* OutLength) override {   // 06dabd00
         return RpcDecodeServerSetMissionMessage(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_MISSION_MESSAGE) == 0x2cu, "FLPACKET_SERVER_SET_MISSION_MESSAGE is operator new(0x2c)");
 
@@ -2260,7 +2260,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06dac2b0
         RpcDumpServerRepairObject(*this, Out);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REPAIROBJECT) == 0x2cu, "FLPACKET_SERVER_REPAIROBJECT is operator new(0x2c)");
 
@@ -2279,7 +2279,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETNUMKILLS) == 0x24u, "FLPACKET_SERVER_SETNUMKILLS is operator new(0x24)");
 
@@ -2298,7 +2298,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONSUCCESSES) == 0x24u, "FLPACKET_SERVER_SETMISSIONSUCCESSES is operator new(0x24)");
 
@@ -2317,7 +2317,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETMISSIONFAILURES) == 0x24u, "FLPACKET_SERVER_SETMISSIONFAILURES is operator new(0x24)");
 
@@ -2343,7 +2343,7 @@ public:
                         unsigned int* OutLength) override {   // 06dac5c0
         return RpcDecodeServerBurnFuse(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x1c];   // +0x20
+    unsigned char Body[0x58];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_BURNFUSE) == 0x3cu, "FLPACKET_SERVER_BURNFUSE is operator new(0x3c)");
 
@@ -2411,7 +2411,7 @@ public:
                         unsigned int* OutLength) override {   // 06dacd70
         return RpcDecodeWireCollisionGroups(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x98];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETCOLLISIONGROUPS) == 0x2cu, "FLPACKET_SERVER_SETCOLLISIONGROUPS is operator new(0x2c)");
 
@@ -2431,7 +2431,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETHULLSTATUS) == 0x24u, "FLPACKET_SERVER_SETHULLSTATUS is operator new(0x24)");
 
@@ -2453,7 +2453,7 @@ public:
                         unsigned int* OutLength) override {   // 06dacea0
         return RpcDecodeWireDwordDwordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SETGUIDEDTARGET) == 0x2cu, "FLPACKET_SERVER_SETGUIDEDTARGET is operator new(0x2c)");
 
@@ -2486,7 +2486,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad320
         return RpcDecodeServerSendComm(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x58];   // +0x20
+    unsigned char Body[0xd0];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SENDCOMM) == 0x78u, "FLPACKET_SERVER_SENDCOMM is operator new(0x78)");
 
@@ -2508,7 +2508,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad690
         return RpcDecodeWireDwordWordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_USE_ITEM) == 0x28u, "FLPACKET_SERVER_USE_ITEM is operator new(0x28)");
 
@@ -2527,7 +2527,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SCANNOTIFY) == 0x28u, "FLPACKET_SERVER_SCANNOTIFY is operator new(0x28)");
 
@@ -2558,7 +2558,7 @@ public:
                         unsigned int* OutLength) override {   // 06d99b60
         return RpcDecodeServerPlayerList(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_PLAYERLIST) == 0x30u, "FLPACKET_SERVER_PLAYERLIST is operator new(0x30)");
 
@@ -2584,7 +2584,7 @@ public:
                         unsigned int* OutLength) override {   // 06d8f970
         return RpcDecodeServerRemoteObjectCargoUpdate(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x24
+    unsigned char Body[0x30];   // +0x24
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE) == 0x2cu, "FLPACKET_SERVER_REMOTEOBJECTCARGOUPDATE is operator new(0x2c)");
 
@@ -2644,7 +2644,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad820
         return RpcDecodeWireDwordBlock12(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_FORMATION_UPDATE) == 0x30u, "FLPACKET_SERVER_FORMATION_UPDATE is operator new(0x30)");
 
@@ -2673,7 +2673,7 @@ public:
                         unsigned int* OutLength) override {   // 06dadb80
         return RpcDecodeServerObjectCargoUpdate(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0x48];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_OBJECTCARGOUPDATE) == 0x34u, "FLPACKET_SERVER_OBJECTCARGOUPDATE is operator new(0x34)");
 
@@ -2693,7 +2693,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SENDNNMESSAGE) == 0x24u, "FLPACKET_SERVER_SENDNNMESSAGE is operator new(0x24)");
 
@@ -2712,7 +2712,7 @@ public:
                         unsigned int* OutLength) override {   // 06dadf30
         return RpcDecodeServerSetMusic(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x18];   // +0x20
+    unsigned char Body[0x50];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_SET_MUSIC) == 0x38u, "FLPACKET_SERVER_SET_MUSIC is operator new(0x38)");
 
@@ -2749,7 +2749,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_SERVER_PLAY_SOUND_EFFECT) == 0x24u, "FLPACKET_SERVER_PLAY_SOUND_EFFECT is operator new(0x24)");
 
@@ -2772,7 +2772,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCHANGECASH) == 0x24u, "FLPACKET_CLIENT_REQCHANGECASH is operator new(0x24)");
 
@@ -2791,7 +2791,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQSETCASH) == 0x24u, "FLPACKET_CLIENT_REQSETCASH is operator new(0x24)");
 
@@ -2816,7 +2816,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQREMOVEITEM) == 0x28u, "FLPACKET_CLIENT_REQREMOVEITEM is operator new(0x28)");
 
@@ -2847,7 +2847,7 @@ public:
                         unsigned int* OutLength) override {   // 06d9a410
         return RpcDecodeClientReqModifyItem(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x18];   // +0x20
+    unsigned char Body[0x50];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQMODIFYITEM) == 0x38u, "FLPACKET_CLIENT_REQMODIFYITEM is operator new(0x38)");
 
@@ -2901,7 +2901,7 @@ public:
                         unsigned int* OutLength) override {   // 06d99f80
         return RpcDecodeClientReqAddItem(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x18];   // +0x20
+    unsigned char Body[0x50];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQADDITEM) == 0x38u, "FLPACKET_CLIENT_REQADDITEM is operator new(0x38)");
 
@@ -2920,7 +2920,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQSHIPARCH) == 0x24u, "FLPACKET_CLIENT_REQSHIPARCH is operator new(0x24)");
 
@@ -2969,7 +2969,7 @@ public:
                         unsigned int* OutLength) override {   // 06dae430
         return RpcDecodeClientMunCollision(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x1c];   // +0x20
+    unsigned char Body[0x58];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_MUNCOLLISION) == 0x3cu, "FLPACKET_CLIENT_MUNCOLLISION is operator new(0x3c)");
 
@@ -2991,7 +2991,7 @@ public:
                         unsigned int* OutLength) override {   // 06da78d0
         return RpcDecodeWireDwordWordDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_BADLANDSOBJCOLLISION) == 0x2cu, "FLPACKET_CLIENT_BADLANDSOBJCOLLISION is operator new(0x2c)");
 
@@ -3015,7 +3015,7 @@ public:
                         unsigned int* OutLength) override {   // 06dae910
         return RpcDecodeClientObjCollision(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0x48];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_OBJCOLLISION) == 0x34u, "FLPACKET_CLIENT_OBJCOLLISION is operator new(0x34)");
 
@@ -3034,7 +3034,7 @@ public:
                         unsigned int* OutLength) override {   // 06daa3e0
         return RpcDecodeClientRequestEvent(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x14];   // +0x20
+    unsigned char Body[0x48];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUEST_EVENT) == 0x34u, "FLPACKET_CLIENT_REQUEST_EVENT is operator new(0x34)");
 
@@ -3053,7 +3053,7 @@ public:
                         unsigned int* OutLength) override {   // 06daa6d0
         return RpcDecodeClientRequestCancel(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUEST_CANCEL) == 0x30u, "FLPACKET_CLIENT_REQUEST_CANCEL is operator new(0x30)");
 
@@ -3072,7 +3072,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_CARGOSCAN) == 0x28u, "FLPACKET_CLIENT_CARGOSCAN is operator new(0x28)");
 
@@ -3094,7 +3094,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daf370
         RpcDumpClientRequestLaunch(*this, Out);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTLAUNCH) == 0x24u, "FLPACKET_CLIENT_REQUESTLAUNCH is operator new(0x24)");
 
@@ -3137,7 +3137,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06dafab0
         RpcDumpWireCharacterIdDump(*this, Out);
     }
-    unsigned char Body[0x200];   // +0x20
+    unsigned char Body[0x420];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_SELECTCHARACTER) == 0x220u, "FLPACKET_CLIENT_SELECTCHARACTER is operator new(0x220)");
 
@@ -3156,7 +3156,7 @@ public:
                         unsigned int* OutLength) override {   // 06d9ab00
         return RpcDecodeWireFourDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_COMMCOMPLETE) == 0x30u, "FLPACKET_CLIENT_COMMCOMPLETE is operator new(0x30)");
 
@@ -3188,7 +3188,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daf760
         RpcDumpClientCreateNewChar(*this, Out);
     }
-    unsigned char Body[0x90];   // +0x20
+    unsigned char Body[0x140];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_CREATENEWCHAR) == 0xb0u, "FLPACKET_CLIENT_CREATENEWCHAR is operator new(0xb0)");
 
@@ -3211,7 +3211,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06dafab0
         RpcDumpWireCharacterIdDump(*this, Out);
     }
-    unsigned char Body[0x200];   // +0x20
+    unsigned char Body[0x420];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DESTROYCHAR) == 0x220u, "FLPACKET_CLIENT_DESTROYCHAR is operator new(0x220)");
 
@@ -3233,7 +3233,7 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daff50
         RpcDumpClientLogin(*this, Out);
     }
-    unsigned char Body[0x404];   // +0x20
+    unsigned char Body[0x828];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_LOGIN) == 0x424u, "FLPACKET_CLIENT_LOGIN is operator new(0x424)");
 
@@ -3252,7 +3252,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_ENTERBASE) == 0x24u, "FLPACKET_CLIENT_ENTERBASE is operator new(0x24)");
 
@@ -3271,7 +3271,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf230
         return RpcDecodeWireDwordByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTBASEINFO) == 0x28u, "FLPACKET_CLIENT_REQUESTBASEINFO is operator new(0x28)");
 
@@ -3290,7 +3290,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf230
         return RpcDecodeWireDwordByte(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUESTLOCATIONINFO) == 0x28u, "FLPACKET_CLIENT_REQUESTLOCATIONINFO is operator new(0x28)");
 
@@ -3319,7 +3319,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE) == 0x24u, "FLPACKET_CLIENT_SYSTEM_SWITCH_OUT_COMPLETE is operator new(0x24)");
 
@@ -3338,7 +3338,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_EXITBASE) == 0x24u, "FLPACKET_CLIENT_EXITBASE is operator new(0x24)");
 
@@ -3357,7 +3357,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_ENTERLOCATION) == 0x24u, "FLPACKET_CLIENT_ENTERLOCATION is operator new(0x24)");
 
@@ -3376,7 +3376,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_EXITLOCATION) == 0x24u, "FLPACKET_CLIENT_EXITLOCATION is operator new(0x24)");
 
@@ -3405,7 +3405,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_INTERFACEITEMUSED) == 0x24u, "FLPACKET_CLIENT_INTERFACEITEMUSED is operator new(0x24)");
 
@@ -3425,7 +3425,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_RTCDONE) == 0x24u, "FLPACKET_CLIENT_RTCDONE is operator new(0x24)");
 
@@ -3444,7 +3444,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_ABORT_MISSION) == 0x24u, "FLPACKET_CLIENT_ABORT_MISSION is operator new(0x24)");
 
@@ -3463,7 +3463,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_LAUNCHCOMPLETE) == 0x28u, "FLPACKET_CLIENT_LAUNCHCOMPLETE is operator new(0x28)");
 
@@ -3484,7 +3484,7 @@ public:
                         unsigned int* OutLength) override {   // 06d95d40
         return RpcDecodeWireDwordPair(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_JUMPINCOMPLETE) == 0x28u, "FLPACKET_CLIENT_JUMPINCOMPLETE is operator new(0x28)");
 
@@ -3506,7 +3506,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_HAIL) == 0x2cu, "FLPACKET_CLIENT_HAIL is operator new(0x2c)");
 
@@ -3525,7 +3525,7 @@ public:
                         unsigned int* OutLength) override {   // 06d9ab00
         return RpcDecodeWireFourDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFGOODBUY) == 0x30u, "FLPACKET_CLIENT_GFGOODBUY is operator new(0x30)");
 
@@ -3544,7 +3544,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFGOODSELL) == 0x2cu, "FLPACKET_CLIENT_GFGOODSELL is operator new(0x2c)");
 
@@ -3563,7 +3563,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFGOODVAPORIZED) == 0x2cu, "FLPACKET_CLIENT_GFGOODVAPORIZED is operator new(0x2c)");
 
@@ -3582,7 +3582,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_GFSELECTOBJECT) == 0x24u, "FLPACKET_CLIENT_GFSELECTOBJECT is operator new(0x24)");
 
@@ -3608,7 +3608,7 @@ public:
                         unsigned int* OutLength) override {   // 06d9a950
         return RpcDecodeClientSaveGame(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x208];   // +0x20
+    unsigned char Body[0x430];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_SAVEGAME) == 0x228u, "FLPACKET_CLIENT_SAVEGAME is operator new(0x228)");
 
@@ -3630,7 +3630,7 @@ public:
                         unsigned int* OutLength) override {   // 06daeca0
         return RpcDecodeClientMineAsteroid(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x1c];   // +0x20
+    unsigned char Body[0x58];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_MINEASTEROID) == 0x3cu, "FLPACKET_CLIENT_MINEASTEROID is operator new(0x3c)");
 
@@ -3649,7 +3649,7 @@ public:
                         unsigned int* OutLength) override {   // 06daf010
         return RpcDecodeClientMissionResponse(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_MISSIONRESPONSE) == 0x2cu, "FLPACKET_CLIENT_MISSIONRESPONSE is operator new(0x2c)");
 
@@ -3675,7 +3675,7 @@ public:
                         unsigned int* OutLength) override {   // 06d9a660
         return RpcDecodeWireTradeResponse(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_TRADERESPONSE) == 0x28u, "FLPACKET_CLIENT_TRADERESPONSE is operator new(0x28)");
 
@@ -3732,7 +3732,7 @@ public:
                         unsigned int* OutLength) override {   // 06db0b30
         return RpcDecodeClientDbgCreateShip(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x70];   // +0x20
+    unsigned char Body[0x100];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGCREATESHIP) == 0x90u, "FLPACKET_CLIENT_DBGCREATESHIP is operator new(0x90)");
 
@@ -3759,7 +3759,7 @@ public:
                         unsigned int* OutLength) override {   // 06db10e0
         return RpcDecodeWireBlobBufferFirstSkipEmpty(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGLOADSYSTEM) == 0x28u, "FLPACKET_CLIENT_DBGLOADSYSTEM is operator new(0x28)");
 
@@ -3800,7 +3800,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DOCK) == 0x24u, "FLPACKET_CLIENT_DOCK is operator new(0x24)");
 
@@ -3820,7 +3820,7 @@ public:
                         unsigned int* OutLength) override {   // 06db17a0
         return RpcDecodeClientDbgConsole(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x84];   // +0x20
+    unsigned char Body[0x128];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGCONSOLE) == 0xa4u, "FLPACKET_CLIENT_DBGCONSOLE is operator new(0xa4)");
 
@@ -3839,7 +3839,7 @@ public:
                         unsigned int* OutLength) override {   // 06db13e0
         return RpcDecodeClientDbgDestroyObject(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGDESTROYOBJECT) == 0x28u, "FLPACKET_CLIENT_DBGDESTROYOBJECT is operator new(0x28)");
 
@@ -3861,7 +3861,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad820
         return RpcDecodeWireDwordBlock12(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    unsigned char Body[0x40];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_DBGRELOCATE_SHIP) == 0x30u, "FLPACKET_CLIENT_DBGRELOCATE_SHIP is operator new(0x30)");
 
@@ -3883,7 +3883,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6e40
         return RpcDecodeWireThreeDwords(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x38];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_SETMANEUVER) == 0x2cu, "FLPACKET_CLIENT_SETMANEUVER is operator new(0x2c)");
 
@@ -3909,7 +3909,7 @@ public:
                         unsigned int* OutLength) override {   // 06dacd70
         return RpcDecodeWireCollisionGroups(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0xc];   // +0x20
+    unsigned char Body[0x98];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQCOLLISIONGROUPS) == 0x2cu, "FLPACKET_CLIENT_REQCOLLISIONGROUPS is operator new(0x2c)");
 
@@ -3929,7 +3929,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQHULLSTATUS) == 0x24u, "FLPACKET_CLIENT_REQHULLSTATUS is operator new(0x24)");
 
@@ -3951,7 +3951,7 @@ public:
                         unsigned int* OutLength) override {   // 06dad690
         return RpcDecodeWireDwordWordWord(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQUEST_USE_ITEM) == 0x28u, "FLPACKET_CLIENT_REQUEST_USE_ITEM is operator new(0x28)");
 
@@ -3973,7 +3973,7 @@ public:
                         unsigned int* OutLength) override {   // 06da6a50
         return RpcDecodeWireDwordTwoBytes(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x8];   // +0x20
+    unsigned char Body[0x30];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQINVINCIBILITY) == 0x28u, "FLPACKET_CLIENT_REQINVINCIBILITY is operator new(0x28)");
 
@@ -3992,7 +3992,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_MISSIONSAVEB) == 0x24u, "FLPACKET_CLIENT_MISSIONSAVEB is operator new(0x24)");
 
@@ -4012,7 +4012,7 @@ public:
                         unsigned int* OutLength) override {   // 06db03f0
         return RpcDecodeWireDword(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x4];   // +0x20
+    unsigned char Body[0x28];   // +0x20
 };
 static_assert(sizeof(FPacket_FLPACKET_CLIENT_REQDIFFICULTYSCALE) == 0x24u, "FLPACKET_CLIENT_REQDIFFICULTYSCALE is operator new(0x24)");
 

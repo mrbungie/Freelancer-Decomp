@@ -2463,7 +2463,7 @@ bool ActRemoveAmbient::Execute()
     {
         if (_stricmp(It->Path.Data, Path.Data) != 0)
             continue;
-        unsigned long SceneHandle = static_cast<unsigned long>(It->Handle);
+        uint32_t SceneHandle = static_cast<uint32_t>(It->Handle);
         pub::GF::AmbientScriptDestroy(&SceneHandle);
         Mission->AmbientScenes.erase(It);
         return true;

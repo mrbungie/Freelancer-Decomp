@@ -1,0 +1,25 @@
+// Portable shim for <mmsystem.h> (macOS build). Only what Freelancer uses.
+#ifndef FL_PLATFORM_MMSYSTEM_H
+#define FL_PLATFORM_MMSYSTEM_H
+#include "win_compat.h"
+
+typedef UINT MMRESULT;
+#define MMSYSERR_NOERROR 0
+#define MMSYSERR_ERROR 1
+#define MMSYSERR_BADDEVICEID 2
+#define MMSYSERR_NODRIVER 6
+#define MMSYSERR_NOMEM 7
+#define MMSYSERR_NOTSUPPORTED 8
+#define MMSYSERR_INVALPARAM 11
+#define MMSYSERR_NOTENABLED 3
+#define MMSYSERR_ALLOCATED 4
+#define MMSYSERR_INVALHANDLE 5
+#define MMSYSERR_HANDLEBUSY 12
+#define MMSYSERR_INVALFLAG 10
+#define MMSYSERR_BADERRNUM 9
+
+#ifndef WAVE_FORMAT_PCM
+#define WAVE_FORMAT_PCM 1
+#endif
+
+#endif

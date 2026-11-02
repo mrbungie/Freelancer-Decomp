@@ -11,11 +11,11 @@
 CDPServer* CDPServer::m_pServer = nullptr;
 // .data:065ca254 is seeded at DLL load by the static initializer LAB_065c4630 (__xc table entry
 // .data:065ca008): CALL timeGetTime; MOV [065ca254],EAX.
-unsigned long CDPServer::m_dwLastMsgReceivedTime = timeGetTime();
+uint32_t CDPServer::m_dwLastMsgReceivedTime = timeGetTime();
 
 namespace
 {
-    enum EMsgType : unsigned long
+    enum EMsgType : uint32_t
     {
         kMsgReceive = 0,
         kMsgPlayerCreated = 1,
@@ -24,7 +24,7 @@ namespace
     };
 
     // DPN_APPLICATION_DESC::dwFlags bit SetPassword toggles (DPNSESSION_REQUIREPASSWORD).
-    const unsigned long kFlagRequirePassword = 0x80;
+    const uint32_t kFlagRequirePassword = 0x80;
 
     // Module-wide registry; critical section is destroyed before the list.
     std::list<CDPClientProxy*> g_ClientProxies;
@@ -45,7 +45,12 @@ CDPServer::CDPServer()
                                          IID_IDirectPlay8Server, (void**)(&Server));
     if (FAILED(Hr))
     {
-        (*CriticalWarningFn)(0xd4, nullptr);
+        // Portable build: global objects can construct before WinMain installs the handler, and
+        // DirectPlay is unavailable, so tolerate a missing handler.
+        if (CriticalWarningFn != nullptr)
+            (*CriticalWarningFn)(0xd4, nullptr);
+        else
+            fprintf(stderr, "[fl] DirectPlay unavailable (CoCreateInstance(DirectPlay8Client) failed)\n");
         return;
     }
 
@@ -222,11 +227,11 @@ void CDPServer::StopHosting()
 }
 
 // A failed port lookup still appends its seeded zero value.
-void CDPServer::GetPort(std::vector<unsigned long>& Ports)
+void CDPServer::GetPort(std::vector<uint32_t>& Ports)
 {
     for (DWORD i = 0; i < NumHostAddresses; ++i)
     {
-        unsigned long Port = 0;
+        uint32_t Port = 0;
         DWORD Size = 4;
         DWORD Type = 2;
         HostAddresses[i]->GetComponentByName(L"port", &Port, &Size, &Type);
@@ -235,7 +240,7 @@ void CDPServer::GetPort(std::vector<unsigned long>& Ports)
 }
 
 // Retail DALib.dll.c CDPServer::SendTo @ 0x5360.
-bool CDPServer::SendTo(CDPClientProxy* Proxy, void* Data, unsigned long Size)
+bool CDPServer::SendTo(CDPClientProxy* Proxy, void* Data, uint32_t Size)
 {
     if (Server == nullptr || Proxy == nullptr)
         return false;
@@ -246,7 +251,7 @@ bool CDPServer::SendTo(CDPClientProxy* Proxy, void* Data, unsigned long Size)
 }
 
 // Retail DALib.dll.c CDPServer::DisconnectClient @ 0x53d0.
-void CDPServer::DisconnectClient(unsigned long PlayerId)
+void CDPServer::DisconnectClient(uint32_t PlayerId)
 {
     if (Server != nullptr)
         Server->DestroyClient(PlayerId, nullptr, 0, 0);
@@ -296,7 +301,7 @@ unsigned int CDPServer::GetSendQBytes(CDPClientProxy* Proxy)
 }
 
 // Retail DALib.dll.c CDPServer::SetEnumResponse @ 0x5500.
-bool CDPServer::SetEnumResponse(void* Data, unsigned long Size)
+bool CDPServer::SetEnumResponse(void* Data, uint32_t Size)
 {
     if (Size > sizeof(EnumResponseData))
         return false;
@@ -313,7 +318,7 @@ bool CDPServer::SetEnumResponse(void* Data, unsigned long Size)
 }
 
 // Retail .text:065c5560: MOV EAX,[m_dwLastMsgReceivedTime]; RET.
-unsigned long CDPServer::GetLastMsgTimestamp()
+uint32_t CDPServer::GetLastMsgTimestamp()
 {
     return m_dwLastMsgReceivedTime;
 }
@@ -451,7 +456,7 @@ void CDPServer::DispatchMsgs()
                 // Ping-quality response: echo back a byte derived from the proxy's link
                 // saturation.
                 const unsigned char Quality =
-                    (unsigned char)(-1 - (long)(Proxy->GetLinkSaturation()));
+                    (unsigned char)(-1 - (int32_t)(Proxy->GetLinkSaturation()));
                 DPN_BUFFER_DESC BufferDesc{1, (unsigned char*)(&Quality)};
                 DPNHANDLE AsyncHandle = 0;
                 if (Server != nullptr && Proxy != nullptr)

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "font_string.h"
+#include "fl/handles.h"
 #include "msvcrt_numeric_format.h"
 
 #include "font_atlas.h"
@@ -49,14 +50,15 @@ unsigned NumberPackColor(unsigned char Alpha, unsigned Source);
 // only -- a face still referenced at exit is not deleted.
 std::map<unsigned, FNumberFace*> G_NumberFaceMap;
 
+// PORT: callers pass `characters * 2` (retail wchar_t is 2 bytes); the host wchar_t is wider.
 wchar_t* AllocWideBytes(unsigned ByteCount)
 {
-    return static_cast<wchar_t*>(std::malloc(ByteCount));
+    return static_cast<wchar_t*>(std::malloc(static_cast<size_t>(ByteCount) / 2 * sizeof(wchar_t)));
 }
 
 wchar_t* ReallocWide(wchar_t* P, unsigned ByteCount)
 {
-    return static_cast<wchar_t*>(std::realloc(P, ByteCount));
+    return static_cast<wchar_t*>(std::realloc(P, static_cast<size_t>(ByteCount) / 2 * sizeof(wchar_t)));
 }
 
 void FreeWide(wchar_t* P)
@@ -312,12 +314,12 @@ void WideTextReserve(FHudWideText* Self, unsigned Need)
     if (Self->Text != nullptr)
     {
         // 0x004142b5..0x004142c7: realloc(Text, Need * 2); the result is stored unchecked.
-        Self->Text = static_cast<wchar_t*>(realloc(Self->Text, Need * 2));
+        Self->Text = static_cast<wchar_t*>(realloc(Self->Text, Need * sizeof(wchar_t)));
         Self->Capacity = Need;
         return;
     }
-    // 0x004142cd..0x004142e1: malloc(Need * 2), first char 0.
-    Self->Text = static_cast<wchar_t*>(malloc(Need * 2));
+    // 0x004142cd..0x004142e1: malloc(Need * sizeof(wchar_t)), first char 0.
+    Self->Text = static_cast<wchar_t*>(malloc(Need * sizeof(wchar_t)));
     Self->Text[0] = 0;
     Self->Capacity = Need;
 }
@@ -524,6 +526,7 @@ void FontStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
     FFontStringDrawOrigin const* const Org = static_cast<FFontStringDrawOrigin const*>(Origin);
 
     // 0x00412e5c..0x00412e85: FUN_005792b0(8) "TEXT", a null or empty text -- nothing.
+    if (getenv("FL_TRACE_FONT")) { static int n = 0; if (n++ < 12) fprintf(stderr, "[fl] font: Paint text-option=%d text=%p '%ls'\n", (int)GetGameOption(kGameOptText), (const void*)Text_, Text_ ? Text_ : L"(null)"); }
     if (GetGameOption(kGameOptText) == 0)
         return;
     if (Text_ == nullptr || Text_[0] == L'\0')
@@ -601,8 +604,8 @@ void FontStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
             // 0x004130c0..0x00413110: FUN_00402e30(frame, 2, 0) for every page, before any
             // clipping. Retail writes only the frame's texture dword; the four rect dwords are
             // stack contents. The records carry their own UVs, so the port passes zeros there.
-            unsigned long Frame[5] = {
-                static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Col->Texture)), 0ul, 0ul,
+            uint32_t Frame[5] = {
+                static_cast<uint32_t>(fl::PtrToHandle(Col->Texture)), 0ul, 0ul,
                 0ul, 0ul};
             ScreenQuadBeginBatchFrame(Frame, 2, false);
             // 0x00413115..0x0041319e: the far corner, and the shadow quad offset by the scale
@@ -1809,7 +1812,7 @@ void NumberStringChild::Paint(void* Origin, void* DrawCtx, void* DrawArg)
     // 0041390c..00413925: FUN_00402e30(frame, 2, 1) with the page texture in the frame's first
     // dword. Retail leaves the frame's four rect dwords unwritten (stack contents); the records
     // below carry their own UVs, so the port passes zeros there.
-    unsigned long Frame[5] = {static_cast<unsigned long>(reinterpret_cast<uintptr_t>(Page->Texture)),
+    uint32_t Frame[5] = {static_cast<uint32_t>(fl::PtrToHandle(Page->Texture)),
                               0ul, 0ul, 0ul, 0ul};
     ScreenQuadBeginBatchFrame(Frame, 2, true);
     // 0041392a..0041393d: FUN_00414070 on a stale face.
@@ -1954,7 +1957,7 @@ FNumberFace* NumberFaceGetOrCreate(IFont* FontKey)
     FNumberFace*& Slot =
         G_NumberFaceMap
             .insert(std::map<unsigned, FNumberFace*>::value_type(
-                static_cast<unsigned>(reinterpret_cast<uintptr_t>(FontKey)), nullptr))
+                static_cast<unsigned>(fl::PtrToHandle(FontKey)), nullptr))
             .first->second;
     if (Slot != nullptr)
     {
@@ -1983,7 +1986,7 @@ void NumberFaceRelease(FNumberFace* Face)
     // delete the face at zero (FUN_00415050 + operator delete), then erase the node
     // (FUN_0046c8c0) when it was found and the count reached zero. Callers test the face first.
     std::map<unsigned, FNumberFace*>::iterator Found =
-        G_NumberFaceMap.find(static_cast<unsigned>(reinterpret_cast<uintptr_t>(Face->FontKey)));
+        G_NumberFaceMap.find(static_cast<unsigned>(fl::PtrToHandle(Face->FontKey)));
     int const Remaining = --Face->RefCount;
     if (Remaining <= 0)
     {

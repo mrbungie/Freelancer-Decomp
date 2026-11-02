@@ -505,6 +505,7 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
         if (tonumber(r) || tonumber(l))
           call_arith(IM_SUB);
         else {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             const real *RightNumber = &nvalue(r);
             real *LeftNumber = &nvalue(l);
             /* Retail loads right before FSUBR. Optimized C loads/quietens left
@@ -516,6 +517,9 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
               fsubr qword ptr [ecx]
               fstp qword ptr [ecx]
             }
+#else
+            nvalue(l) -= nvalue(r);
+#endif
           --S->top;
         }
         break;
@@ -539,6 +543,7 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
         if (tonumber(r) || tonumber(l))
           call_arith(IM_DIV);
         else {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             const real *RightNumber = &nvalue(r);
             real *LeftNumber = &nvalue(l);
             /* Same right-load requirement as retail 06f4db47; C/volatile C
@@ -550,6 +555,9 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
               fdivr qword ptr [ecx]
               fstp qword ptr [ecx]
             }
+#else
+            nvalue(l) /= nvalue(r);
+#endif
           --S->top;
         }
         break;

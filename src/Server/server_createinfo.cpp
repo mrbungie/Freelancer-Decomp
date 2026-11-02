@@ -54,7 +54,7 @@ I3DMathEngine* Server_Acquire3DMathEngine()
 {
     struct FAGGDESC12
     {
-        unsigned long Size;       // +0x00  0xc
+        uint32_t Size;       // +0x00  0xc
         const char* Name;         // +0x04  "3DMathEngine"
         void* Field_0x08;         // +0x08  0
     };

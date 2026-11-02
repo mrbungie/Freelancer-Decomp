@@ -57,6 +57,7 @@
 // ===========================================================================
 
 #include "rpc_containers.h"
+#include "wire_wchar.h"
 #include "rpc_payloads.h"
 
 #include <new>
@@ -111,10 +112,9 @@ unsigned int RpcEncodeClientLogin(FPacketBase& Packet, unsigned char** BufferHol
         return Stream.GetError();
     }
     // 06dafb9b / 06dafba8, both results kept in AL only.
-    const unsigned char LenA =
-        (unsigned char)(RpcWideLength(Wire->AccountName) & 0xffu);
-    const unsigned char LenB =
-        (unsigned char)(RpcWideLength(Wire->Password) & 0xffu);
+    auto Len16 = [](const unsigned short* T) { unsigned int n = 0; while (T[n] != 0) ++n; return n; };
+    const unsigned char LenA = (unsigned char)(Len16(Wire->AccountName) & 0xffu);
+    const unsigned char LenB = (unsigned char)(Len16(Wire->Password) & 0xffu);
     if (!Stream.PutByte(LenA)) {                                          // 06dafbe1
         return Stream.GetError();
     }
@@ -123,7 +123,9 @@ unsigned int RpcEncodeClientLogin(FPacketBase& Packet, unsigned char** BufferHol
     }
     if (LenA != 0) {                                                      // 06dafc17
         // MSVCRT `_wcslwr` through IAT .rdata:06db320c, on the packet itself.
-        _wcslwr(Wire->AccountName);                                       // 06dafc1d
+        for (unsigned int i = 0; Wire->AccountName[i] != 0; ++i) {        // _wcslwr, in place on the 16-bit text
+            if (Wire->AccountName[i] >= 'A' && Wire->AccountName[i] <= 'Z') Wire->AccountName[i] += 32;
+        }
         // 06dafc2e `SHL EAX,0x1` -- the reservation and the copy are both 2*LenA.
         if (!Stream.PutBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafc63
             return Stream.GetError();
@@ -168,13 +170,13 @@ unsigned int RpcDecodeClientLogin(FPacketBase& Packet, const unsigned char* Buff
         if (!Stream.GetBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafe49
             return Stream.GetError();
         }
-        Wire->AccountName[LenA] = L'\0';                                  // 06dafe60
+        Wire->AccountName[LenA] = 0;                                  // 06dafe60
     }
     if (LenB != 0) {                                                      // 06dafe6e
         if (!Stream.GetBytes(Wire->Password, (unsigned int)LenB * 2u)) {     // 06dafeae
             return Stream.GetError();
         }
-        Wire->Password[LenB] = L'\0';                                     // 06dafec4
+        Wire->Password[LenB] = 0;                                     // 06dafec4
     }
     // 06dafedf FUN_06da13c0 -- consumes nothing.
     *OutLength = Stream.Length();

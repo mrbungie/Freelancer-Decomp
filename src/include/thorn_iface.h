@@ -5,8 +5,10 @@
 // Author: Giperion.
 
 #pragma once
+#include "fl/handles.h"
 
 #include "dacom.h"
+#include <cstring>
 
 // 8-slot IMotionPath. Slot 4 = per-frame position LAB_06f343f0 (stdcall RET 0xC).
 struct IMotionPath : IDAComponent
@@ -109,8 +111,8 @@ static_assert(sizeof(FThornLightProps) == 0x90, "FUN_06f27fe0 lightprops is 0x24
 struct IPersistString : IDAComponent
 {
     virtual GENRESULT DACOM_API Slot3Load(const char* Text) = 0;                  // +0x0c RET 8
-    virtual GENRESULT DACOM_API Slot4Save(char* Buffer, unsigned long Size) = 0;   // +0x10 RET 12
-    virtual unsigned long DACOM_API Slot5EstimateSize() = 0;                    // +0x14 RET 4
+    virtual GENRESULT DACOM_API Slot4Save(char* Buffer, uint32_t Size) = 0;   // +0x10 RET 12
+    virtual uint32_t DACOM_API Slot5EstimateSize() = 0;                    // +0x14 RET 4
 };
 
 // The MOTION_PATH entity's descriptor tail (+0x44). Retail stores a VC6 string plus a
@@ -171,6 +173,18 @@ static_assert(sizeof(void*) != 4 || sizeof(FThornEntitySnap) == 0xd4,
 struct FThornExtendedProgress
 {
     unsigned char Bytes[10];
+
+    inline void Set(double Value)
+    {
+        std::memcpy(Bytes, &Value, sizeof(double));
+    }
+
+    inline double Get() const
+    {
+        double Value = 0;
+        std::memcpy(&Value, Bytes, sizeof(double));
+        return Value;
+    }
 };
 static_assert(sizeof(FThornExtendedProgress) == 10, "x87 extended value storage");
 
@@ -213,7 +227,7 @@ struct FThornEventDesc
     int DurationMs;     // +0x18
     int PrimaryIndex;   // +0x1c the entity the event drives
     int SecondaryIndex; // +0x20
-    IParamCurve* ParamCurve; // +0x24 curve, or null
+    fl::Slot32<IParamCurve> ParamCurve; // +0x24 curve, or null
     int Field28;        // +0x28 TODO: meaning not recovered
 };
 
@@ -267,7 +281,7 @@ struct FThornAttachEventDesc
     int TargetType;
     int UpAxis;
     int FrontAxis;
-    const char* TargetPart;
+    fl::Slot32<const char> TargetPart;
 };
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornAttachEventDesc) == 0x48,
@@ -316,11 +330,11 @@ struct FThornMotionEventDesc
     float TransTime;              // +0x30 "trans_time"
     float TimeScale;              // +0x34 "time_scale"
     float Weight;                 // +0x38 "weight"
-    char const* Animation;        // +0x3c "animation" (the script name CharacterInfo knows)
+    fl::Slot32<const char> Animation;        // +0x3c "animation" (the script name CharacterInfo knows)
     unsigned char Field40;        // +0x40 TODO: meaning not recovered (FUN_06f43af0 copies it)
     unsigned char Pad41[3];
     float Heading;                // +0x44 "heading"
-    char const* LockedBone;       // +0x48 "locked_bone"
+    fl::Slot32<const char> LockedBone;       // +0x48 "locked_bone"
     float TransScale;             // +0x4c "trans_scale"
     int Field50;                  // +0x50 TODO: meaning not recovered (FUN_06f43af0 copies it)
 };
@@ -340,7 +354,7 @@ static_assert(sizeof(void*) != 4 || sizeof(FThornMotionEventDesc) == 0x54,
 struct FThornStartIkDesc
 {
     FThornEventDesc Common;       // +0x00 Type == kThornTypeStartIk
-    void const* Key;              // +0x2c the event object itself
+    fl::Slot32<const void> Key;              // +0x2c the event object itself
     int CountToRoot;              // +0x30 "count_to_root"
     int LookAtUpAxis;             // +0x34 "up"
     int LookAtFrontAxis;          // +0x38 "front"
@@ -349,8 +363,8 @@ struct FThornStartIkDesc
     unsigned char bMoveTo;        // +0x41 "move_to"
     unsigned char Pad42[2];
     float TransitionDuration;     // +0x44 "transition_duration"
-    char const* EndEffector;      // +0x48 "end_effector" (c_str of the event's copy)
-    char const* TargetPart;       // +0x4c "target_part"
+    fl::Slot32<const char> EndEffector;      // +0x48 "end_effector" (c_str of the event's copy)
+    fl::Slot32<const char> TargetPart;       // +0x4c "target_part"
     int TargetType;               // +0x50 "target_type"
 };
 
@@ -364,8 +378,8 @@ static_assert(sizeof(void*) != 4 || sizeof(FThornStartIkDesc) == 0x54,
 struct FThornConnectEventDesc
 {
     FThornEventDesc Common;       // +0x00 Type == kThornTypeConnectHardpoints
-    char const* Hardpoint;        // +0x2c on the primary entity
-    char const* ParentHardpoint;  // +0x30 on the secondary entity
+    fl::Slot32<const char> Hardpoint;        // +0x2c on the primary entity
+    fl::Slot32<const char> ParentHardpoint;  // +0x30 on the secondary entity
 };
 
 static_assert(sizeof(void*) != 4 || sizeof(FThornConnectEventDesc) == 0x34,
@@ -397,7 +411,7 @@ struct FThornSpatialEventDesc
     float Quaternion[4];
     float AxisRotAngle;
     int AxisRotAxis;
-    const char* TargetPart;
+    fl::Slot32<const char> TargetPart;
     int TargetType;
 };
 
@@ -494,7 +508,7 @@ struct FThornFloorEventDesc
 {
     FThornEventDesc Common;
     float FloorHeight;
-    const char* TargetPart;
+    fl::Slot32<const char> TargetPart;
     int TargetType;
 };
 
@@ -546,7 +560,7 @@ struct IScriptEngine : IDAComponent
     virtual GENRESULT DACOM_API Slot3(void* A, void* B) = 0;                      // 3  RET 0xC unused
     virtual GENRESULT DACOM_API Slot4Load(void* FileSystem) = 0;                   // 4  RET 0x8
     virtual GENRESULT DACOM_API Slot5Save(void* FileSystem) = 0;                   // 5  RET 0x8 save FUN_06f2aa10
-    virtual unsigned long DACOM_API Slot6EntityCount() = 0;                       // 6  RET 0x4
+    virtual uint32_t DACOM_API Slot6EntityCount() = 0;                       // 6  RET 0x4
     virtual void* DACOM_API Slot7EntityHandle(int Index) = 0;                     // 7  RET 0x8
     virtual void* DACOM_API Slot8(int Index) = 0;                                 // 8  RET 0x8 inorder snapshot
     virtual void* DACOM_API Slot9Entity(int Index) = 0;                           // 9  RET 0x8
@@ -554,7 +568,7 @@ struct IScriptEngine : IDAComponent
     virtual GENRESULT DACOM_API Slot11GetOrient(int Index, float* OutMat9) = 0;   // 11 RET 0xC
     virtual GENRESULT DACOM_API Slot12Attach(int Index, void* EngineObj) = 0;     // 12 RET 0xC
     virtual GENRESULT DACOM_API Slot13Detach(int Index) = 0;                      // 13 RET 0x8
-    virtual unsigned long DACOM_API Slot14EventCount() = 0;                       // 14 RET 0x4
+    virtual uint32_t DACOM_API Slot14EventCount() = 0;                       // 14 RET 0x4
     virtual void* DACOM_API Slot15EventByIndex(int Index) = 0;                    // 15 RET 0x8
     virtual void* DACOM_API Slot16EventById(int Id) = 0;                          // 16 RET 0x8
     virtual int DACOM_API Slot17GetDuration() = 0;                                // 17 RET 0x4
@@ -572,7 +586,7 @@ struct IScriptEngine : IDAComponent
     virtual GENRESULT DACOM_API Slot28(void* A, void* B) = 0;                     // 28 RET 0xC stub 0
     virtual GENRESULT DACOM_API Slot29(void* A, void* B, void* C) = 0;            // 29 RET 0x10 stub −1
     virtual GENRESULT DACOM_API Slot30(void* A, void* B, void* C) = 0;            // 30 RET 0x10 stub −1
-    virtual unsigned long DACOM_API Slot31(int Index) = 0;                        // 31 RET 0x8 userprop count
+    virtual uint32_t DACOM_API Slot31(int Index) = 0;                        // 31 RET 0x8 userprop count
     virtual const char* DACOM_API Slot32(int Index, int N) = 0;                   // 32 RET 0xC N-th userprop key
     virtual GENRESULT DACOM_API Slot33UserProp(void* Handle, const char* Key,
                                                char** Out) = 0;                  // 33 RET 0x10

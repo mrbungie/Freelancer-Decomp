@@ -30,26 +30,26 @@ static const char* const G_FileSystemName = "FileSystem";
 static const char* const G_Name3DMathEngine = "3DMathEngine";
 
 // ReadFile UTF header (0x38). Deformable2 walks IFileSystem nodes, not this dword.
-static const unsigned long G_UtfMagic = 0x20465455u; // "UTF "
-static const unsigned long G_UtfVersion = 0x101u;
+static const uint32_t G_UtfMagic = 0x20465455u; // "UTF "
+static const uint32_t G_UtfVersion = 0x101u;
 static const int G_MaxBoneCount = 150;
 
 struct FUtfHeader
 {
-    unsigned long Magic;       // +0x00 "UTF "
-    unsigned long Version;     // +0x04 0x101
-    unsigned long TreeOffset;  // +0x08
-    unsigned long Pad0C;
-    unsigned long Pad10;
-    unsigned long NodeSize;    // +0x14 0x0C or 0x2C
-    unsigned long StringOff;   // +0x18
-    unsigned long Pad1C;
-    unsigned long Pad20;
-    unsigned long DataOffset;  // +0x24
-    unsigned long Pad28;
-    unsigned long Pad2C;
-    unsigned long Pad30;
-    unsigned long Pad34;
+    uint32_t Magic;       // +0x00 "UTF "
+    uint32_t Version;     // +0x04 0x101
+    uint32_t TreeOffset;  // +0x08
+    uint32_t Pad0C;
+    uint32_t Pad10;
+    uint32_t NodeSize;    // +0x14 0x0C or 0x2C
+    uint32_t StringOff;   // +0x18
+    uint32_t Pad1C;
+    uint32_t Pad20;
+    uint32_t DataOffset;  // +0x24
+    uint32_t Pad28;
+    uint32_t Pad2C;
+    uint32_t Pad30;
+    uint32_t Pad34;
 };
 
 static_assert(sizeof(FUtfHeader) == 0x38, "UTF header must be 0x38");
@@ -63,15 +63,15 @@ struct FUvDeformBinding;
 
 struct FFaceGroup
 {
-    unsigned long Kind;       // +0 = 4
-    unsigned long MaterialCrc;
+    uint32_t Kind;       // +0 = 4
+    uint32_t MaterialCrc;
     IMaterial* Material;
     FUvDeformBinding* UvBinding; // formerly Pad0C
-    unsigned long IndexMin;
-    unsigned long IndexMax;
+    uint32_t IndexMin;
+    uint32_t IndexMax;
     unsigned short* Indices;
-    unsigned long IndexCount;
-    unsigned long UvBoneIndex; // +0x20 FUN_065f7590: -1 none; 0 = EyeMaterial
+    uint32_t IndexCount;
+    uint32_t UvBoneIndex; // +0x20 FUN_065f7590: -1 none; 0 = EyeMaterial
 };
 
 static_assert(sizeof(FFaceGroup) == 0x24, "face group must be 0x24");
@@ -103,7 +103,7 @@ struct FUvDeformBinding
     FBoneRuntime* Bone;        // BoneSlots[Record->BoneId]
     // EyeMaterial Bind (LAB_065fff20, 066001a3 INC [ESI+8]) counts every eye texture
     // transform it sets.
-    unsigned long EyeUvTransformCount;
+    uint32_t EyeUvTransformCount;
 };
 
 // Bone_id_chain + Bone_weight_chain pair. LAB_065f6bf0 applies as skin.
@@ -157,7 +157,7 @@ struct ICamera;
 struct FDeformMesh
 {
     int RefCount;           // +0x04
-    unsigned long NameCrc;  // +0x08
+    uint32_t NameCrc;  // +0x08
 
     explicit FDeformMesh(const char* Name);
     virtual int GetIndexCount();                                              // 0 +0x00
@@ -184,15 +184,15 @@ struct FMeshArchetype : FDeformMesh
     unsigned char GetBoundSphere(float* OutRadius, float* OutCenter) override;
     unsigned char Draw(ICamera* Camera, FDeformPart* Part) override;
 
-    unsigned long ParseTag;     // +0x0C FVF (0x112 after UTF)
+    uint32_t ParseTag;     // +0x0C FVF (0x112 after UTF)
     int PointIndexCount;        // +0x10
-    unsigned long* PointIndices;         // +0x14
+    uint32_t* PointIndices;         // +0x14
     int FaceGroupCount;         // +0x18
     FFaceGroup* FaceGroups;     // +0x1C counted body
     // +0x20: read only by slot 1 (LAB_065f8b60, added to +0x10). No MOV/LEA/arith write to
     // [reg+0x20] of the mesh anywhere in deformable2.dll (the 065f7e80 loader does not store
     // the pair count), so it stays 0 from the calloc of FUN_065f26f0.
-    unsigned long Field_0x20;   // +0x20 TODO: meaning (never written)
+    uint32_t Field_0x20;   // +0x20 TODO: meaning (never written)
     int VertexCount;            // +0x24 Points bytes / 0xC
     void* Vertices;             // +0x28 count * 0x18
     FSkinPair* SkinPairs;       // +0x2C flattened id/weight
@@ -203,10 +203,10 @@ struct FMeshArchetype : FDeformMesh
     // Per-draw skinning and UV transform counters.
     unsigned int SkinnedVertexCount; // +0x40
     unsigned int SkinnedBoneCount;   // +0x44
-    unsigned long EyeUvTransformCount; // +0x48 formerly Field_0x48
+    uint32_t EyeUvTransformCount; // +0x48 formerly Field_0x48
     int UvCount;                // +0x4C  UV0 bytes >> 3
     void* UvData;               // +0x50  count * 8
-    unsigned long* UvIndices;            // +0x54  UV0_indices
+    uint32_t* UvIndices;            // +0x54  UV0_indices
     int UvDeformCount;          // +0x58 FUN_065f8480 rows
     FUvDeformRecord* UvDeform;  // +0x5C count * 0x24
     unsigned char NameHint;     // +0x60 vector pad
@@ -265,23 +265,23 @@ void FillFileDesc(FFileSystemDesc* Desc, const char* Path);      // FUN_065f3e80
 // Aggregate descriptor used to create the Deformable component.
 struct FAggDesc18
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     void* Outer;
     void** InnerOut;
-    unsigned long Pad10;
+    uint32_t Pad10;
     IDAComponent* SystemAt14;
 };
 
 // Factory FUN_065f2250: operator_new(0xC). CreateInstance stays on derived types.
 struct FDeformableFactory : IComponentFactory
 {
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 };
 
 // Shared implementation and its concrete DACOM aggregate wrapper.
@@ -353,12 +353,12 @@ struct FDeformableObject;
 
 struct FDeformableInner : IDAComponent
 {
-    unsigned long RefCount;    // +0x04 (object +0x10)
+    uint32_t RefCount;    // +0x04 (object +0x10)
     FDeformableObject* Owner;  // +0x08 (object +0x14)
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 };
 
 // Component FUN_065f22f0: operator_new(0x18). IDeformable @ +0, IEngineComponent @ +4.
@@ -368,8 +368,8 @@ struct FDeformableObject : FDeformable
     FDeformableInner Inner;  // +0x0C
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 };
 
 // FUN_065f36c0 ctor: 150 * 0x34 + header. FUN_065f13e0 identity at bone+4.
@@ -417,9 +417,9 @@ struct FBoneRuntime : IInstanceTransform
     float* DACOM_API GetMatrix(void* InInstance) override;                            // LAB_065f1720
     GENRESULT DACOM_API GetExtra(void* InInstance, float* OutExtra, float* OutVec) override; // LAB_065f1760
     GENRESULT DACOM_API SetExtra(void* InInstance, float Extra, const float* Vec) override;  // LAB_065f1780
-    GENRESULT DACOM_API SetUser(void* InInstance, unsigned long User) override;       // LAB_065f1790
-    unsigned long DACOM_API GetUser(void* InInstance) override;                       // LAB_065f17a0
-    unsigned long DACOM_API MarkWorldDirty(void* InInstance) override; // formerly Slot13
+    GENRESULT DACOM_API SetUser(void* InInstance, uint32_t User) override;       // LAB_065f1790
+    uint32_t DACOM_API GetUser(void* InInstance) override;                       // LAB_065f17a0
+    uint32_t DACOM_API MarkWorldDirty(void* InInstance) override; // formerly Slot13
 };
 
 static_assert(sizeof(FBoneRuntime) == 0x70, "bone runtime must be 0x70");
@@ -463,7 +463,7 @@ struct FIkListNode
     unsigned char Active; // +0 = 0 anim (FUN_065f41d0); 1 IK (FUN_065f5400)
     unsigned char Pad01[3];
     struct FIkEvent* Event; // +4 handle or FIkEvent*
-    unsigned long Extra8;   // +8 FUN_065f41d0 local
+    uint32_t Extra8;   // +8 FUN_065f41d0 local
     FIkListNode* Prev; // +0xC
     FIkListNode* Next; // +0x10
 };
@@ -480,7 +480,7 @@ struct FIkEvent : IChannelOwner
     FIkEvent& operator=(const FIkEvent&) = delete;
 
     // LAB_065fb540 (vtable +0x00).
-    int DACOM_API Apply(float* Sampled, unsigned long ChannelKey, void* BindDesc,
+    int DACOM_API Apply(float* Sampled, uint32_t ChannelKey, void* BindDesc,
                         float Time) override;
 
     FIkListNode* Owner;      // +0x04
@@ -492,7 +492,7 @@ struct FIkEvent : IChannelOwner
     float* Quats;            // +0x1C count * 0x10
     void* TargetA;           // +0x20 desc+0x10
     void* TargetB;           // +0x24 desc+0x14
-    unsigned long Flags28;   // +0x28 desc+0x0C
+    uint32_t Flags28;   // +0x28 desc+0x0C
     unsigned char* LockBytes;// +0x2C
     int Extra30;             // +0x30 desc+0x1C
     unsigned char Flags34;   // +0x34 ctor &= ~1
@@ -521,7 +521,7 @@ static_assert(offsetof(FIkApplyGate, JointAt0C) == 0x0C, "IK apply gate +C");
 
 struct FIkMathDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     void* Extra;
 };
@@ -585,10 +585,10 @@ struct FDeformInstance : IChannelSink
     float Offset24;          // +0x24 FUN_065f4de0: bone+0x34 − Offset20
     float RateCookie;        // +0x28 DAT_0660314c / rand phase
 
-    void DACOM_API OnKeys(unsigned long ChannelKey, void* Context,
+    void DACOM_API OnKeys(uint32_t ChannelKey, void* Context,
                           FChannelKeyBatch* Batch) override;                 // FUN_065f5210
     void DACOM_API OnOpaqueNotification(void* A, void* B) override; // formerly Slot01
-    void DACOM_API OnLoop(unsigned long ChannelKey, float* Transform,
+    void DACOM_API OnLoop(uint32_t ChannelKey, float* Transform,
                           void* Context) override;                           // LAB_065f52b0
 };
 

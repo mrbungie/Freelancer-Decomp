@@ -1061,7 +1061,7 @@ void* IVP_Core::find_object_hash_entry(unsigned Key) const
     {
         if (this->ObjectHashMap == nullptr)
             return nullptr;
-        return ((IVP_VHash_Store*)this->ObjectHashMap)->FindElem((void*)Key); // FUN_06352930
+        return ((IVP_VHash_Store*)this->ObjectHashMap)->FindElem((void*)(intptr_t)(int32_t)(Key)); // FUN_06352930
     }
 
     void* Candidate = this->ObjectHashMap;
@@ -1105,7 +1105,7 @@ void IVP_Core::register_object_hash_entry(void* Candidate)
         }
 
         unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
-        ((IVP_VHash_Store*)this->ObjectHashMap)->AddElem((void*)CandidateKey, Candidate); // FUN_063526d0
+        ((IVP_VHash_Store*)this->ObjectHashMap)->AddElem((void*)(intptr_t)(int32_t)(CandidateKey), Candidate); // FUN_063526d0
     }
     else
     {
@@ -1125,7 +1125,7 @@ void IVP_Core::unregister_object_hash_entry(void* Candidate)
     if ((this->Flags & 0xC) == 4)
     {
         unsigned CandidateKey = *reinterpret_cast<unsigned*>(reinterpret_cast<uintptr_t>(Candidate) + 0x8);
-        ((IVP_VHash_Store*)this->ObjectHashMap)->RemoveElem((void*)CandidateKey); // FUN_063527e0
+        ((IVP_VHash_Store*)this->ObjectHashMap)->RemoveElem((void*)(intptr_t)(int32_t)(CandidateKey)); // FUN_063527e0
     }
     else
     {

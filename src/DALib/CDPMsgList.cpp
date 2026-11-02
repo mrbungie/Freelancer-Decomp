@@ -39,7 +39,7 @@ void CDPMsgList::Unlock()
 }
 
 // Retail .text:065c45a0: WaitForSingleObject([this+0x28], TimeoutMs); RET 4.
-void CDPMsgList::WaitForMsg(unsigned long TimeoutMs)
+void CDPMsgList::WaitForMsg(uint32_t TimeoutMs)
 {
     WaitForSingleObject(EmptyEvent, TimeoutMs);
 }
@@ -88,7 +88,7 @@ CDPMessage* CDPMsgList::PeekNextMsg()
 }
 
 // Lock Dest before this; extraction does not reset the source list event.
-void CDPMsgList::ExtractMsgs(unsigned long Id, CDPMsgList& Dest)
+void CDPMsgList::ExtractMsgs(uint32_t Id, CDPMsgList& Dest)
 {
     EnterCriticalSection(&Dest.Cs);
     EnterCriticalSection(&Cs);

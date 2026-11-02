@@ -10,6 +10,7 @@
 // initializers 06ed3d90-06ed3f70 (DAT_06fcf058..DAT_06fcf01c) = ContentStaticIds.h.
 
 #include "ContentStaticIds.h"
+#include "fl/handles.h"
 
 #include "BaseDB.h"
 #include "ContentPlayerState.h"
@@ -90,7 +91,7 @@ bool FBaseNpcRumor::Parse(INI_Reader* Reader)
     // Retail keeps the stage in the stack slot of the Reader argument, never
     // initialised: a name missing from the table leaves the Reader pointer bits
     // (06ed4053), and a missing second name repeats the first result (06ed409e).
-    int Stage = static_cast<int>(reinterpret_cast<intptr_t>(Reader));
+    int Stage = static_cast<int>(fl::PtrToHandle(Reader));
     Stage = FindStageValue(Reader->get_value_string(0), Stage);
     FromStage = Stage;
     Stage = FindStageValue(Reader->get_value_string(1), Stage);

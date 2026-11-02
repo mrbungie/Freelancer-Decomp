@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_dockbehavior.h"
+#include "fl/handles.h"
 #include "common_misc.h"   // SinglePlayer() -- UpdateApproachTail()'s case 0xb calls it
 #include "common_systemmanager.h"  // SystemManagerGunGroupManager::SetShieldActive -- FUN_062e9a60
 #include "common_gotobehavior.h"   // ComputeFormationFollowerEnvelope / ProxWatcherComputeSpeedCap
@@ -2110,7 +2111,7 @@ bool DockBehavior::Slot10(void* DirectiveOp)
 // loop at .text:062d405c passes).
 void DockBehavior::Slot21(void* Arg)
 {
-    unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
+    unsigned int const LeftId = static_cast<unsigned int>(fl::PtrToHandle(Arg));
     IObjRW* const Watched = ObjRwFromWatchable(const_cast<Watchable*>(Watcher324.target()));
     if (Watched != nullptr && Watched->get_id() == LeftId)          // 062c2f8f slot 0x20
         Watcher324.set(nullptr);

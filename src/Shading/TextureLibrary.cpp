@@ -4,6 +4,8 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
+#include "engine/engbase.h"   // FEngineName
+#include "fl/handles.h"
 #include "TextureLibrary.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
@@ -17,23 +19,23 @@
 
 namespace
 {
-    static const unsigned long kFourCcDxt1 = 0x31545844u;
-    static const unsigned long kFourCcDxt2 = 0x32545844u;
-    static const unsigned long kFourCcDxt3 = 0x33545844u;
-    static const unsigned long kFourCcDxt4 = 0x34545844u;
-    static const unsigned long kFourCcDxt5 = 0x35545844u;
-    static const unsigned long kFourCcDaop = 0x504F4144u;
-    static const unsigned long kFourCcDaot = 0x544F4144u;
-    static const unsigned long kFourCcDaa1 = 0x31414144u;
-    static const unsigned long kFourCcDaa4 = 0x34414144u;
-    static const unsigned long kFourCcDaa8 = 0x38414144u;
+    static const uint32_t kFourCcDxt1 = 0x31545844u;
+    static const uint32_t kFourCcDxt2 = 0x32545844u;
+    static const uint32_t kFourCcDxt3 = 0x33545844u;
+    static const uint32_t kFourCcDxt4 = 0x34545844u;
+    static const uint32_t kFourCcDxt5 = 0x35545844u;
+    static const uint32_t kFourCcDaop = 0x504F4144u;
+    static const uint32_t kFourCcDaot = 0x544F4144u;
+    static const uint32_t kFourCcDaa1 = 0x31414144u;
+    static const uint32_t kFourCcDaa4 = 0x34414144u;
+    static const uint32_t kFourCcDaa8 = 0x38414144u;
 
     // DAT_06ed57c4 stride 0x34. FUN_06ebea90 pairs (value, mask=-1 if set).
     struct FTextureFormatMap
     {
-        unsigned long Value[6];
-        unsigned long Mask[6];
-        unsigned long FourCc;
+        uint32_t Value[6];
+        uint32_t Mask[6];
+        uint32_t FourCc;
     };
 
     std::vector<FTextureFormatMap> GFormatMaps;
@@ -41,7 +43,7 @@ namespace
     // Profile numbers accept a narrower syntax than general C integer parsing.
     char GProfileValue[0x401]; // DAT_06ed5860 shared profile scratch.
 
-    unsigned long ParseRetailProfileInteger(char* Value)
+    uint32_t ParseRetailProfileInteger(char* Value)
     {
         const size_t Span = std::strspn(Value, "0123456789truefalsynoxTRUEFALSYNOX+-");
         if (Span != 0)
@@ -52,23 +54,23 @@ namespace
             return 0;
         if (std::strchr(Value, 'x') != nullptr || std::strchr(Value, 'X') != nullptr)
             return std::strtoul(Value, nullptr, 16);
-        return (unsigned long)MsvcrtAtoi(Value);
+        return (uint32_t)MsvcrtAtoi(Value);
     }
 
     // FUN_06ec09a0: the supplied output survives a failed parser acquisition.
-    unsigned long ReadProfileInteger(ICOManager* Manager, IProfileParser* SuppliedParser,
+    uint32_t ReadProfileInteger(ICOManager* Manager, IProfileParser* SuppliedParser,
                                      const char* SectionName, const char* Key,
-                                     unsigned long DefaultValue, unsigned long* Out)
+                                     uint32_t DefaultValue, uint32_t* Out)
     {
-        unsigned long LocalValue;
-        unsigned long* Value = Out != nullptr ? Out : &LocalValue;
+        uint32_t LocalValue;
+        uint32_t* Value = Out != nullptr ? Out : &LocalValue;
         IProfileParser* Parser = SuppliedParser;
         if (Parser != nullptr)
             Parser->AddRef();
         else if (Manager->QueryInterface(Iids::ProfileParser,
                                         (void**)&Parser) != GR_OK)
         {
-            const unsigned long Result = *Value;
+            const uint32_t Result = *Value;
             if (Parser != nullptr)
                 Parser->Release();
             return Result;
@@ -81,7 +83,7 @@ namespace
                 *Value = ParseRetailProfileInteger(GProfileValue);
             Parser->CloseSection(Section);
         }
-        const unsigned long Result = *Value;
+        const uint32_t Result = *Value;
         if (Parser != nullptr)
             Parser->Release();
         return Result;
@@ -93,7 +95,7 @@ namespace
     }
 
     void FormatMapAppend(int Field0, int Field1, int Field2, int Field3, int Field4, int Field5,
-                         unsigned long FourCc)
+                         uint32_t FourCc)
     {
         FTextureFormatMap Entry;
         std::memset(&Entry, 0, sizeof(Entry));
@@ -102,7 +104,7 @@ namespace
         {
             if (Fields[Index] >= 0)
             {
-                Entry.Value[Index] = (unsigned long)Fields[Index];
+                Entry.Value[Index] = (uint32_t)Fields[Index];
                 Entry.Mask[Index] = 0xFFFFFFFFu;
             }
         }
@@ -170,10 +172,10 @@ namespace
         const int F3 = ParseFormatMapField(Field, " \t:", true);
         const int F4 = ParseFormatMapField(Field, " \t:", true);
         const int F5 = ParseFormatMapField(Field, " \t:", false);
-        const unsigned long FourCc = (unsigned char)Value[0] |
-            ((unsigned long)(unsigned char)Value[1] << 8) |
-            ((unsigned long)(unsigned char)Value[2] << 16) |
-            ((unsigned long)(unsigned char)Value[3] << 24);
+        const uint32_t FourCc = (unsigned char)Value[0] |
+            ((uint32_t)(unsigned char)Value[1] << 8) |
+            ((uint32_t)(unsigned char)Value[2] << 16) |
+            ((uint32_t)(unsigned char)Value[3] << 24);
         FormatMapAppend(F0, F1, F2, F3, F4, F5, FourCc);
     }
 
@@ -183,7 +185,7 @@ namespace
         if (Section == nullptr)
             return;
         char Line[1024]; // Retail ReadLine buffer is not cleared between reads.
-        unsigned long LineIndex = 0;
+        uint32_t LineIndex = 0;
         while (Parser->ReadLine(Section, LineIndex, Line, sizeof(Line)) != 0)
         {
             ++LineIndex;
@@ -206,7 +208,7 @@ namespace
         return GR_OK;
     }
 
-    int FourCcToFormatId(unsigned long FourCc)
+    int FourCcToFormatId(uint32_t FourCc)
     {
         // FUN_06ed0b80: scan DAT_06ed51d8 ids 9…0x15, miss → 0.
         for (int Index = 9; Index < kPixelFormatFourCcCount; ++Index)
@@ -219,18 +221,18 @@ namespace
 
     struct FTextureFormatChannel
     {
-        unsigned long BitCount;
-        unsigned long Mask;
-        unsigned long Shift;
-        unsigned long ExpansionShift;
+        uint32_t BitCount;
+        uint32_t Mask;
+        uint32_t Shift;
+        uint32_t ExpansionShift;
     };
 
     // Full private DAT_06ed5230 record, including masks and shifts. This is
     // texture conversion data, not a VC6 container or a cross-DLL structure.
     struct FTextureFormatDescriptor
     {
-        unsigned long Id;
-        unsigned long BitsPerPixel;
+        uint32_t Id;
+        uint32_t BitsPerPixel;
         FTextureFormatChannel Red;
         FTextureFormatChannel Green;
         FTextureFormatChannel Blue;
@@ -265,7 +267,7 @@ namespace
         return &GTextureFormatDescriptors[FormatId > 14 ? 0 : FormatId];
     }
 
-    void PixelFormatMatchFields(int FormatId, unsigned long* Out)
+    void PixelFormatMatchFields(int FormatId, uint32_t* Out)
     {
         const FTextureFormatDescriptor* Descriptor = TextureFormatDescriptor(FormatId);
         Out[0] = Descriptor->BitsPerPixel;
@@ -290,11 +292,11 @@ namespace
                 return false;
             if (Row.Value[4] != 0)
                 return false;
-            unsigned long Fields[5];
+            uint32_t Fields[5];
             PixelFormatMatchFields(SrcId, Fields);
             return (Row.Mask[5] & Fields[4]) == Row.Value[5];
         }
-        unsigned long Fields[5];
+        uint32_t Fields[5];
         PixelFormatMatchFields(SrcId, Fields);
         if ((Row.Mask[0] & Fields[0]) != Row.Value[0])
             return false;
@@ -309,7 +311,7 @@ namespace
         return (Row.Mask[5] & Fields[4]) == Row.Value[5];
     }
 
-    unsigned short ReadU16(const unsigned char* Bytes, unsigned long Offset)
+    unsigned short ReadU16(const unsigned char* Bytes, uint32_t Offset)
     {
         return (unsigned short)(Bytes[Offset] | (Bytes[Offset + 1] << 8));
     }
@@ -325,16 +327,16 @@ namespace
         return false;
     }
 
-    bool MatchSourcePixelFormat(unsigned long* OutFormat, unsigned long Bits,
-                                unsigned long Red, unsigned long Green, unsigned long Blue,
-                                unsigned long Alpha)
+    bool MatchSourcePixelFormat(uint32_t* OutFormat, uint32_t Bits,
+                                uint32_t Red, uint32_t Green, uint32_t Blue,
+                                uint32_t Alpha)
     {
         // FUN_06ed0bc0: nine physical descriptors, independent of profile remaps.
         for (int Index = 0; Index < 9; ++Index)
         {
             const FTextureFormatDescriptor* Descriptor = TextureFormatDescriptor(Index);
             if (Bits == Descriptor->BitsPerPixel &&
-                (unsigned long)(Alpha != 0) == Descriptor->bHasAlpha &&
+                (uint32_t)(Alpha != 0) == Descriptor->bHasAlpha &&
                 Red == Descriptor->Red.BitCount && Green == Descriptor->Green.BitCount &&
                 Blue == Descriptor->Red.BitCount && Alpha == Descriptor->Alpha.BitCount)
             {
@@ -346,7 +348,7 @@ namespace
         return false;
     }
 
-    bool GetTgaSourceFormat(const unsigned char* Blob, unsigned long* OutFormat)
+    bool GetTgaSourceFormat(const unsigned char* Blob, uint32_t* OutFormat)
     {
         const unsigned char Type = Blob[2] & 7;
         if (Type == 1 && Blob[1] == 1)
@@ -368,7 +370,7 @@ namespace
             (Bits == 8 || Bits == 15 || Bits == 16 || Bits == 24 || Bits == 32);
     }
 
-    bool DecodeTgaTexture(const unsigned char* Blob, unsigned long* OutFormat,
+    bool DecodeTgaTexture(const unsigned char* Blob, uint32_t* OutFormat,
                           unsigned char* Palette, unsigned char** OutPixels)
     {
         // FUN_06ebf2b0: native source pixels, palette and byte-oriented origin branches.
@@ -389,7 +391,7 @@ namespace
         }
         const int Width = (short)ReadU16(Blob, 12);
         const int Height = (short)ReadU16(Blob, 14);
-        const unsigned long Pitch = ((TextureFormatDescriptor(*OutFormat)->BitsPerPixel + 7) >> 3) * Width;
+        const uint32_t Pitch = ((TextureFormatDescriptor(*OutFormat)->BitsPerPixel + 7) >> 3) * Width;
         unsigned char* Pixels = new unsigned char[Height * Pitch];
         *OutPixels = Pixels;
         const unsigned char* Source = Blob + Blob[0] + 18;
@@ -421,7 +423,7 @@ namespace
             for (int Row = 0; Row < Height; ++Row)
             {
                 const int DestinationRow = bBit5 ? Row : Height - Row - 1;
-                for (unsigned long Byte = 0; Byte < Pitch; ++Byte)
+                for (uint32_t Byte = 0; Byte < Pitch; ++Byte)
                     Pixels[DestinationRow * Pitch + Pitch - Byte - 1] = Source[Row * Pitch + Byte];
             }
         }
@@ -734,12 +736,12 @@ GENRESULT DACOM_API FTexLibAggregate::QueryInterface(const char* Iid, void** Out
     return Owner->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FTexLibAggregate::AddRef()
+uint32_t DACOM_API FTexLibAggregate::AddRef()
 {
     return Owner->AddRef();
 }
 
-unsigned long DACOM_API FTexLibAggregate::Release()
+uint32_t DACOM_API FTexLibAggregate::Release()
 {
     return Owner->Release();
 }
@@ -765,18 +767,18 @@ GENRESULT DACOM_API FTextureLibraryController::QueryInterface(const char* Iid, v
     return GR_OK;
 }
 
-unsigned long DACOM_API FTextureLibraryController::AddRef()
+uint32_t DACOM_API FTextureLibraryController::AddRef()
 {
     return ++Owner->RefCount;
 }
 
-unsigned long DACOM_API FTextureLibraryController::Release()
+uint32_t DACOM_API FTextureLibraryController::Release()
 {
     // LAB_06ec6940 is this non-delegating face, not public Release.
     // This embedded controller is constructed with its mandatory owner.
     if (Owner->RefCount != 0)
         --Owner->RefCount;
-    const unsigned long Next = Owner->RefCount;
+    const uint32_t Next = Owner->RefCount;
     if (Next == 0)
     {
         FTextureLibrary* DeleteOwner = Owner;
@@ -819,7 +821,7 @@ GENRESULT DACOM_API FTexLibAggregate::Initialize()
         else
             LocalResult = Manager->QueryInterface(Iids::ProfileParser,
                                                    (void**)&LocalParser);
-        unsigned long Value;
+        uint32_t Value;
         if (LocalResult == GR_OK)
         {
             Value = 1;
@@ -865,7 +867,7 @@ void FTextureLibrary::DestroyEntry(FTextureEntry* Entry)
         return;
     // Frames select borrowed children. Only the canonical record owns its handle.
     if (Entry->GpuHandle != 0)
-        PipeDestroyTexture(Pipeline, (void*)Entry->GpuHandle);
+        PipeDestroyTexture(Pipeline, (void*)fl::HandleToPtr(Entry->GpuHandle));
     delete Entry;
 }
 
@@ -882,8 +884,8 @@ int FTextureLibrary::ReleaseEntryReference(FTextureEntry* Entry, bool bCleanup)
     if (Remaining > 0 || !bCleanup)
         return Remaining;
 
-    const unsigned long Key = DACOM_CRC::GetCRC32(Entry->GetName());
-    const std::map<unsigned long, FTextureEntry*>::iterator Found = CanonicalRecords.find(Key);
+    const uint32_t Key = DACOM_CRC::GetCRC32(Entry->GetName());
+    const std::map<uint32_t, FTextureEntry*>::iterator Found = CanonicalRecords.find(Key);
     FTextureEntry* Indexed = Found->second; // Retail trusts the name-map lookup.
     DestroyEntry(Indexed);
     CanonicalRecords.erase(Found);
@@ -897,7 +899,7 @@ void FTextureLibrary::StoreByNameCrc(FTextureEntry* Entry)
     CanonicalRecords.insert(std::make_pair(Entry->Crc, Entry));
 }
 
-bool FTextureLibrary::CreateTextureRecord(unsigned long GpuHandle, const char* Name,
+bool FTextureLibrary::CreateTextureRecord(uint32_t GpuHandle, const char* Name,
                                           FTextureEntry** Out, bool bRetain)
 {
     // FUN_06ec0f10 publishes before filling the two owned vectors.
@@ -946,13 +948,13 @@ GENRESULT DACOM_API FTextureLibrary::QueryInterface(const char* Iid, void** Out)
     return Controlling->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FTextureLibrary::AddRef()
+uint32_t DACOM_API FTextureLibrary::AddRef()
 {
     IDAComponent* Controlling = Outer != nullptr ? Outer : &Controller;
     return Controlling->AddRef();
 }
 
-unsigned long DACOM_API FTextureLibrary::Release()
+uint32_t DACOM_API FTextureLibrary::Release()
 {
     IDAComponent* Controlling = Outer != nullptr ? Outer : &Controller;
     return Controlling->Release();
@@ -975,16 +977,16 @@ namespace
     }
 
     bool ReadTextureProperty(IFileSystem* FileSystem, const char* Name, void* Buffer,
-                             unsigned long Size)
+                             uint32_t Size)
     {
         FFileSystemDesc Desc = MakeTextureDescriptor(Name);
         const int Handle = FileSystem->OpenByDesc(&Desc);
         if (Handle == -1)
             return false;
-        unsigned long BytesRead = 0;
-        const int Result = FileSystem->Read((unsigned long)Handle, Buffer,
+        uint32_t BytesRead = 0;
+        const int Result = FileSystem->Read((uint32_t)Handle, Buffer,
                                             Size, &BytesRead, 0);
-        FileSystem->CloseFile((unsigned long)Handle);
+        FileSystem->CloseFile((uint32_t)Handle);
         return Result != 0 && BytesRead == Size;
     }
 }
@@ -994,12 +996,12 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
                                                   const char* Name, FTextureEntry** Out,
                                                   bool bRetain)
 {
-    unsigned long TextureCount = 0;
+    uint32_t TextureCount = 0;
     if (!ReadTextureProperty(TextureFileSystem, "Texture count", &TextureCount, 4))
         return (GENRESULT)-8;
     std::vector<FTextureEntry*> Children;
     Children.reserve(TextureCount);
-    for (unsigned long Index = 0; Index < TextureCount; ++Index)
+    for (uint32_t Index = 0; Index < TextureCount; ++Index)
     {
         const std::string ChildName = std::string(Name) + "_" + std::to_string(Index);
         FFileSystemDesc Desc = MakeTextureDescriptor(ChildName.c_str());
@@ -1019,7 +1021,7 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
     float StoredFramesPerSecond;
     if (ReadTextureProperty(TextureFileSystem, "FPS", &StoredFramesPerSecond, 4))
         FramesPerSecond = StoredFramesPerSecond;
-    unsigned long FrameCount = 0;
+    uint32_t FrameCount = 0;
     // Retail's late-property failures deliberately do not release earlier child refs.
     if (!ReadTextureProperty(TextureFileSystem, "Frame count", &FrameCount, 4))
         return GR_GENERIC;
@@ -1027,24 +1029,24 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
     DefaultFrame.Uv[2] = 1.0f;
     DefaultFrame.Uv[3] = 1.0f;
     std::vector<FTextureFrame> Frames(FrameCount, DefaultFrame);
-    unsigned long FrameBytes = FrameCount * 20u;
+    uint32_t FrameBytes = FrameCount * 20u;
     FFileSystemDesc RectDesc = MakeTextureDescriptor("Frame rects");
     const int RectHandle = TextureFileSystem->OpenByDesc(&RectDesc);
     if (RectHandle == -1)
         return GR_GENERIC;
     if (FrameBytes == 0)
-        FrameBytes = TextureFileSystem->GetSize((unsigned long)RectHandle, 0);
-    unsigned long BytesRead = 0;
-    const int ReadResult = TextureFileSystem->Read((unsigned long)RectHandle,
+        FrameBytes = TextureFileSystem->GetSize((uint32_t)RectHandle, 0);
+    uint32_t BytesRead = 0;
+    const int ReadResult = TextureFileSystem->Read((uint32_t)RectHandle,
                                                   Frames.data(), FrameBytes, &BytesRead, 0);
-    TextureFileSystem->CloseFile((unsigned long)RectHandle);
+    TextureFileSystem->CloseFile((uint32_t)RectHandle);
     if (ReadResult == 0 || BytesRead != FrameBytes)
         return GR_GENERIC;
     FTextureEntry* Entry = new FTextureEntry();
     Entry->SetName(Name);
     *Out = Entry;
     Entry->Frames.resize(FrameCount, DefaultFrame);
-    for (unsigned long Index = 0; Index < FrameCount; ++Index)
+    for (uint32_t Index = 0; Index < FrameCount; ++Index)
     {
         const FTextureFrame* Source = &Frames[Index];
         FTextureFrame* Destination = &Entry->Frames[Index];
@@ -1072,7 +1074,7 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
     }
     Entry->TileRate = FramesPerSecond;
     Entry->Children.resize(TextureCount, nullptr);
-    for (unsigned long Index = 0; Index < TextureCount; ++Index)
+    for (uint32_t Index = 0; Index < TextureCount; ++Index)
     {
         if (Children[Index] != nullptr)
         {
@@ -1093,7 +1095,7 @@ namespace
         IFileSystem* FileSystem;
         int File;
         int Mapping;
-        unsigned long Size;
+        uint32_t Size;
         unsigned char* View;
 
         FTextureFileMap(IFileSystem* InFileSystem, const char* Name)
@@ -1107,7 +1109,7 @@ namespace
                 Size = FileSystem->GetSize(File, 0);
                 Mapping = FileSystem->CreateMapping(File, 0, 2, 0, 0, 0);
                 if (Mapping != -1)
-                    View = (unsigned char*)FileSystem->MapFileView(Mapping, 4, 0, 0, 0);
+                    View = (unsigned char*)fl::HandleToPtr(FileSystem->MapFileView(Mapping, 4, 0, 0, 0));
             }
         }
 
@@ -1119,7 +1121,7 @@ namespace
                 if (Mapping != -1)
                 {
                     if (View != nullptr)
-                        FileSystem->UnmapFileView((unsigned long)View);
+                        FileSystem->UnmapFileView((uint32_t)fl::PtrToHandle(View));
                     FileSystem->CloseFile(Mapping);
                 }
                 FileSystem->CloseFile(File);
@@ -1131,10 +1133,10 @@ namespace
     struct FTextureDdsCursor
     {
         const unsigned char* Pixels;
-        unsigned long Bytes;
-        unsigned long MinimumBlock;
-        unsigned long Width;
-        unsigned long Height;
+        uint32_t Bytes;
+        uint32_t MinimumBlock;
+        uint32_t Width;
+        uint32_t Height;
 
         void Advance()
         {
@@ -1157,7 +1159,7 @@ namespace
               Line, Message);
     }
 
-    unsigned long D3dFormatToTextureFormat(unsigned long Format)
+    uint32_t D3dFormatToTextureFormat(uint32_t Format)
     {
         // FUN_06ed0b60 searches all 22 entries, including ordinary RGB formats.
         for (int Index = 0; Index < kPixelFormatFourCcCount; ++Index)
@@ -1166,7 +1168,7 @@ namespace
         return 0;
     }
 
-    unsigned long RoundTexturePowerOfTwo(unsigned long Value)
+    uint32_t RoundTexturePowerOfTwo(uint32_t Value)
     {
         if ((Value & (Value - 1)) == 0)
             return Value;
@@ -1180,11 +1182,11 @@ namespace
     }
 }
 
-unsigned long FTextureLibrary::SelectTextureMipLevels(unsigned long* Width, unsigned long* Height)
+uint32_t FTextureLibrary::SelectTextureMipLevels(uint32_t* Width, uint32_t* Height)
 {
     // FUN_06ec1110, unused argument omitted from this internal native helper.
-    unsigned long Count = 0;
-    const unsigned long Limit = GenericSlots[4];
+    uint32_t Count = 0;
+    const uint32_t Limit = GenericSlots[4];
     if (Limit != 0)
     {
         while (*Width > Limit || *Height > Limit)
@@ -1197,8 +1199,8 @@ unsigned long FTextureLibrary::SelectTextureMipLevels(unsigned long* Width, unsi
     return Count;
 }
 
-GENRESULT FTextureLibrary::SelectTextureDimensions(unsigned long Width, unsigned long Height,
-                                                  unsigned long* OutWidth, unsigned long* OutHeight)
+GENRESULT FTextureLibrary::SelectTextureDimensions(uint32_t Width, uint32_t Height,
+                                                  uint32_t* OutWidth, uint32_t* OutHeight)
 {
     // FUN_06ec0d50: publish inputs before zero rejection, then power-of-two/square policy.
     *OutWidth = Width;
@@ -1218,7 +1220,7 @@ GENRESULT FTextureLibrary::SelectTextureDimensions(unsigned long Width, unsigned
     }
     if (bSquare)
     {
-        const unsigned long Maximum = *OutWidth > *OutHeight ? *OutWidth : *OutHeight;
+        const uint32_t Maximum = *OutWidth > *OutHeight ? *OutWidth : *OutHeight;
         *OutWidth = Maximum;
         *OutHeight = Maximum;
     }
@@ -1248,10 +1250,10 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
         TextureDdsWarning(0x215, "load_dds_mips: %s: couldnt load dds info!", Name);
         return GR_GENERIC;
     }
-    unsigned long SourceFormat = D3dFormatToTextureFormat(Info.Format);
-    const unsigned long* Header = (const unsigned long*)Map.View;
+    uint32_t SourceFormat = D3dFormatToTextureFormat(Info.Format);
+    const uint32_t* Header = (const uint32_t*)Map.View;
     const bool bPitch = (Header[2] & 8) != 0;
-    unsigned long MinimumBlock = 1;
+    uint32_t MinimumBlock = 1;
     if (!bPitch)
     {
         switch (Header[0x54 / 4])
@@ -1266,10 +1268,10 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
             return GR_GENERIC;
         }
     }
-    unsigned long Width = Info.Width;
-    unsigned long Height = Info.Height;
-    unsigned long Skip = 0;
-    unsigned long Levels = 1;
+    uint32_t Width = Info.Width;
+    uint32_t Height = Info.Height;
+    uint32_t Skip = 0;
+    uint32_t Levels = 1;
     if (GenericSlots[0] != 0)
     {
         Skip = SelectTextureMipLevels(&Width, &Height);
@@ -1277,10 +1279,10 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
         if ((int)Levels <= 0)
             return GR_GENERIC;
     }
-    unsigned long DestinationWidth;
-    unsigned long DestinationHeight;
+    uint32_t DestinationWidth;
+    uint32_t DestinationHeight;
     SelectTextureDimensions(Width, Height, &DestinationWidth, &DestinationHeight);
-    unsigned long TargetFormat = D3dFormatToTextureFormat(0);
+    uint32_t TargetFormat = D3dFormatToTextureFormat(0);
     PickGpuFormat(&SourceFormat, &TargetFormat);
     unsigned int GpuFormat = TargetFormat;
     void* Handle = nullptr;
@@ -1292,13 +1294,13 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
     FTextureDdsCursor Cursor = {Map.View + 0x80,
         bPitch ? Header[0x14 / 4] * Header[0x0c / 4] : Header[0x14 / 4],
         MinimumBlock, Header[0x10 / 4], Header[0x0c / 4]};
-    for (unsigned long Index = 0; Index < Skip; ++Index)
+    for (uint32_t Index = 0; Index < Skip; ++Index)
         Cursor.Advance();
     unsigned int UploadFormat = SourceFormat;
-    for (unsigned long Level = 0; Level < Levels; ++Level)
+    for (uint32_t Level = 0; Level < Levels; ++Level)
     {
         // Retail divides the linear byte size by the WIDTH block count.
-        const unsigned long Pitch = bPitch ? (Header[0x58 / 4] >> 3) * Cursor.Width
+        const uint32_t Pitch = bPitch ? (Header[0x58 / 4] >> 3) * Cursor.Width
             : Cursor.Bytes / ((Cursor.Width + 3) >> 2);
         if (Pipeline->SetTextureLevelData(Handle, Level, Cursor.Width, Cursor.Height, Pitch,
                                           &UploadFormat, Cursor.Pixels, nullptr, nullptr) < 0)
@@ -1319,7 +1321,7 @@ namespace
     struct FTextureTgaMap
     {
         int File;
-        unsigned long Size;
+        uint32_t Size;
         int Mapping;
         unsigned char* View;
         IFileSystem* FileSystem;
@@ -1334,7 +1336,7 @@ namespace
                 {
                     if (View != nullptr)
                     {
-                        FileSystem->UnmapFileView((unsigned long)View);
+                        FileSystem->UnmapFileView((uint32_t)fl::PtrToHandle(View));
                         View = nullptr;
                     }
                     FileSystem->CloseFile(Mapping);
@@ -1372,8 +1374,14 @@ namespace
                 Size = FileSystem->GetSize(File, 0);
                 Mapping = FileSystem->CreateMapping(File, 0, 2, 0, 0, 0);
                 if (Mapping != -1)
-                    View = (unsigned char*)FileSystem->MapFileView(Mapping, 4, 0, 0, 0);
+                {
+                    const int ViewHandle = FileSystem->MapFileView(Mapping, 4, 0, 0, 0);
+                    View = (unsigned char*)fl::HandleToPtr(ViewHandle);
+                    if (getenv("FL_TRACE_FILES")) fprintf(stderr, "[fl] viewhandle=%d (0x%x) -> %p\n", ViewHandle, (unsigned)ViewHandle, (void*)View);
+                }
             }
+            if (getenv("FL_TRACE_FILES"))
+                fprintf(stderr, "[fl] tga map '%s': file=%d size=%u mapping=%d view=%p\n", Name, File, Size, Mapping, (void*)View);
         }
     };
 
@@ -1432,14 +1440,14 @@ GENRESULT FTextureLibrary::LoadTgaTexture(IFileSystem* FileSystem, const char* N
             Name, Count, LargestIndex);
 
     void* Handle = nullptr;
-    unsigned long SourceFormat = 0;
-    unsigned long Skip = 0;
+    uint32_t SourceFormat = 0;
+    uint32_t Skip = 0;
     int Levels = 0;
     const unsigned char* Header = Maps[0].View;
     if (GetTgaSourceFormat(Header, &SourceFormat))
     {
-        unsigned long Width = (short)ReadU16(Header, 12);
-        unsigned long Height = (short)ReadU16(Header, 14);
+        uint32_t Width = (short)ReadU16(Header, 12);
+        uint32_t Height = (short)ReadU16(Header, 14);
         Levels = 1;
         if (GenericSlots[0] != 0)
         {
@@ -1452,10 +1460,10 @@ GENRESULT FTextureLibrary::LoadTgaTexture(IFileSystem* FileSystem, const char* N
                     Skip = Count - 1;
             }
         }
-        unsigned long TargetFormat = 0;
+        uint32_t TargetFormat = 0;
         PickGpuFormat(&SourceFormat, &TargetFormat);
-        unsigned long DestinationWidth;
-        unsigned long DestinationHeight;
+        uint32_t DestinationWidth;
+        uint32_t DestinationHeight;
         SelectTextureDimensions(Width, Height, &DestinationWidth, &DestinationHeight);
         unsigned int GpuFormat = TargetFormat;
         if (Pipeline->CreateTexture(DestinationWidth, DestinationHeight, &GpuFormat,
@@ -1472,13 +1480,13 @@ GENRESULT FTextureLibrary::LoadTgaTexture(IFileSystem* FileSystem, const char* N
             TextureTgaWarning(0x11b, "load_tga_mips: %s: mip invalid!", Name);
             continue;
         }
-        unsigned long UploadFormat = 0;
+        uint32_t UploadFormat = 0;
         unsigned char Palette[256 * (0xff >> 3)]; // Byte-sized palette depth: at most 31 bytes/entry.
         unsigned char* Pixels = nullptr;
         DecodeTgaTexture(Blob, &UploadFormat, Palette, &Pixels);
         const int Width = (short)ReadU16(Blob, 12);
         const int Height = (short)ReadU16(Blob, 14);
-        const unsigned long Pitch = ((TextureFormatDescriptor(UploadFormat)->BitsPerPixel + 7) >> 3) * Width;
+        const uint32_t Pitch = ((TextureFormatDescriptor(UploadFormat)->BitsPerPixel + 7) >> 3) * Width;
         unsigned int Format = UploadFormat;
         const GENRESULT Result = Pipeline->SetTextureLevelData(Handle, Level, Width, Height, Pitch,
             &Format, Pixels, nullptr, UploadFormat == 1 ? Palette : nullptr);
@@ -1551,7 +1559,7 @@ GENRESULT FTextureLibrary::LoadTextureRecord(IFileSystem* RootFileSystem, FFileS
     }
     if (Handle != nullptr && Result >= 0)
     {
-        if (!CreateTextureRecord((unsigned long)Handle, ChildName, Out, bRetain))
+        if (!CreateTextureRecord((uint32_t)fl::PtrToHandle(Handle), ChildName, Out, bRetain))
         {
             Pipeline->DestroyTexture(Handle);
             Result = GR_GENERIC;
@@ -1599,7 +1607,7 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* Out
                 if (FindData.cFileName[0] != '.')
                 {
                     FFileSystemDesc Desc = MakeTextureDescriptor(FindData.cFileName);
-                    Desc.Field30 = (unsigned long)FindHandle;
+                    Desc.Field30 = (uint32_t)FindHandle;
                     FTextureEntry* Entry;
                     const GENRESULT Result = LoadTextureRecord(Source, &Desc, &Entry, false);
                     if (Result >= 0)
@@ -1617,8 +1625,8 @@ GENRESULT DACOM_API FTextureLibrary::LoadTextureGroup(void* FileSystem, int* Out
                               0x5b4, Message);
                     }
                 }
-            } while (Source->FindNext((unsigned long)FindHandle, &FindData) != 0);
-            Source->FindClose((unsigned long)FindHandle);
+            } while (Source->FindNext((uint32_t)FindHandle, &FindData) != 0);
+            Source->FindClose((uint32_t)FindHandle);
         }
         Source->OpenNode("..");
     }
@@ -1652,9 +1660,9 @@ FTextureGroup* FTextureLibrary::FindGroup(int Id)
     return Found == GroupRecords.end() ? nullptr : &Found->second;
 }
 
-FTextureEntry* FTextureLibrary::FindEntryByCrc(unsigned long Crc)
+FTextureEntry* FTextureLibrary::FindEntryByCrc(uint32_t Crc)
 {
-    const std::map<unsigned long, FTextureEntry*>::iterator Found = CanonicalRecords.find(Crc);
+    const std::map<uint32_t, FTextureEntry*>::iterator Found = CanonicalRecords.find(Crc);
     return Found == CanonicalRecords.end() ? nullptr : Found->second;
 }
 
@@ -1668,7 +1676,7 @@ void FTextureLibrary::AddRefEntryRecursive(FTextureEntry* Entry)
         AddRefEntryRecursive(Entry->Children[Index]);
 }
 
-static void WriteEmptyFrame(unsigned long* Out)
+static void WriteEmptyFrame(uint32_t* Out)
 {
     Out[0] = 0;
     Out[1] = 0;
@@ -1677,7 +1685,7 @@ static void WriteEmptyFrame(unsigned long* Out)
     Out[4] = 0x3f800000;
 }
 
-static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Frame, unsigned long* Out)
+static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Frame, uint32_t* Out)
 {
     // FUN_06ebe7f0: cache count lazily, then select the child via the frame's first word.
     if (Playback->FrameCount == 0)
@@ -1699,7 +1707,7 @@ static GENRESULT ReadPlaybackFrame(FTexturePlayback* Playback, unsigned int Fram
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::GetFrame(int Id, int Frame, unsigned long* Out)
+GENRESULT DACOM_API FTextureLibrary::GetFrame(int Id, int Frame, uint32_t* Out)
 {
     // FUN_06ec3310 ignores the frame core's return for a valid ID.
     FTexturePlayback* Playback = FindPlayback(Id);
@@ -1709,7 +1717,7 @@ GENRESULT DACOM_API FTextureLibrary::GetFrame(int Id, int Frame, unsigned long* 
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::GetTextureFrame(void* Tex, int Frame, unsigned long* Out)
+GENRESULT DACOM_API FTextureLibrary::GetTextureFrame(void* Tex, int Frame, uint32_t* Out)
 {
     // LAB_06ec2ee0: canonical source; only -2 selects the last frame.
     FTextureEntry* Source = (FTextureEntry*)Tex;
@@ -1735,7 +1743,7 @@ GENRESULT DACOM_API FTextureLibrary::FindTextureByCrc(void* Query, void** OutTex
 {
     // LAB_06ec2810 RET 0xC: CRC at Query+4 → map this+0x54 (FUN_06ecaa00).
     // Hit: FUN_06ebe560(tex) then *OutTex = node+0x10. Miss: EAX=-1.
-    const unsigned long Crc = *(unsigned long*)((unsigned char*)Query + 4);
+    const uint32_t Crc = static_cast<const FEngineName*>(Query)->Crc;   // retail Query+4
     FTextureEntry* Entry = FindEntryByCrc(Crc);
     if (Entry == nullptr)
         return GR_GENERIC;
@@ -1748,20 +1756,20 @@ GENRESULT DACOM_API FTextureLibrary::FindTextureByCrc(void* Query, void** OutTex
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::PickGpuFormat(const unsigned long* Src, unsigned long* OutId)
+GENRESULT DACOM_API FTextureLibrary::PickGpuFormat(const uint32_t* Src, uint32_t* OutId)
 {
     // LAB_06ec37f0 directly forwards to FUN_06ebf110.
     const int SrcId = (int)*Src;
     if (SrcId >= 10 && SrcId <= 14)
     {
-        *OutId = (unsigned long)SrcId;
+        *OutId = (uint32_t)SrcId;
         return GR_OK;
     }
     for (size_t Index = 0; Index < GFormatMaps.size(); ++Index)
     {
         if (FormatMapRowMatches(GFormatMaps[Index], SrcId))
         {
-            *OutId = (unsigned long)FourCcToFormatId(GFormatMaps[Index].FourCc);
+            *OutId = (uint32_t)FourCcToFormatId(GFormatMaps[Index].FourCc);
             return GR_OK;
         }
     }
@@ -1770,14 +1778,14 @@ GENRESULT DACOM_API FTextureLibrary::PickGpuFormat(const unsigned long* Src, uns
 
 // --- Cycle 6 high-confidence accessors -----------------
 
-GENRESULT DACOM_API FTextureLibrary::SetGenericSlot(int Index, unsigned long Value)
+GENRESULT DACOM_API FTextureLibrary::SetGenericSlot(int Index, uint32_t Value)
 {
     // LAB_06ec0d10: no bounds branch in the indexed write.
     GenericSlots[Index] = Value;
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::GetGenericSlot(int Index, unsigned long* Out)
+GENRESULT DACOM_API FTextureLibrary::GetGenericSlot(int Index, uint32_t* Out)
 {
     // LAB_06ec0d30: no bounds or output-null branch.
     *Out = GenericSlots[Index];
@@ -1796,7 +1804,7 @@ GENRESULT DACOM_API FTextureLibrary::GarbageCollect(int GroupId)
             GroupRecords.erase(Group);
         }
     }
-    for (std::map<unsigned long, FTextureEntry*>::iterator It = CanonicalRecords.begin();
+    for (std::map<uint32_t, FTextureEntry*>::iterator It = CanonicalRecords.begin();
          It != CanonicalRecords.end();)
     {
         FTextureEntry* Entry = It->second;
@@ -1834,7 +1842,7 @@ GENRESULT DACOM_API FTextureLibrary::GetGroupPixelFormat(void* Record, void* Unu
     FTextureEntry* Entry = (FTextureEntry*)Record;
     if (Entry != nullptr && !Entry->Frames.empty())
     {
-        const unsigned long Handle = Entry->Children[0]->GpuHandle;
+        const uint32_t Handle = Entry->Children[0]->GpuHandle;
         if (Handle != 0)
             return PipeGetTextureFormat(Pipeline, Handle, OutFormat);
     }
@@ -1853,7 +1861,7 @@ GENRESULT DACOM_API FTextureLibrary::SetGroupName(int Id, const char* Name)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::GetGroupName(int Id, char* Buf, unsigned long Size)
+GENRESULT DACOM_API FTextureLibrary::GetGroupName(int Id, char* Buf, uint32_t Size)
 {
     if (Id == -1 || Id == 0)
         return GR_GENERIC;
@@ -1873,14 +1881,14 @@ GENRESULT DACOM_API FTextureLibrary::GetGroupName(int Id, char* Buf, unsigned lo
 GENRESULT DACOM_API FTextureLibrary::FindOrCreateByName(const char* Name, void** OutTex)
 {
     // LAB_06ec2760 returns -1 on an existing CRC; only a miss creates then queries.
-    const unsigned long NameCrc = DACOM_CRC::GetCRC32(Name);
+    const uint32_t NameCrc = DACOM_CRC::GetCRC32(Name);
     if (FindEntryByCrc(NameCrc) != nullptr)
         return GR_GENERIC;
     FTextureEntry* Entry;
     CreateTextureRecord(0, Name, &Entry, false);
-    const unsigned long Query[2] = { 0, DACOM_CRC::GetCRC32(Name) };
+    FEngineName Query = { nullptr, DACOM_CRC::GetCRC32(Name) };
     // The query stays read-only; the shared lookup has an opaque mutable signature.
-    return FindTextureByCrc(const_cast<unsigned long*>(Query), OutTex);
+    return FindTextureByCrc(&Query, OutTex);
 }
 
 GENRESULT DACOM_API FTextureLibrary::CreatePlaybackGroup(void* SourceRecord, int* OutId)
@@ -1948,7 +1956,7 @@ GENRESULT DACOM_API FTextureLibrary::DecRefById(int Id)
     return ReleasePlaybackReference(Id) == -1 ? GR_GENERIC : GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::CopyName(void* Node, char* Buf, unsigned long Size)
+GENRESULT DACOM_API FTextureLibrary::CopyName(void* Node, char* Buf, uint32_t Size)
 {
     // LAB_06ec2890: clear first, then copy only min(strlen, unsigned(Size-1)).
     *Buf = '\0';
@@ -1956,9 +1964,9 @@ GENRESULT DACOM_API FTextureLibrary::CopyName(void* Node, char* Buf, unsigned lo
     if (Entry == nullptr)
         return GR_GENERIC;
     const char* Source = Entry->GetName();
-    const unsigned long Length = (unsigned long)std::strlen(Source);
-    const unsigned long Capacity = Size - 1u;
-    const unsigned long Count = Length < Capacity ? Length : Capacity;
+    const uint32_t Length = (uint32_t)std::strlen(Source);
+    const uint32_t Capacity = Size - 1u;
+    const uint32_t Count = Length < Capacity ? Length : Capacity;
     std::memcpy(Buf, Source, Count);
     Buf[Count] = '\0';
     return GR_OK;
@@ -1977,7 +1985,7 @@ static FTextureFrame* FindMutableFrame(FTextureEntry* Entry, int Index)
     return &Entry->Frames[Selected];
 }
 
-GENRESULT DACOM_API FTextureLibrary::SetFrameHandle(void* Record, int Index, unsigned long Handle)
+GENRESULT DACOM_API FTextureLibrary::SetFrameHandle(void* Record, int Index, uint32_t Handle)
 {
     // LAB_06ec2bf0: the first word is a child index, never a GPU handle.
     FTextureFrame* Frame = FindMutableFrame((FTextureEntry*)Record, Index);
@@ -2135,10 +2143,10 @@ GENRESULT DACOM_API FTextureLibrary::AdvanceTime(int Id, float DeltaSeconds)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FTextureLibrary::PeekNextGroupId(unsigned long* Out)
+GENRESULT DACOM_API FTextureLibrary::PeekNextGroupId(uint32_t* Out)
 {
     // LAB_06ec2240 reads tree size +0x4c, not allocation counter +0x50.
-    *Out = (unsigned long)GroupRecords.size() + 1u;
+    *Out = (uint32_t)GroupRecords.size() + 1u;
     return GR_OK;
 }
 
@@ -2161,7 +2169,7 @@ GENRESULT DACOM_API FTextureLibrary::EnumTexture(int Id, int Index, void** OutRe
 {
     if (Id == 0)
     {
-        std::map<unsigned long, FTextureEntry*>::iterator It = CanonicalRecords.begin();
+        std::map<uint32_t, FTextureEntry*>::iterator It = CanonicalRecords.begin();
         unsigned int Ordinal = 0;
         while (It != CanonicalRecords.end() && Ordinal < (unsigned int)Index)
         {
@@ -2242,8 +2250,8 @@ GENRESULT DACOM_API FTextureLibrary::AllocateNewTextureId(int* OutId)
 GENRESULT DACOM_API FTextureLibrary::SetRecordName(void* Record, const char* Name)
 {
     // LAB_06ec28e0 probes the incoming name, then erases that node before renaming Record.
-    const unsigned long Key = DACOM_CRC::GetCRC32(Name);
-    const std::map<unsigned long, FTextureEntry*>::iterator Found = CanonicalRecords.find(Key);
+    const uint32_t Key = DACOM_CRC::GetCRC32(Name);
+    const std::map<uint32_t, FTextureEntry*>::iterator Found = CanonicalRecords.find(Key);
     FTextureEntry* Entry = (FTextureEntry*)Record;
     if (Found == CanonicalRecords.end() || Entry == nullptr)
         return GR_GENERIC;
@@ -2258,8 +2266,8 @@ GENRESULT DACOM_API FTextureLibrary::SetSubTexture(void* Record, int Index, int 
     if (Parent == nullptr)
         return GR_GENERIC;
     FTextureEntry* Child = nullptr;
-    const unsigned long Handle = (unsigned long)TextureId;
-    for (std::map<unsigned long, FTextureEntry*>::const_iterator It = CanonicalRecords.begin();
+    const uint32_t Handle = (uint32_t)TextureId;
+    for (std::map<uint32_t, FTextureEntry*>::const_iterator It = CanonicalRecords.begin();
          It != CanonicalRecords.end(); ++It)
     {
         if (It->second->GpuHandle == Handle)
@@ -2301,7 +2309,7 @@ GENRESULT DACOM_API FTextureLibrary::ResolveTextureRecord(int Id, void** Out)
         return GR_GENERIC;
     FTextureEntry* Source = Playback->Source;
     AddRefEntryRecursive(Source);
-    for (std::map<unsigned long, FTextureEntry*>::const_iterator It = CanonicalRecords.begin();
+    for (std::map<uint32_t, FTextureEntry*>::const_iterator It = CanonicalRecords.begin();
          It != CanonicalRecords.end(); ++It)
     {
         if (It->second == Source)

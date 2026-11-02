@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "client_debris.h"
+#include "fl/handles.h"
 
 #include "client_explosion.h"   // Action_Explode (FUN_005361e0)
 #include "client_objdb.h"       // ClientObjDb_RegisterGameobj (FUN_00540c30)
@@ -425,7 +426,7 @@ void FClientDebrisGameobj::Init(FDebrisArch const* Arch)
     // +0x3c (FUN_005553b0, no hint).
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+    DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
 }
 
 FClientDebrisGameobj* CreateDebrisGameobjForObject(CObject* Object, FDebrisArch const* Arch)

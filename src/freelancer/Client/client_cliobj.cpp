@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "client_cliobj.h"
+#include "fl/handles.h"
 
 #include "common_goods.h"
 #include "common_id.h"
@@ -33,7 +34,7 @@ namespace Archetype
 {
     struct FCliMaterialEntry
     {
-        unsigned long PathCrc;
+        uint32_t PathCrc;
         int TextureId;
         int MaterialId;
         void* VMeshHandle;
@@ -235,7 +236,7 @@ namespace Archetype
             void Bind(Root* Record) override;
             void FreeResources() override;
             void Inherit(ICliObj* Donor) override;
-            unsigned long Load(int LoadMode) override;
+            uint32_t Load(int LoadMode) override;
             void* Slot09(unsigned Flags) override;
             void Slot10() override;
             void Slot11() override;
@@ -251,7 +252,7 @@ namespace Archetype
             // FUN_00406c50 — recompute LodPick from BoundRoot; keeps stale value if !is_loaded.
             void RecomputeLodPick(float const* BlendSource);
             // FUN_00406cd0 — same with caller-supplied engine index / flag (no Root lookup).
-            void RecomputeLodPickExplicit(long EngineIndex, float const* BlendSource,
+            void RecomputeLodPickExplicit(int32_t EngineIndex, float const* BlendSource,
                                           bool bSolarOrShip);
 
             // Layout public so offsetof can verify retail offsets (like Archetype::Root).
@@ -531,7 +532,7 @@ namespace Archetype
             bool ReadUnknown(INI_Reader* Reader) override;
             void Redefine(ICliObj* Donor) override;
             void Inherit(ICliObj* Donor) override;
-            unsigned long Load(int LoadMode) override;
+            uint32_t Load(int LoadMode) override;
             void Slot11() override;
 
             // FUN_00408a70 — random pick from LiveEffects.
@@ -626,7 +627,7 @@ namespace Archetype
             bool ReadUnknown(INI_Reader* Reader) override;
             void Redefine(ICliObj* Donor) override;
             void Inherit(ICliObj* Donor) override;
-            unsigned long Load(int LoadMode) override;
+            uint32_t Load(int LoadMode) override;
 
             ID_String FlashParticle;     // +0x54 "flash_particle_name"
             float FlashRadius;           // +0x58 "flash_radius", ctor 4.0
@@ -784,7 +785,7 @@ namespace Archetype
         // frees nodes -- nothing is released through the libraries at exit. std::map with the
         // entry by value has exactly those properties (node addresses are stable, so
         // &It->second is the retail node + 0xc pointer).
-        std::map<unsigned long, FCliMaterialEntry> GMaterialCacheByCrc;
+        std::map<uint32_t, FCliMaterialEntry> GMaterialCacheByCrc;
 
         // FUN_0041acf0 — init probe/entry fields from path CRC.
         void InitMaterialEntry(FCliMaterialEntry* Entry, char const* Path)
@@ -808,8 +809,8 @@ namespace Archetype
             EnterCriticalSection(&GMaterialCacheLock.Cs);
             FCliMaterialEntry Candidate;
             InitMaterialEntry(&Candidate, Path);
-            std::pair<std::map<unsigned long, FCliMaterialEntry>::iterator, bool> const Result =
-                GMaterialCacheByCrc.insert(std::pair<unsigned long const, FCliMaterialEntry>(
+            std::pair<std::map<uint32_t, FCliMaterialEntry>::iterator, bool> const Result =
+                GMaterialCacheByCrc.insert(std::pair<uint32_t const, FCliMaterialEntry>(
                     Candidate.PathCrc, Candidate));
             LeaveCriticalSection(&GMaterialCacheLock.Cs);
 
@@ -827,7 +828,7 @@ namespace Archetype
         bool LoadMaterialTextures(IFileSystem* Filesys, FCliMaterialEntry* Entry, unsigned Arg)
         {
             // 0x0041ad38: the saved group starts at 0.
-            unsigned long SavedGroup = 0;
+            uint32_t SavedGroup = 0;
             bool bRestoreGroup = false;
             int GroupOverride = static_cast<int>(Arg);
 
@@ -848,7 +849,7 @@ namespace Archetype
                 // 0x0041ad84 slot 4 (+0x10) GetGenericSlot(4, &saved); 0x0041ad94 slot 3 (+0x0c)
                 // SetGenericSlot(4, group).
                 DALib::TextureLib->GetGenericSlot(4, &SavedGroup);
-                DALib::TextureLib->SetGenericSlot(4, static_cast<unsigned long>(GroupOverride));
+                DALib::TextureLib->SetGenericSlot(4, static_cast<uint32_t>(GroupOverride));
             }
 
             // 0x0041adab: slot 5 (+0x14) with the entry's +0x04.
@@ -959,7 +960,7 @@ namespace Archetype
                     if (!bTexOk && MaterialResult < 0 && Entry->VMeshHandle == nullptr &&
                         Entry->MatAnimHandle == nullptr)
                     {
-                        unsigned long const Key = Entry->PathCrc;   // the node dies with the erase
+                        uint32_t const Key = Entry->PathCrc;   // the node dies with the erase
                         EnterCriticalSection(&GMaterialCacheLock.Cs);
                         GMaterialCacheByCrc.erase(Key);
                         LeaveCriticalSection(&GMaterialCacheLock.Cs);
@@ -1020,7 +1021,7 @@ namespace Archetype
             if (!bTexOk && MaterialResult < 0 && Entry->VMeshHandle == nullptr &&
                 Entry->MatAnimHandle == nullptr)
             {
-                unsigned long const Key = Entry->PathCrc;       // the node dies with the erase
+                uint32_t const Key = Entry->PathCrc;       // the node dies with the erase
                 EnterCriticalSection(&GMaterialCacheLock.Cs);
                 GMaterialCacheByCrc.erase(Key);
                 LeaveCriticalSection(&GMaterialCacheLock.Cs);
@@ -1105,7 +1106,7 @@ namespace Archetype
                 // equal_range); Entry is not touched afterwards.
                 if (Remaining <= 0)
                 {
-                    unsigned long const Key = Entry->PathCrc;   // the node dies with the erase
+                    uint32_t const Key = Entry->PathCrc;   // the node dies with the erase
                     GMaterialCacheByCrc.erase(Key);
                 }
             }
@@ -1127,7 +1128,7 @@ namespace Archetype
         // on +0x0c (0) -- each only when set. That is DestroyMaterialEntryResources, the same
         // body ReleaseMaterialEntrySlot (FUN_0041b030) inlines. Reference counts are ignored.
         int Count = 0;
-        std::map<unsigned long, FCliMaterialEntry>::iterator It = GMaterialCacheByCrc.begin();
+        std::map<uint32_t, FCliMaterialEntry>::iterator It = GMaterialCacheByCrc.begin();
         for (; It != GMaterialCacheByCrc.end(); ++It)
         {
             ++Count;
@@ -1163,7 +1164,7 @@ namespace Archetype
 
                 void* MatHook = nullptr;
                 GENRESULT const Qi = DALib::Engine->QueryEngineComponent(
-                    static_cast<int>(reinterpret_cast<ptrdiff_t>(Handle)),
+                    static_cast<int>(fl::PtrToHandle(Handle)),
                     const_cast<char*>(Iids::MatHookUp), &MatHook);
                 if (Qi >= 0)
                 {
@@ -1178,7 +1179,7 @@ namespace Archetype
         // archetype (Engine slot 19, +0x4c) walks its children (slot 21, +0x54) with
         // LAB_004253f0 and a null context (the callback answers AL = 1); otherwise the body on
         // the argument itself. No test of the argument or of the DALib globals.
-        void UnloadEngineComponents(long EngineIndex)
+        void UnloadEngineComponents(int32_t EngineIndex)
         {
             void* const Handle = reinterpret_cast<void*>(EngineIndex);
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
@@ -1276,7 +1277,7 @@ namespace Archetype
 
             // 0x00401f80..0x00401fbd: the first node whose part CRC (+0x24) is 0 or matches; no
             // list, or no match -> done.
-            unsigned long const PartCrc = DACOM_CRC::GetCRC32(PartName);
+            uint32_t const PartCrc = DACOM_CRC::GetCRC32(PartName);
             FLodNode* const Head = Ctx->Head;
             FLodNode* Match = Head;
             if (Match == nullptr)
@@ -1362,7 +1363,7 @@ namespace Archetype
                     Ctx->MaxDistance = static_cast<float>(Range);
                 DALib::Renderer->SetArchetypeLodRange(MeshHandle, Index, PriorScaled, CurrentScaled);
                 DALib::Renderer->SetArchetypeRootLodSelection(MeshHandle, reinterpret_cast<void*>(-1),
-                                        static_cast<unsigned long>(Ctx->Unused08));
+                                        static_cast<uint32_t>(Ctx->Unused08));
                 PriorScaled = CurrentScaled;
                 ++Index;
             } while (Index < LodCount);
@@ -1371,7 +1372,7 @@ namespace Archetype
         }
 
         // FUN_004021b0 — thiscall on LodHead; blends optional source, then ApplyArchLodRanges.
-        float ComputeLodPickThis(FLodNode* LodHead, long EngineIndex, float const* BlendSource,
+        float ComputeLodPickThis(FLodNode* LodHead, int32_t EngineIndex, float const* BlendSource,
                                  bool bSolarOrShip)
         {
             // FUN_004021b0 (thiscall on the LOD list head, RET 0xc), listing-traced
@@ -1433,11 +1434,10 @@ namespace Archetype
         }
 
         // FUN_004022f0 — cdecl thunk: (EngineIndex, LodHead, BlendSource, bSolarOrShip).
-        float ComputeLodPick(long EngineIndex, FLodNode* LodHead, int BlendSource,
+        float ComputeLodPick(int32_t EngineIndex, FLodNode* LodHead, int BlendSource,
                              bool bSolarOrShip)
         {
-            float const* Blend = reinterpret_cast<float const*>(
-                static_cast<ptrdiff_t>(BlendSource));
+            float const* Blend = static_cast<float const*>(fl::HandleToPtr(static_cast<uint32_t>(BlendSource)));
             return ComputeLodPickThis(LodHead, EngineIndex, Blend, bSolarOrShip);
         }
 
@@ -2134,12 +2134,12 @@ namespace Archetype
 
             int BlendArg = 0;
             if (BlendSource != nullptr)
-                BlendArg = static_cast<int>(reinterpret_cast<ptrdiff_t>(BlendSource));
+                BlendArg = static_cast<int>(fl::PtrToHandle(BlendSource));
             LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, BlendArg, bSolarOrShip);
         }
 
         // FUN_00406cd0 — explicit-parameter overload (no Root::is_loaded gate).
-        void FCliObj::RecomputeLodPickExplicit(long EngineIndex, float const* BlendSource,
+        void FCliObj::RecomputeLodPickExplicit(int32_t EngineIndex, float const* BlendSource,
                                                bool bSolarOrShip)
         {
             if (LodHead == nullptr)
@@ -2150,7 +2150,7 @@ namespace Archetype
 
             int BlendArg = 0;
             if (BlendSource != nullptr)
-                BlendArg = static_cast<int>(reinterpret_cast<ptrdiff_t>(BlendSource));
+                BlendArg = static_cast<int>(fl::PtrToHandle(BlendSource));
             LodPick = ComputeLodPick(EngineIndex, LodHead, BlendArg, bSolarOrShip);
         }
 
@@ -2361,7 +2361,7 @@ namespace Archetype
             return PickRecordByDistance(&ShieldHitEffects, Distance);
         }
 
-        unsigned long FCliObj::Load(int LoadMode)
+        uint32_t FCliObj::Load(int LoadMode)
         {
             // LAB_00407380 — LoadMode unread in base (Munition override uses it).
             (void)LoadMode;
@@ -3489,13 +3489,13 @@ namespace Archetype
 
         // LAB_004081c0. 004081c9..004081e1: "skip" = cache built AND Slot12 done, sampled
         // before anything runs. 004081e1..0040828a is LAB_00407380's body inlined.
-        unsigned long FCliMunition::Load(int LoadMode)
+        uint32_t FCliMunition::Load(int LoadMode)
         {
             bool bSkipEffectRebuild =
                 ((StateFlags & CliObjFlagCacheBuilt) != 0) &&
                 ((StateFlags & CliObjFlagSlot12Done) != 0);
 
-            unsigned long Result = FCliObj::Load(LoadMode);
+            uint32_t Result = FCliObj::Load(LoadMode);
 
             if (!bSkipEffectRebuild)
                 RebuildLiveEffects(static_cast<unsigned>(LoadMode));
@@ -3817,12 +3817,12 @@ namespace Archetype
         // unless it was already loaded, the launcher's projectile_archetype (Root +0x98) is looked
         // up with Archetype::GetEquipment and that equipment's companion (Root +0x04) is loaded
         // with the same argument (0040a4b7 JMP [vt+0x20]).
-        unsigned long FCliLauncher::Load(int LoadMode)
+        uint32_t FCliLauncher::Load(int LoadMode)
         {
             bool const bWasLoaded = (StateFlags & CliObjFlagCacheBuilt) != 0 &&
                                     (StateFlags & CliObjFlagSlot12Done) != 0;
 
-            unsigned long const Result = FCliObj::Load(LoadMode);
+            uint32_t const Result = FCliObj::Load(LoadMode);
             if (bWasLoaded)
                 return Result;
 
@@ -4576,7 +4576,7 @@ namespace Archetype
         return static_cast<FCliSolar*>(Companion)->ShapeName();
     }
 
-    void CliObjRecomputeLodPickExplicit(ICliObj* Companion, long EngineIndex,
+    void CliObjRecomputeLodPickExplicit(ICliObj* Companion, int32_t EngineIndex,
                                         float const* BlendSource, bool bSolarOrShip)
     {
         // FUN_00406cd0, called directly (thiscall on the companion) by FUN_005595a0 and
@@ -4676,7 +4676,7 @@ namespace Archetype
         }
     }
 
-    void HookUpInstanceTreeMaterials(long EngineIndex)
+    void HookUpInstanceTreeMaterials(int32_t EngineIndex)
     {
         // FUN_00425480 (cdecl).
         void* const Instance = reinterpret_cast<void*>(EngineIndex);

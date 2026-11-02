@@ -422,9 +422,14 @@ static void io_date (void) {
   char Buffer[256];
   char *Format = luaL_opt_string(1, "%c");
   struct tm *LocalTime;
+#if defined(_MSC_VER)
   __time32_t Time;
   _time32(&Time);
   LocalTime = _localtime32(&Time);
+#else
+  time_t Time = time(NULL);
+  LocalTime = localtime(&Time);
+#endif
   if (strftime(Buffer, sizeof(Buffer), Format, LocalTime))
     lua_pushstring(Buffer);
   else

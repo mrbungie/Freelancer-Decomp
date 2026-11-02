@@ -22,6 +22,7 @@
 //   TEST 0x44 / JP  taken when ST != src or unordered
 
 #include "common_zone.h"
+#include "fl/handles.h"
 #include "common_archetype.h" // CacheString
 
 #include "common_csys.h"  // Acquire3DMathEngine (FUN_06391cf0)
@@ -1184,7 +1185,7 @@ ZONE::~ZONE()
     // ReleaseHandle) and the handle is reset.
     if (MeshHandle != -1)
     {
-        DALib::Engine->ReleaseHandle((void*)MeshHandle);
+        DALib::Engine->ReleaseHandle((void*)fl::HandleToPtr(MeshHandle));
         MeshHandle = -1;
     }
     // .text:06339057-06339067: the owned loot record (FUN_06391d5a is free()).
@@ -1261,7 +1262,7 @@ unsigned ZONE::GetShape() const
 }
 
 // 062a6690 (ICF): MOV EAX,[ECX+0x40].
-unsigned long ZONE::GetProperties() const
+uint32_t ZONE::GetProperties() const
 {
     return PropertyFlags;
 }
@@ -1285,7 +1286,7 @@ Vector ZONE::GetSize() const
 }
 
 // 063390f0 (ICF): MOV EAX,[ECX+0x50].
-long ZONE::GetMeshHandle() const
+int32_t ZONE::GetMeshHandle() const
 {
     return MeshHandle;
 }

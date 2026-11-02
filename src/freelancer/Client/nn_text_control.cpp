@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "nn_text_control.h"
+#include "fl/handles.h"
 #include "hud_widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
 
 #include "font_imp.h"
@@ -281,15 +282,15 @@ bool NnTextControl::Create(Win3D* NewParent, void* Data)
             else if (Ini->is_value("stringID"))
             {
                 // 0058a07f..0058a08f: ftol(value) into FUN_0058a5f0.
-                SetIds(static_cast<unsigned>(static_cast<long>(Ini->get_value_float(0))));
+                SetIds(static_cast<unsigned>(static_cast<int32_t>(Ini->get_value_float(0))));
             }
             else if (Ini->is_value("justification"))
             {
-                Dword358 = static_cast<long>(Ini->get_value_float(0)); // 0058a0a3..0058a0b0
+                Dword358 = static_cast<int32_t>(Ini->get_value_float(0)); // 0058a0a3..0058a0b0
             }
             else if (Ini->is_value("tooltip"))
             {
-                Dword344 = static_cast<long>(Ini->get_value_float(0)); // 0058a0c3..0058a0d2
+                Dword344 = static_cast<int32_t>(Ini->get_value_float(0)); // 0058a0c3..0058a0d2
             }
         } while (Ini->read_value()); // 0058a0d8..0058a0e2
     }
@@ -752,7 +753,7 @@ void NnTextControl::Draw()
     // 0058aa6a..0058abf7: the colour (FUN_00417780).
     if (bColourOverride != 0)
     {
-        unsigned long PackedOverride;
+        uint32_t PackedOverride;
         memcpy(&PackedOverride, OverrideColour, sizeof(PackedOverride));
         FontAtlasSetDrawColor(static_cast<unsigned>(PackedOverride));
     }
@@ -800,7 +801,7 @@ void NnTextControl::Draw()
             // draws in the pulse colour (FUN_00561da0).
             if (HitTest(Ray) && Byte380 != 0)
             {
-                unsigned long Pulse = 0;
+                uint32_t Pulse = 0;
                 NnUiPulseBlendArgb(&Pulse);
                 FontAtlasSetDrawColor(static_cast<unsigned>(Pulse));
             }
@@ -854,8 +855,8 @@ void NnTextControl::Draw()
         TextWinProjectPoint(World, &Origin.X, &Origin.Y);
     }
     FontStringDrawChildren(&Origin, FontString,
-                           reinterpret_cast<void*>(static_cast<intptr_t>(Field34c)),
-                           reinterpret_cast<void*>(static_cast<intptr_t>(Field350))); // 0058ad52
+                           static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Field34c))),
+                           static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Field350)))); // 0058ad52
     Win3DDisable(kWin3DDepthTest); // 0058ad57
 }
 
@@ -872,7 +873,7 @@ intptr_t NnTextControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
         Offset[1] = NewOffset[1];
         Offset[2] = NewOffset[2];
         // 0058b4c5: no engine instance (+0x84 == -1) -- done.
-        if (MeshHolder.EngineInstance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+        if (MeshHolder.EngineInstance == static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
             return 0;
         float Local[3];
         GetAttachPosition(Local);   // 0058b4e1 vt+0xa4

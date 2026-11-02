@@ -34,7 +34,7 @@ IUnknown* g_serviceProvider = nullptr; // DAT_06ae0948
 HMODULE g_movieModule = nullptr; // DAT_06ae0904
 
 // 0x06ac16a0
-bool __cdecl Movie_LogNegativeCode(long Code, const char* File, int Line)
+bool __cdecl Movie_LogNegativeCode(int32_t Code, const char* File, int Line)
 {
     char Buffer[0x400];
     if (Code < 0)
@@ -211,7 +211,7 @@ void __cdecl StopMovie()
     }
 }
 
-long __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path)
+int32_t __cdecl PlayMovie(HWND hwnd, bool fullscreen, const char* path)
 {
     if (g_stateFlag == 0)
     {

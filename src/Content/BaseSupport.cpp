@@ -302,7 +302,7 @@ namespace
                 if (Stage < Item->FromStage || Stage > Item->ToStage)
                     continue;
                 Item->Desc.BaseId = BaseId;
-                unsigned long const Handle = pub::GF::NewsBroadcastCreate(Item->Desc);
+                uint32_t const Handle = pub::GF::NewsBroadcastCreate(Item->Desc);
                 Visit.NewsHandles.push_back(Handle);                           // FUN_06eb5770
             }
             // 06eb4ecf-06eb4f17: pair copy (FUN_06eb5660, the offers are copied without a
@@ -326,7 +326,7 @@ namespace
             }
             else
             {
-                for (std::vector<unsigned long>::iterator Handle =
+                for (std::vector<uint32_t>::iterator Handle =
                          Visit->second.NewsHandles.begin();
                      Handle != Visit->second.NewsHandles.end(); ++Handle)
                     pub::GF::NewsBroadcastDestroy(&*Handle);

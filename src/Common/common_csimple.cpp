@@ -6,6 +6,7 @@
 
 // CSimple (retail CSimple.cpp) and CEquipmentObj.
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "common_cobject_internal.h" // CmnCobject::CopyMatrix9
 #include "x86math.h"
 
@@ -148,7 +149,7 @@ void CSimple::cache_physical_props()
         return;
     }
 
-    DALib::Engine->GetInstanceExtent((void*)EngineInstanceId, 0, &CachedRadius,
+    DALib::Engine->GetInstanceExtent((void*)fl::HandleToPtr(EngineInstanceId), 0, &CachedRadius,
                                      (float*)&CachedCenterOfMass);
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
@@ -315,7 +316,7 @@ void CSimple::init(CreateParms const& Parms)
 
     // .text:062b5c99-062b5cac: DALib::Engine vt+0x6c, IEngine::UpdateInstance(this+4, 0, 0).
     // The engine instance was made by whoever created this object (see CSimple::open).
-    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr);
+    DALib::Engine->UpdateInstance((void*)fl::HandleToPtr(EngineInstanceId), 0, nullptr);
 
     // .text:062b5caf-062b5cbb: vt+0x9c init_physics(Parms+0x40, Parms+0x4c).
     init_physics(Parms.Velocity, Parms.AngularVelocity);

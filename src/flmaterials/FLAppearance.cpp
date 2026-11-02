@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "flmaterials.h"
+#include "fl/handles.h"
 #include "common_misc.h" // ICamera
 #include "engine/engbase.h" // IEngine
 #include "render/rendcomp.h" // IRenderer2
@@ -54,9 +55,9 @@ namespace
     unsigned char G_Slot12FlagC = 1; // DAT_06704094
     unsigned char G_Slot12FlagD = 0; // DAT_06704644
 
-    const unsigned long kShadowDrawRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
-    const unsigned long kShadowDrawTss0[] = {1, 4, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
-    const unsigned long kShadowDrawTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
+    const uint32_t kShadowDrawRs[] = {0x89, 0, 0x1D, 0, 0x1B, 1, 0x13, 5, 0x14, 6, 0};
+    const uint32_t kShadowDrawTss0[] = {1, 4, 2, 2, 3, 1, 4, 4, 5, 2, 6, 1, 0};
+    const uint32_t kShadowDrawTss1[] = {1, 1, 2, 2, 3, 1, 4, 1, 5, 2, 6, 1, 0};
 
     const char* const G_Name3DMathEngine = "3DMathEngine";
     const float kCameraNearConst = 1.0f;       // DAT_06701394
@@ -73,7 +74,7 @@ namespace
     const float kShadowColorScale = 255.0f;    // DAT_067022C4
     const float kShadowFadeForce = 10.0f;      // DAT_06702FC0
     const double kShadowScaleBias = 0.8;       // DAT_06702FB8
-    const unsigned long kShadowFvf = 0x142;    // XYZ|DIFFUSE|TEX1
+    const uint32_t kShadowFvf = 0x142;    // XYZ|DIFFUSE|TEX1
     float G_ShadowQuadScale = 1.0f;            // DAT_06704078
     unsigned char G_ShadowFadeForce = 0;       // DAT_06704640
     I3DMathEngine* G_MathEngine = nullptr;
@@ -124,17 +125,17 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount_ += 1;
             return RefCount_;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount_ != 0)
                 RefCount_ -= 1;
-            const unsigned long Next = RefCount_;
+            const uint32_t Next = RefCount_;
             if (Next == 0)
             {
                 RefCount_ = 1;
@@ -303,11 +304,17 @@ namespace
             if (G_MathEngine == nullptr)
                 G_MathEngine = FlmCreateMathEngine();
             I3DMathEngine* Math = G_MathEngine;
+            if (getenv("FL_TRACE_RENDER")) { void** vt = *(void***)Math; fprintf(stderr, "[fl] math=%p vtbl=%p s5..9=%p %p %p %p %p\n", (void*)Math, (void*)vt, vt[5], vt[6], vt[7], vt[8], vt[9]); }
             float Dest[3];
             // These references view float storage without a numeric conversion.
-            Math->TransposeTransform(reinterpret_cast<FVector&>(Dest[0]),
-                                     reinterpret_cast<const FMatrix&>(TransformA_[0]),
-                                     reinterpret_cast<const FVector&>(TransformA_[9]));
+            {   // TransposeTransform(Dest, TransformA_ rotation, TransformA_ translation): Dest = R^T * t
+                const float* R = &TransformA_[0];
+                const float* T = &TransformA_[9];
+                Dest[0] = R[0] * T[0] + R[3] * T[1] + R[6] * T[2];
+                Dest[1] = R[1] * T[0] + R[4] * T[1] + R[7] * T[2];
+                Dest[2] = R[2] * T[0] + R[5] * T[1] + R[8] * T[2];
+                (void)Math;
+            }
             float Transposed[12];
             Transposed[0] = TransformA_[0];
             Transposed[1] = TransformA_[3];
@@ -335,7 +342,7 @@ namespace
         float TransformB_[12];
         float Vec6C_[3];
         float Vec78_[3];
-        unsigned long RefCount_;
+        uint32_t RefCount_;
     };
 
     static_assert(sizeof(FCameraBlob) == 0x88, "retail camera object is 0x88");
@@ -372,10 +379,10 @@ namespace
             return;
         }
 
-        unsigned long CrcStruct[2];
-        CrcStruct[0] = (unsigned long)(Name);
-        CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
-        Materials->RemoveMaterial(0, CrcStruct);
+        FEngineName CrcStruct;
+        CrcStruct.Text = Name;
+        CrcStruct.Crc = DACOM_CRC::GetCRC32(Name);
+        Materials->RemoveMaterial(0, &CrcStruct);
     }
 
     void CreateOverrides(IDAComponent* Library)
@@ -383,7 +390,7 @@ namespace
         for (int Index = 0; Index < kOverrideCount; ++Index)
             CreateOneOverride(Library, Index);
 
-        unsigned long Reserve[2];
+        uint32_t Reserve[2];
         Reserve[0] = 1;
         Reserve[1] = 0;
         ((IMaterialLibrary*)Library)->SetGlobalRecord(4, Reserve);
@@ -396,8 +403,8 @@ namespace
         {
         public:
             GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-            unsigned long DACOM_API AddRef() override;
-            unsigned long DACOM_API Release() override;
+            uint32_t DACOM_API AddRef() override;
+            uint32_t DACOM_API Release() override;
             int DACOM_API Initialize() override;
             int DACOM_API CreateArchetype(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
             int DACOM_API DuplicateArchetype(void* A, void* B) override { (void)A; (void)B; return GR_OK; }
@@ -426,9 +433,9 @@ namespace
         {
         public:
             GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-            unsigned long DACOM_API AddRef() override;
-            unsigned long DACOM_API Release() override;
-            unsigned long RefCount;
+            uint32_t DACOM_API AddRef() override;
+            uint32_t DACOM_API Release() override;
+            uint32_t RefCount;
             FFLAppearanceBase* Owner;
         };
 
@@ -436,14 +443,14 @@ namespace
         virtual ~FFLAppearanceBase() noexcept(false);
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override = 0;
-        unsigned long DACOM_API AddRef() override = 0;
-        unsigned long DACOM_API Release() override = 0;
+        uint32_t DACOM_API AddRef() override = 0;
+        uint32_t DACOM_API Release() override = 0;
         GENRESULT DACOM_API SetInstanceValue(int Id, void* Value) override;
         GENRESULT DACOM_API GetInstanceValue(int Id, void** Out) override;
         GENRESULT DACOM_API RemoveInstanceValue(int Key) override;
         GENRESULT DACOM_API SetDirectionalLight(const float* First, const float* Second) override;
         GENRESULT DACOM_API SetDirectionalLightEnabled(unsigned char Flag) override;
-        GENRESULT DACOM_API GetOverrideMaterial(unsigned long Index, void** Out) override;
+        GENRESULT DACOM_API GetOverrideMaterial(uint32_t Index, void** Out) override;
         GENRESULT DACOM_API DrawBackdrop(void* A, void* Extra) override;
         GENRESULT DACOM_API DrawStarsphere(void* A, void* Extra) override;
         GENRESULT DACOM_API DrawFadingShadows(void* A, void* B, void* C, void* D) override;
@@ -473,8 +480,8 @@ namespace
         {
             return Outer_->QueryInterface(Iid, Out);
         }
-        unsigned long DACOM_API AddRef() override { return Outer_->AddRef(); }
-        unsigned long DACOM_API Release() override { return Outer_->Release(); }
+        uint32_t DACOM_API AddRef() override { return Outer_->AddRef(); }
+        uint32_t DACOM_API Release() override { return Outer_->Release(); }
     };
 
     FFLAppearanceBase* OwnerFromEngineFace(FFLAppearanceBase::FEngineFace* Face)
@@ -514,12 +521,12 @@ namespace
         return OwnerFromEngineFace(this)->QueryInterface(Iid, Out);
     }
 
-    unsigned long DACOM_API FFLAppearanceBase::FEngineFace::AddRef()
+    uint32_t DACOM_API FFLAppearanceBase::FEngineFace::AddRef()
     {
         return OwnerFromEngineFace(this)->AddRef();
     }
 
-    unsigned long DACOM_API FFLAppearanceBase::FEngineFace::Release()
+    uint32_t DACOM_API FFLAppearanceBase::FEngineFace::Release()
     {
         return OwnerFromEngineFace(this)->Release();
     }
@@ -533,7 +540,7 @@ namespace
     {
         // LAB_066fda20: adjust the receiver and forward to IFLAppearance slot 5.
         return OwnerFromEngineFace(this)->RemoveInstanceValue(
-            (int)((unsigned long)(Instance)));
+            (int)((uint32_t)fl::PtrToHandle((Instance))));
     }
 
     GENRESULT DACOM_API FFLAppearanceBase::FInner::QueryInterface(const char* Iid, void** Out)
@@ -555,18 +562,18 @@ namespace
         return GR_OK;
     }
 
-    unsigned long DACOM_API FFLAppearanceBase::FInner::AddRef()
+    uint32_t DACOM_API FFLAppearanceBase::FInner::AddRef()
     {
         RefCount += 1;
         return RefCount;
     }
 
-    unsigned long DACOM_API FFLAppearanceBase::FInner::Release()
+    uint32_t DACOM_API FFLAppearanceBase::FInner::Release()
     {
         // LAB_066ff8d0: zero skips decrement, then still enters destruction.
         if (RefCount != 0)
             RefCount -= 1;
-        const unsigned long Next = RefCount;
+        const uint32_t Next = RefCount;
         if (Next == 0)
         {
             RefCount = 1;
@@ -730,7 +737,7 @@ namespace
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFLAppearanceBase::GetOverrideMaterial(unsigned long Index, void** Out)
+    GENRESULT DACOM_API FFLAppearanceBase::GetOverrideMaterial(uint32_t Index, void** Out)
     {
         *Out = G_Overrides[Index];
         if (*Out != nullptr)
@@ -759,7 +766,7 @@ namespace
     void FillLocalAxes(FCameraBlob* Camera)
     {
         const int* Viewport = Camera->Inner()->GetViewport();
-        const long Width = (long)Viewport[2] - (long)Viewport[0];
+        const int32_t Width = (int32_t)Viewport[2] - (int32_t)Viewport[0];
         const float HalfWidth = (float)((double)Width * kHalf);
         const float Horizontal = (float)((double)HalfWidth / Camera->GetXScaleOverNear());
         const float Vertical = (float)((double)Horizontal / Camera->GetAspect());
@@ -788,12 +795,12 @@ namespace
             : Pipeline(Pipeline)
         {
             PipelineGetRenderState(Pipeline, D3DRS_AMBIENT, &Saved);
-            PipelineSetRenderState(Pipeline, D3DRS_AMBIENT, (unsigned long)-1);
+            PipelineSetRenderState(Pipeline, D3DRS_AMBIENT, (uint32_t)-1);
         }
         ~FAppearanceRenderStateScope() noexcept(false) { PipelineSetRenderState(Pipeline, D3DRS_AMBIENT, Saved); }
     private:
         IRenderPipeline* Pipeline;
-        unsigned long Saved;
+        uint32_t Saved;
     };
 
     struct FShadowTextureScope // FUN_066ff260
@@ -813,7 +820,7 @@ namespace
 
     struct FShadowRenderStateScope // FUN_066f3080
     {
-        FShadowRenderStateScope(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, unsigned long Value)
+        FShadowRenderStateScope(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, uint32_t Value)
             : Pipeline(Pipeline), State(State)
         {
             PipelineGetRenderState(Pipeline, State, &Saved);
@@ -822,7 +829,7 @@ namespace
         ~FShadowRenderStateScope() noexcept(false) { PipelineSetRenderState(Pipeline, State, Saved); }
         IRenderPipeline* Pipeline;
         D3DRENDERSTATETYPE State;
-        unsigned long Saved;
+        uint32_t Saved;
     };
 
     struct FShadowInterfacesScope
@@ -864,7 +871,7 @@ namespace
         float X;
         float Y;
         float Z;
-        unsigned long Color;
+        uint32_t Color;
         float U;
         float V;
     };
@@ -877,24 +884,24 @@ namespace
         int Stride;
         int Written;
         int MaxVerts;
-        unsigned long ColorValue;
+        uint32_t ColorValue;
         float U;
         float V;
-        unsigned long ExpanderCount;
+        uint32_t ExpanderCount;
         FShadowCorner Saved[2];
     };
 
-    void ShadowWriterReset(FShadowVertWriter* Writer, char* Dest, int MaxVerts, unsigned long Fvf)
+    void ShadowWriterReset(FShadowVertWriter* Writer, char* Dest, int MaxVerts, uint32_t Fvf)
     {
         Writer->Xyz = Dest;
-        const unsigned long PositionBytes = (Fvf & 0xC) == 0xC ? 28 :
+        const uint32_t PositionBytes = (Fvf & 0xC) == 0xC ? 28 :
             ((Fvf & 4) != 0 ? 16 : ((Fvf & 2) != 0 ? 12 : 0));
-        const unsigned long NormalBytes = (Fvf & 0x10) != 0 ? 12 : 0;
-        const unsigned long ColorBytes = ((Fvf & 0x40) != 0 ? 4 : 0) + ((Fvf & 0x80) != 0 ? 4 : 0);
-        unsigned long TextureBytes = 0;
-        for (unsigned long Index = 0; Index < ((Fvf >> 8) & 15); ++Index)
+        const uint32_t NormalBytes = (Fvf & 0x10) != 0 ? 12 : 0;
+        const uint32_t ColorBytes = ((Fvf & 0x40) != 0 ? 4 : 0) + ((Fvf & 0x80) != 0 ? 4 : 0);
+        uint32_t TextureBytes = 0;
+        for (uint32_t Index = 0; Index < ((Fvf >> 8) & 15); ++Index)
         {
-            const unsigned long Lane = (Fvf >> ((16 + Index * 2) & 31)) & 3;
+            const uint32_t Lane = (Fvf >> ((16 + Index * 2) & 31)) & 3;
             TextureBytes += Lane == 0 ? 8 : (Lane == 1 ? 12 : (Lane == 2 ? 16 : 4));
         }
         Writer->Color = Dest + PositionBytes + NormalBytes;
@@ -915,7 +922,7 @@ namespace
         Xyz[1] = Corner->Y;
         Xyz[2] = Corner->Z;
         Writer->Xyz += Writer->Stride;
-        *(unsigned long*)Writer->Color = Corner->Color;
+        *(uint32_t*)Writer->Color = Corner->Color;
         Writer->Color += Writer->Stride;
         float* Uv = (float*)Writer->Uv;
         Uv[0] = Corner->U;
@@ -935,7 +942,7 @@ namespace
         Corner.U = Writer->U;
         Corner.V = Writer->V;
         ShadowWriterRaw(Writer, &Corner);
-        const unsigned long Index = Writer->ExpanderCount;
+        const uint32_t Index = Writer->ExpanderCount;
         if ((Index & 1) == 0)
             Writer->Saved[Index >> 1] = Corner;
         Writer->ExpanderCount = Index + 1;
@@ -952,18 +959,18 @@ namespace
                              void* D)
     {
         (void)D;
-        unsigned long Ability = 0;
+        uint32_t Ability = 0;
         PipelineQueryDeviceAbility(Appearance->Pipeline_, 9, &Ability);
         if (Ability == 0)
             return (GENRESULT)-1;
-        const int InstanceCount = (int)((unsigned long)(C));
+        const int InstanceCount = (int)((uint32_t)fl::PtrToHandle((C)));
         if (InstanceCount == 0)
             return GR_OK;
 
         FShadowTextureScope Texture((ITextureLibrary2*)Appearance->TextureLibrary_);
-        unsigned long Handle = 0;
-        unsigned long Crc[2] = {(unsigned long)("efxshadow"), DACOM_CRC::GetCRC32("efxshadow")};
-        const GENRESULT Found = Texture.Library->FindTextureByCrc(Crc, &Texture.Record);
+        uint32_t Handle = 0;
+        FEngineName Crc = {"efxshadow", DACOM_CRC::GetCRC32("efxshadow")};
+        const GENRESULT Found = Texture.Library->FindTextureByCrc(&Crc, &Texture.Record);
         if (Found < 0)
         {
             FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
@@ -972,7 +979,7 @@ namespace
         }
         else
         {
-            unsigned long Frame[5];
+            uint32_t Frame[5];
             if (Texture.Library->GetTextureFrame(Texture.Record, 0, Frame) >= 0)
                 Handle = Frame[0];
         }
@@ -991,9 +998,9 @@ namespace
         PipelineApplyTssTable(Appearance->Pipeline_, 1, kShadowDrawTss1);
 
         FShadowInterfacesScope Interfaces(Appearance->Pipeline_, Appearance->VertexBuffers_);
-        const unsigned long QuadVertsBits = (unsigned long)InstanceCount * 4;
+        const uint32_t QuadVertsBits = (uint32_t)InstanceCount * 4;
         const int QuadVerts = (int)QuadVertsBits;
-        const unsigned long LockCount = QuadVertsBits + (unsigned long)(QuadVerts / 4) * 2;
+        const uint32_t LockCount = QuadVertsBits + (uint32_t)(QuadVerts / 4) * 2;
         if (QuadVerts != 0)
         {
             FVertexMemoryLock LockOut = {{nullptr, kShadowFvf, 0}, nullptr};
@@ -1013,7 +1020,7 @@ namespace
                     Engine->ReleaseHandle(Archetype);
                     float Extents[6];
                     bool bUsedFallback = true;
-                    if (FlagD != 0 && Archetype != (void*)((unsigned long)-1))
+                    if (FlagD != 0 && Archetype != (void*)((uint32_t)-1))
                         bUsedFallback = Appearance->Renderer_->GetBounds(Archetype, 1.0f, Extents) < 0;
                     if (bUsedFallback)
                     {
@@ -1059,7 +1066,7 @@ namespace
                     if (!(Alpha > 0.0))
                         continue;
                     const int ColorByte = (int)((Alpha * Alpha) * kShadowColorScale);
-                    Writer.ColorValue = ((unsigned long)ColorByte << 24) | 0x00FFFFFF;
+                    Writer.ColorValue = ((uint32_t)ColorByte << 24) | 0x00FFFFFF;
                     const double Angle = std::atan2((double)Transform[2], (double)Transform[8]);
                     const double SinA = std::sin(Angle) * G_ShadowQuadScale;
                     const double CosA = std::cos(Angle) * G_ShadowQuadScale;
@@ -1094,7 +1101,7 @@ namespace
                 Interfaces.Manager->UnlockVertexMemory(&LockOut);
                 if (Writer.Written != 0)
                     PipelineDrawPrimitiveVb(Interfaces.Pipeline, 4, LockOut.Listing.VertexBuffer, LockOut.Listing.BaseVertex,
-                        (unsigned long)Writer.Written, nullptr);
+                        (uint32_t)Writer.Written, nullptr);
             }
         }
         return GR_OK;
@@ -1141,16 +1148,21 @@ namespace
         FAppearanceRenderStateScope SavedState(Pipeline_);
         IDAComponent* const Override = G_Overrides[6];
         FCameraBlob* Camera = (FCameraBlob*)Scratch88_;
+        if (getenv("FL_TRACE_RENDER")) fprintf(stderr, "[fl] DrawStarsphere A=%p Extra=%p Renderer=%p Pipe=%p Camera=%p Override=%p\n", A, Extra, (void*)Renderer_, (void*)Pipeline_, (void*)Camera, (void*)Override);
         Camera->BindArg(A, 0, 1);
         {
+            if (getenv("FL_TRACE_RENDER")) { void** vt = *(void***)A; fprintf(stderr, "[fl] camera vtbl=%p slots %p %p %p %p %p\n", (void*)vt, vt[0], vt[1], vt[2], vt[3], vt[4]); }
             const float* Orientation = ((ICamera*)A)->GetOrientation();
             float Translation[3];
             Translation[0] = 0.0f;
             Translation[1] = 0.0f;
             Translation[2] = 0.0f;
+            if (getenv("FL_TRACE_RENDER")) fprintf(stderr, "[fl] SS orient=%p\n", (const void*)Orientation);
             Camera->SetOrientationAndTranslation(Orientation, Translation);
+            if (getenv("FL_TRACE_RENDER")) fprintf(stderr, "[fl] SS set ok\n");
             float Inverse[12];
             Camera->BuildInverseTransform(Inverse);
+            if (getenv("FL_TRACE_RENDER")) fprintf(stderr, "[fl] SS inverse ok\n");
             float* Dest = Camera->TransformB();
             for (int Index = 0; Index < 12; ++Index)
                 Dest[Index] = Inverse[Index];
@@ -1158,6 +1170,7 @@ namespace
         // LAB_066fe667: Inst is the second argument, Extra is the Starsphere override.
         IRenderer2* const Renderer = Renderer_;
         Camera = (FCameraBlob*)Scratch88_;
+        if (getenv("FL_TRACE_RENDER")) { void** vt = *(void***)Renderer; fprintf(stderr, "[fl] renderer vtbl=%p slots(6..9) %p %p %p %p\n", (void*)vt, vt[6], vt[7], vt[8], vt[9]); }
         Renderer->RenderInstance(Camera, Extra, 1.0f, 0x80, nullptr, Override);
         Camera = (FCameraBlob*)Scratch88_;
         if (Camera->Byte8() != 0)
@@ -1190,7 +1203,7 @@ namespace
         FlmVisibleCounterReset();
         // FUN_066ff620: both renderer and result destination are mandatory.
         Renderer_->RenderInstance(A, B, 1.0f, 0x80, nullptr, Visible);
-        FlmVisibleCounterCopy((unsigned long*)C);
+        FlmVisibleCounterCopy((uint32_t*)C);
         return GR_OK;
     }
 }

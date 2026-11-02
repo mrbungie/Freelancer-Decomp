@@ -55,6 +55,7 @@
 // not in this file.
 
 #include "rpc_containers.h"
+#include "wire_wchar.h"
 #include "rpc_payloads.h"
 
 // COMMON.DLL entry points retail imports by name, IAT slots read off the call bytes:
@@ -359,7 +360,7 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
     }
     if ((Flag4 & Mask) != 0) {                                 // 06d92028
         Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu));   // 06d92057
-        Stream.PutBytes(Wire->DisplayName, Wire->DisplayNameLength * 2u);   // 06d9209a
+        Stream.PutBytes(FlWire16Out(Wire->DisplayName, Wire->DisplayNameLength), Wire->DisplayNameLength * 2u);   // 06d9209a
     }
     if ((Flag2 & Mask) != 0) {                                 // 06d920b4
         RpcPutSizedBlock(Stream, Wire->NameASize, Wire->NameABuffer);       // 06d920e8
@@ -589,7 +590,7 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
         Stream.PutWord(Chars);                                 // 06d98ee3
         // 06d98f12..06d98f17: retail's buffer pointer, or MSVCP60's _Nullstr when the
         // string never allocated -- which is what std::wstring::c_str() is.
-        Stream.PutBytes(Wire->Text.c_str(), (unsigned int)Chars * 2u);   // 06d98f2e
+        Stream.PutBytes(FlWire16Out(Wire->Text.c_str(), (unsigned int)Chars), (unsigned int)Chars * 2u);   // 06d98f2e
     }
     if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d98f45
         Stream.PutDword(Wire->Field_0x34);                     // 06d98f74
@@ -662,8 +663,8 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
         // LAB_06d9969f) leaves without freeing it: retail leaks the buffer there, and so
         // does the port. Only the success path frees it (06d99320 MSVCRT free).
         const unsigned int Bytes = (unsigned int)WireChars * 2u;
-        wchar_t* Temp = static_cast<wchar_t*>(malloc(Bytes + 2u));
-        if (!Stream.GetBytes(Temp, Bytes)) {                   // 06d992b3
+        wchar_t* Temp = static_cast<wchar_t*>(malloc(((size_t)WireChars + 1u) * sizeof(wchar_t)));
+        if (!Stream.GetBytes(FlWire16In(Temp, WireChars), Bytes)) {                   // 06d992b3
             return Stream.GetError();
         }
         Temp[WireChars] = 0;                                   // 06d992c9

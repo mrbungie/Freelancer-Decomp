@@ -63,7 +63,11 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
     Options->border = 1;
     Options->refresh_rate = 0x3c;
     Options->mode_field00 = -1;
+#if defined(FREELANCER_PORTABLE)
+    Options->fullscreen = 0;   // PORT: windowed by default (development); Freelancer.ini / PerfOptions can still ask for fullscreen
+#else
     Options->fullscreen = 1;
+#endif
 
     // [ESP+0x14]: the movie_file counter, zeroed at 0x00562269 and kept across every [Startup]
     // section in the file.

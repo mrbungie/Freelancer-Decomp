@@ -76,6 +76,9 @@ namespace
         // 0x00424f30..0x00424f3f: DAT_006679f8 = 0; an inactive application (DAT_00610865)
         // returns that 0 straight away.
         G_bRenderFrameBegun = false;
+        static int dbg = 0;
+        if (getenv("FL_TRACE_RENDER") && (dbg++ % 120) == 0)
+            fprintf(stderr, "[fl] TryBeginFrame active=%d postCreate=%d\n", (int)ClientAppIsActive(), (int)G_bRenderPostCreate);
         if (!ClientAppIsActive())
             return false;
 
@@ -180,6 +183,7 @@ namespace
         // 0x00425145..0x00425158: SwapBuffers +0x40, then NEG EAX / SBB AL,AL / INC AL --
         // DAT_00610864 = (result == 0), not (result >= 0).
         G_bRenderPostCreate = FramePipeline()->SwapBuffers() == 0;
+        if (getenv("FL_TRACE_RENDER")) { static int n = 0; if ((n++ % 120) == 0) fprintf(stderr, "[fl] PresentHalf post=%d\n", (int)G_bRenderPostCreate); }
     }
 }
 

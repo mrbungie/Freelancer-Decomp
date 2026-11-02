@@ -7,6 +7,7 @@
 #pragma once
 
 #include "rpc_packet.h"
+#include "platform/fl_x87.h"
 #include "rpc_equipment_codec.h" // One shared owning equipment handle and packet base.
 #include "common_archetype.h" // Canonical CollisionGroupDesc.
 #include "common_ini.h" // Vector; packet fields use native C++ containers.
@@ -63,7 +64,7 @@ public:
         : Packet(InPacket) {
         Packet.MarshalCursor = 0;
         Packet.MarshalLimit = Capacity;
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(Buffer);
+        Packet.MarshalPtr = reinterpret_cast<uintptr_t>(Buffer);
         Packet.MarshalError = 0;
     }
 
@@ -73,7 +74,7 @@ public:
     FRpcWireStream(FPacketBase& InPacket, unsigned char** BufferHolder, unsigned int Capacity)
         : Packet(InPacket) {
         Packet.MarshalLimit = Capacity;
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(*BufferHolder);
+        Packet.MarshalPtr = reinterpret_cast<uintptr_t>(*BufferHolder);
         Packet.MarshalCursor = 0;
         Packet.MarshalError = 0;
     }
@@ -86,7 +87,7 @@ public:
     void PutHeader() {
         const unsigned short Header = static_cast<unsigned short>(
             (Packet.PacketId & 0xfffu) | (((Packet.PacketId >> 16) & 0xffu) << 8));
-        const unsigned int Destination = Packet.MarshalPtr;
+        const uintptr_t Destination = Packet.MarshalPtr;
         std::memcpy(reinterpret_cast<void*>(Destination), &Header, 2u);
         Packet.MarshalCursor = 2u;
         Packet.MarshalPtr = Destination + 2u;
@@ -97,7 +98,7 @@ public:
     // destination, copy, and commit Ptr=cached+Width. The cursor is never restored.
     bool Put(const void* Value, unsigned int Width) {
         if (!Advance(Width, 0x16u)) return false;
-        const unsigned int Destination = Packet.MarshalPtr;
+        const uintptr_t Destination = Packet.MarshalPtr;
         if (Width != 0) std::memcpy(reinterpret_cast<void*>(Destination), Value, Width);
         Packet.MarshalPtr = Destination + Width;
         return true;
@@ -112,10 +113,10 @@ public:
     // source and destination overlap), then commit Ptr=cached+Width. A zero width
     // performs no access.
     void PutReserved(const void* Value, unsigned int Width) {
-        const unsigned int Destination = Packet.MarshalPtr;
+        const uintptr_t Destination = Packet.MarshalPtr;
         const unsigned int DwordBytes = Width & ~3u;
-        __movsd(reinterpret_cast<unsigned long*>(Destination),
-            static_cast<const unsigned long*>(Value), Width >> 2);
+        __movsd(reinterpret_cast<uint32_t*>(Destination),
+            static_cast<const uint32_t*>(Value), Width >> 2);
         __movsb(reinterpret_cast<unsigned char*>(Destination + DwordBytes),
             static_cast<const unsigned char*>(Value) + DwordBytes, Width & 3u);
         Packet.MarshalPtr = Destination + Width;
@@ -143,14 +144,18 @@ public:
     bool PutFloat(const float& Value) {
         if (!Advance(4u, 0x16u)) return false;
         const float* Source = &Value;
-        const unsigned int Cached = Packet.MarshalPtr;
+        const uintptr_t Cached = Packet.MarshalPtr;
         float* Destination = reinterpret_cast<float*>(Cached);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov eax, Source
             mov edx, Destination
             fld dword ptr [eax]
             fstp dword ptr [edx]
         }
+#else
+        FlX87CopyFloat(Source, Destination);
+#endif
         Packet.MarshalPtr = Cached + 4u;
         return true;
     }
@@ -333,7 +338,7 @@ public:
     }
     // TODO: recover the semantic name of the first native DWORD argument.
     unsigned int Field_0x00;
-    unsigned long MissionId;
+    uint32_t MissionId;
     unsigned char bAccepted;
 };
 

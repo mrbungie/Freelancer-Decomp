@@ -10,9 +10,9 @@
 
 // luaprofile.dll internals. The ABI other modules see is src/include/luaprofile.h.
 
-static const unsigned long kLuaObjectSize = 0x28;
-static const unsigned long kAggDescSize = 0x14;
-static const unsigned long kFactorySize = 0xC;
+static const uint32_t kLuaObjectSize = 0x28;
+static const uint32_t kAggDescSize = 0x14;
+static const uint32_t kFactorySize = 0xC;
 static const unsigned int kRegisterPriority = 0x40000000u;
 
 static const char kComponentName[] = "ILua";
@@ -26,7 +26,7 @@ static const char kInnerAggregate[] = "IAggregateComponent";
 // IUnknown* (not an IID string). +0x10 Extra is not read. Header dacom.h unchanged.
 struct FLuaAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #pragma once
+#include <cstdint>
 
 #include <zlib.h>
 
@@ -21,12 +22,12 @@ public:
     // Retail FUN_065c1110: single-shot inflate(Z_FINISH) + inflateReset.
     bool Decompress(const void* Input, unsigned int InputSize, void* Output, unsigned int OutputCapacity);
 
-    unsigned long GetLastCompressedSize() const { return LastCompressedSize; }
-    unsigned long GetLastDecompressedSize() const { return LastDecompressedSize; }
+    uint32_t GetLastCompressedSize() const { return LastCompressedSize; }
+    uint32_t GetLastDecompressedSize() const { return LastDecompressedSize; }
 
 private:
     z_stream DeflateStream{};
     z_stream InflateStream{};
-    unsigned long LastCompressedSize = 0;
-    unsigned long LastDecompressedSize = 0;
+    uint32_t LastCompressedSize = 0;
+    uint32_t LastDecompressedSize = 0;
 };

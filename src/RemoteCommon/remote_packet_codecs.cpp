@@ -5,6 +5,10 @@
 // Author: Giperion.
 
 #include "rpc_packet_codec.h"
+#include "wire_wchar.h"
+#include "fl/handles.h"
+#include "platform/fl_x87.h"
+#include <cmath>
 #include "common_misc.h" // SinglePlayer selects retail's two FIREWEAPON formats.
 #include "common_net.h" // PLAYER_TRADE counts its trailer by IsMPServer direction.
 #include "common_text.h" // Canonical FmtStr::Val size calculation.
@@ -180,7 +184,7 @@ unsigned int FRpcMissionResponsePacket::Decode(const unsigned char* Buffer,
     unsigned int First;
     if (!Stream.Get(&First, 4u)) return MarshalError;
     Field_0x00 = First;
-    unsigned long Second;
+    uint32_t Second;
     if (!Stream.Get(&Second, 4u)) return MarshalError;
     MissionId = Second;
     if (!Stream.Get(&bAccepted, 1u)) return MarshalError;
@@ -954,7 +958,7 @@ static unsigned int RpcEncodeWideString(FPacketBase& Packet, const wchar_t* Valu
     Destination += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return 0x16u;
     std::memcpy(Destination, Value, ByteCount);
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(Destination + ByteCount);
+    Packet.MarshalPtr = fl::PtrToHandle(Destination + ByteCount);
     return 0;
 }
 
@@ -975,7 +979,7 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
         // the packet name and the moving input pointer completely untouched.
         std::memcpy(*Value, Source, ByteCount);
         (*Value)[Length] = L'\0';
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(Source + ByteCount);
+        Packet.MarshalPtr = fl::PtrToHandle(Source + ByteCount);
     }
     return 0;
 }
@@ -1342,12 +1346,13 @@ const double GUpdateInverseScale = 1.0 / 127.0;   // PE 06c0df48: 08040281402080
 // and only then calls _ftol. Keep that ordering around an unmasked FP exception.
 // The commit stores the destination cached before the preceding payload write
 // plus its width (RC06b64d58/06b64d5b, 06b64e3d/06b64e3e); it never rereads Ptr.
-unsigned char RpcUpdateQuantize(const float& Value, unsigned int* PointerToCommit,
-    unsigned int CommittedPointer) {
+unsigned char RpcUpdateQuantize(const float& Value, uintptr_t* PointerToCommit,
+    uintptr_t CommittedPointer) {
     const float* Source = &Value;
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Source
         fld dword ptr [ecx]
@@ -1366,18 +1371,28 @@ unsigned char RpcUpdateQuantize(const float& Value, unsigned int* PointerToCommi
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    const double Product = static_cast<double>(*Source) * GFireSmallScale;
+    if (PointerToCommit != nullptr) *PointerToCommit = CommittedPointer;
+    Quantized = PortableChopToInt64(Product);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned char>(Quantized);
 }
 
 void RpcUpdateExpand(signed char Encoded, float& Value) {
     const int Quantized = Encoded;
     float* Destination = &Value;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Destination
         fild dword ptr Quantized
         fmul qword ptr GUpdateInverseScale
         fstp dword ptr [ecx]
     }
+#else
+    *Destination = static_cast<float>(static_cast<double>(Quantized) * GUpdateInverseScale);
+#endif
 }
 
 // TEST AH,5 + JP takes the equal/greater/unordered side, while fall-through
@@ -1386,6 +1401,7 @@ unsigned char RpcFirePickTier(const float& Value, bool bHasMediumTier) {
     const float* Source = &Value;
     unsigned char Tier;
     if (bHasMediumTier) {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov ecx, Source
             xor edx, edx
@@ -1407,7 +1423,14 @@ unsigned char RpcFirePickTier(const float& Value, bool bHasMediumTier) {
         FireTierDone:
             mov Tier, dl
         }
+#else
+        const double Abs = std::fabs(static_cast<double>(*Source));
+        if (Abs < GFireSmallLimit) Tier = 1;
+        else if (Abs < GFireMediumLimit) Tier = 2;
+        else Tier = 0;
+#endif
     } else {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov ecx, Source
             xor edx, edx
@@ -1421,6 +1444,10 @@ unsigned char RpcFirePickTier(const float& Value, bool bHasMediumTier) {
         FireSmallDone:
             mov Tier, dl
         }
+#else
+        const double Abs = std::fabs(static_cast<double>(*Source));
+        Tier = (Abs < GFireSmallLimit) ? 1 : 0;
+#endif
     }
     return Tier;
 }
@@ -1434,6 +1461,7 @@ unsigned int RpcFireQuantize(const float& Value, bool bMedium) {
     unsigned short OldControl;
     unsigned short TruncateControl;
     __int64 Quantized;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, Source
         mov eax, PreScale
@@ -1449,6 +1477,10 @@ unsigned int RpcFireQuantize(const float& Value, bool bMedium) {
         fistp qword ptr Quantized
         fldcw OldControl
     }
+#else
+    Quantized = PortableChopToInt64(static_cast<double>(*Source) * static_cast<double>(*PreScale) * *Scale);
+    static_cast<void>(OldControl); static_cast<void>(TruncateControl);
+#endif
     return static_cast<unsigned int>(Quantized);
 }
 
@@ -1492,6 +1524,7 @@ bool RpcFireGetComponent(FRpcWireStream& Stream, float& Value,
     }
     if (bCommitBefore) Stream.CommitReadPointer(Width);
     float* Destination = &Value;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov eax, Scale
         mov ecx, Destination
@@ -1499,6 +1532,9 @@ bool RpcFireGetComponent(FRpcWireStream& Stream, float& Value,
         fmul qword ptr [eax]
         fstp dword ptr [ecx]
     }
+#else
+    *Destination = static_cast<float>(static_cast<double>(Quantized) * *Scale);
+#endif
     if (!bCommitBefore) Stream.CommitReadPointer(Width);
     return true;
 }
@@ -1595,7 +1631,7 @@ unsigned int FRpcClientLoginPacket::Encode(unsigned char** BufferHolder,
     if (AccountLength != 0) {
         // This mutation precedes the account-buffer capacity check in retail.
         _wcslwr(AccountName);
-        if (!Stream.PutBlock(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(AccountName, static_cast<unsigned int>(AccountLength)), static_cast<unsigned int>(AccountLength) * 2u)) return 0x16u;
     }
     if (SecondLength != 0) {
         if (!Stream.PutBlock(Field_0x220, static_cast<unsigned int>(SecondLength) * 2u)) return 0x16u;
@@ -1617,7 +1653,7 @@ unsigned int FRpcClientLoginPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&AccountLength, 1u)) return MarshalError;
     if (!Stream.Get(&SecondLength, 1u)) return MarshalError;
     if (AccountLength != 0) {
-        if (!Stream.Get(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return MarshalError;
+        if (!Stream.Get(FlWire16In(AccountName, static_cast<unsigned int>(AccountLength)), static_cast<unsigned int>(AccountLength) * 2u)) return MarshalError;
         AccountName[AccountLength] = L'\0';
     }
     if (SecondLength != 0) {

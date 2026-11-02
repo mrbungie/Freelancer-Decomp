@@ -157,11 +157,11 @@ namespace
     // 005b41e2) and HUDAnimConfig (+0x20 = 4, 005b435d); vtable PTR_OnAddHost_005e6f80.
     // No MaterialLib -> nothing. Else record[+0x20] = (v > 0.999 [DAT_005c8b68]) through
     // IMaterialLibrary slot 24 (+0x60), then slot 12 (+0x30) ResolveTexturesGroup(0, 0).
-    void ApplyMaterialRecordOption(unsigned long RecordIndex, float Value)
+    void ApplyMaterialRecordOption(uint32_t RecordIndex, float Value)
     {
         if (DALib::MaterialLib == nullptr)
             return;
-        unsigned long bEnabled = 1;
+        uint32_t bEnabled = 1;
         if (!(static_cast<double>(Value) > 0.999))
             bEnabled = 0;
         DALib::MaterialLib->SetGlobalRecordValue(RecordIndex, &bEnabled);
@@ -190,7 +190,7 @@ namespace
     {
         // v > 0 and a pipeline: ask device ability 8; a non-zero answer keeps the raw value
         // in slot 0, every other path stores 0 (005b473a). The HRESULT is not examined.
-        unsigned long Ability = 0;
+        uint32_t Ability = 0;
         IRenderPipeline* Pipe = DALib::Pipeline;
         if (Value > 0.f && Pipe != nullptr)
         {
@@ -207,7 +207,7 @@ namespace
     void ApplyHighDetailTextures(float Value)  // LAB_005b4870 - DAT_0067ed14
     {
         // 005b4871..005b488b: DALib::Pipeline is dereferenced without a null check.
-        unsigned long VidMem = 0;
+        uint32_t VidMem = 0;
         int bLowVidMem = 0;
         IRenderPipeline* Pipe = DALib::Pipeline;
         if (Pipe->QueryDeviceAbility(3, &VidMem) >= 0)
@@ -217,8 +217,8 @@ namespace
         double const V = static_cast<double>(Value);
         int const bHighDetail = (V > 0.6 && bLowVidMem == 0) ? 1 : 0; // DAT_005d5068
         int const bPipelineState4 = (V > 0.5) ? 1 : 0;                // DAT_005c75e8
-        unsigned long Record0 = (V > 0.4) ? 1 : 0;                    // DAT_005e7028
-        unsigned long Record2 = (V > 0.3) ? 1 : 0;                    // DAT_005c9858
+        uint32_t Record0 = (V > 0.4) ? 1 : 0;                    // DAT_005e7028
+        uint32_t Record2 = (V > 0.3) ? 1 : 0;                    // DAT_005c9858
 
         if (DALib::MaterialLib != nullptr)
         {
@@ -359,8 +359,8 @@ namespace
     float ProbeMachineGraphicsLevel()
     {
         float GfxScore = 1.f;           // set before first query, as retail MOV 0x3f800000
-        unsigned long AbilityHwTnL = 0; // out of QueryDeviceAbility(4)
-        unsigned long AbilityVidMem = 0;
+        uint32_t AbilityHwTnL = 0; // out of QueryDeviceAbility(4)
+        uint32_t AbilityVidMem = 0;
 
         IRenderPipeline* Pipe = DALib::Pipeline;
         if (Pipe != nullptr)

@@ -30,6 +30,15 @@ extern "C"
 
 namespace
 {
+    // x87 FISTP with round-toward-zero as used by retail's chop control word.
+    // Out-of-range/NaN inputs produce the x86 "integer indefinite" value.
+    inline long long PortableChopToInt64(double Value)
+    {
+        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
+            return static_cast<long long>(0x8000000000000000ULL);
+        return static_cast<long long>(Value);
+    }
+
     const int kFdumpError = 0x100001;
     const char* const kLuaParserCpp = "LuaScriptParser.cpp";
 
@@ -99,6 +108,7 @@ namespace
         unsigned short ChopControl;
         long long Result;
         const double Number = lua_getnumber(Object);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld qword ptr Number
             fmul qword ptr Scale
@@ -110,6 +120,10 @@ namespace
             fistp qword ptr Result
             fldcw OldControl
         }
+#else
+        Result = PortableChopToInt64(Number * Scale);
+        static_cast<void>(OldControl); static_cast<void>(ChopControl);
+#endif
         return static_cast<int>(static_cast<unsigned int>(Result));
     }
 
@@ -130,6 +144,7 @@ namespace
         unsigned short ChopControl;
         long long Result;
         const double Number = lua_getnumber(Object);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld qword ptr Number
             fwait
@@ -142,6 +157,10 @@ namespace
             fistp qword ptr Result
             fldcw OldControl
         }
+#else
+        Result = PortableChopToInt64(Number);
+        static_cast<void>(OldControl); static_cast<void>(ChopControl);
+#endif
         return static_cast<int>(static_cast<unsigned int>(Result));
     }
 
@@ -157,6 +176,7 @@ namespace
         unsigned short OldControl;
         unsigned short ChopControl;
         long long Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov ecx, Source
             fld dword ptr [ecx]
@@ -197,6 +217,12 @@ namespace
             mov eax, dword ptr Result
             mov dword ptr [edx + 8], eax
         }
+#else
+        static_cast<void>(OldControl); static_cast<void>(ChopControl); static_cast<void>(Result);
+        Output[0] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[0])));
+        Output[1] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[1])));
+        Output[2] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[2])));
+#endif
     }
 
     void ScaleLightAngle(const float* Source, float* Destination)
@@ -679,6 +705,7 @@ namespace
         const unsigned long long ZeroBits = 0;
         unsigned char Result;
         const double Number = lua_getnumber(Object);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld qword ptr Number
             fcomp qword ptr ZeroBits
@@ -692,6 +719,10 @@ namespace
         FogByteStore:
             mov Result, al
         }
+#else
+        Result = (Number != 0.0) ? 1 : 0; // unordered (NaN) counts as nonzero
+        static_cast<void>(ZeroBits);
+#endif
         return Result;
     }
 
@@ -773,10 +804,14 @@ namespace
         lua_pushobject(Table);
         const unsigned long long IntegerIndex = Index;
         double Number;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fild qword ptr IntegerIndex
             fstp qword ptr Number
         }
+#else
+        Number = static_cast<double>(IntegerIndex);
+#endif
         lua_pushnumber(Number);
         return lua_gettable();
     }
@@ -800,10 +835,14 @@ namespace
     {
         const unsigned long long IntegerIndex = Index;
         float FloatIndex;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fild qword ptr IntegerIndex
             fstp dword ptr FloatIndex
         }
+#else
+        FloatIndex = static_cast<float>(IntegerIndex);
+#endif
         return GetLightFloatIndex(Table, &FloatIndex);
     }
 
@@ -824,6 +863,7 @@ namespace
         StoreLuaNumberFloat(GetIndexOrNil(Table, 2.0), &Coordinates[1]);
         const lua_Object Z = GetIndexOrNil(Table, 3.0);
         const double Number = lua_getnumber(Z);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld qword ptr Number
             fld dword ptr Coordinates[0]
@@ -833,6 +873,11 @@ namespace
             fstp dword ptr [edx + 8]
             mov dword ptr [edx + 4], ecx
         }
+#else
+        Output[0] = static_cast<float>(Coordinates[0]);
+        std::memcpy(Output + 1, &Coordinates[1], sizeof(float));
+        Output[2] = static_cast<float>(Number);
+#endif
         return true;
     }
 
@@ -1119,6 +1164,7 @@ namespace
             // Actual C++ Debug/Release publishes R/G before FILD blue and
             // B/alpha before mask800. Retail24b80..95 instead publishes R/G
             // after FILD blue, then mask800 before its waiting FSTP32.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov ecx, Colors
@@ -1147,6 +1193,16 @@ namespace
                 mov esi, dword ptr [ebx + 0ch]
                 mov dword ptr [edx + 0ch], esi
             }
+#else
+            float ColorScale;
+            std::memcpy(&ColorScale, &ColorScaleBits, sizeof(ColorScale));
+            for (int ColorIndex = 0; ColorIndex < 3; ++ColorIndex)
+                Diffuse[ColorIndex] = static_cast<float>(static_cast<double>(Colors[ColorIndex]) *
+                                                         static_cast<double>(ColorScale));
+            Diffuse[3] = 1.0f;
+            *Mask = EntryMask | 0x800;
+            static_cast<void>(ColorBits);
+#endif
         }
         const int InfiniteMask = *Mask;
         if ((InfiniteMask & kThornLightBitInfinite) != 0)
@@ -1165,6 +1221,7 @@ namespace
             // Actual optimized C++ compares zero to cutoff and executes a
             // waiting FSTP on the unordered return path. Retail24be4..c10
             // has no waiting instruction after FNSTSW/TEST AH,05/JP.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov ecx, Cutoff
@@ -1174,6 +1231,10 @@ namespace
                 test ah, 05h
                 setnp bOrderedNegative
             }
+#else
+            bOrderedNegative = (*Cutoff < 0.0f || std::isnan(*Cutoff)) ? 1 : 0;
+            static_cast<void>(ZeroBits);
+#endif
             if (bOrderedNegative != 0)
             {
                 Props->Type = 1;
@@ -1226,6 +1287,7 @@ namespace
         // Actual Debug emits FUCOMPP for C++ !=, even with local /fp:except:
         // that omits retail's invalid flag for quiet NaN. Only this ordered
         // comparison is explicit; the Lua function call remains ordinary C++.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld qword ptr Number
@@ -1234,6 +1296,9 @@ namespace
             test ah, 44h
             setp bResult
         }
+#else
+        bResult = (Number != Zero) ? 1 : 0; // quiet NaN compares unequal
+#endif
         return bResult != 0;
     }
 
@@ -1339,6 +1404,7 @@ namespace
         unsigned short ChopControl;
         long long Result;
         const double Number = bNil != 0 ? 0.0 : lua_getnumber(Object);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             fld qword ptr Number
             fmul dword ptr ScaleBits
@@ -1352,6 +1418,12 @@ namespace
             fistp qword ptr Result
             fldcw OldControl
         }
+#else
+        float ScaleF;
+        std::memcpy(&ScaleF, &ScaleBits, sizeof(ScaleF));
+        Result = PortableChopToInt64(Number * static_cast<double>(ScaleF));
+        static_cast<void>(OldControl); static_cast<void>(ChopControl);
+#endif
         return static_cast<int>(static_cast<unsigned int>(Result));
     }
 
@@ -1362,6 +1434,7 @@ namespace
         unsigned short OldControl;
         unsigned short ChopControl;
         long long Result;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov ecx, Source
             fld dword ptr [ecx + 8]
@@ -1402,6 +1475,13 @@ namespace
             mov eax, dword ptr Result
             mov dword ptr [edx + 8], eax
         }
+#else
+        static_cast<void>(OldControl); static_cast<void>(ChopControl); static_cast<void>(Result);
+        int* Out = static_cast<int*>(Output);
+        Out[0] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[0])));
+        Out[1] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[1])));
+        Out[2] = static_cast<int>(static_cast<unsigned int>(PortableChopToInt64(Source[2])));
+#endif
     }
 
     void LoadSceneEntityDesc(lua_Object Table, FThornEntitySnap* Descriptor)
@@ -1628,7 +1708,7 @@ namespace
                 Common.EventFlags = LuaNumberToRetailInt(EventFlags);
             const lua_Object Curve = GetFieldOrNil(Props, "param_curve");
             if (lua_isnil(Curve) == 0 && lua_istable(Curve) != 0)
-                CreateCurveFromLua(&Common.ParamCurve, Curve);
+                { IParamCurve* NewCurve = nullptr; CreateCurveFromLua(&NewCurve, Curve); Common.ParamCurve = NewCurve; }
             const lua_Object Period = GetFieldOrNil(Props, "pcurve_period");
             if (lua_isnil(Period) == 0)
                 Common.Field28 = LuaNumberToRetailInt(Period);
@@ -2151,28 +2231,28 @@ namespace
         lua_endblock();
     }
 
-    unsigned long IfsAddRef(void* FileSystem)
+    uint32_t IfsAddRef(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->AddRef();
     }
 
-    unsigned long IfsRelease(void* FileSystem)
+    uint32_t IfsRelease(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->Release();
     }
 
-    unsigned long IfsGetSize(void* FileSystem)
+    uint32_t IfsGetSize(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->GetSize(0, 0); // +0x28
     }
 
-    int IfsRead(void* FileSystem, void* Buffer, unsigned long Size, unsigned long* BytesRead)
+    int IfsRead(void* FileSystem, void* Buffer, uint32_t Size, uint32_t* BytesRead)
     {
         if (BytesRead != nullptr)
             *BytesRead = 0;
@@ -2181,7 +2261,7 @@ namespace
         return static_cast<IFileSystem*>(FileSystem)->Read(0, Buffer, Size, BytesRead, 0); // +0x14
     }
 
-    void IfsGetFileSysPath(void* FileSystem, char* Out, unsigned long MaxChars)
+    void IfsGetFileSysPath(void* FileSystem, char* Out, uint32_t MaxChars)
     {
         if (Out == nullptr || MaxChars == 0)
             return;
@@ -2268,14 +2348,14 @@ namespace
             return GR_OK;
         FileSystem->AddRef();
         std::unique_ptr<IFileSystem, FParserFileSystemRelease> Reference(FileSystem);
-        const unsigned long Size = FileSystem->GetSize(0, 0);
+        const uint32_t Size = FileSystem->GetSize(0, 0);
         if (Size < 1)
         {
             FdumpLuaError(0x481, "LUA unable to read file \n");
             return static_cast<GENRESULT>(-1);
         }
         char* Buffer = new char[Size + 1];
-        unsigned long BytesRead = 0;
+        uint32_t BytesRead = 0;
         FileSystem->Read(0, Buffer, Size, &BytesRead, 0);
         if (BytesRead != Size)
         {

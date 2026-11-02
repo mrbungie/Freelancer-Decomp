@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "x86math.h"
+#include "fl/handles.h"
 #include "EngBase.h"
 #include "readfile.h"
 
@@ -75,7 +76,7 @@ static const char* const G_FdumpFileAnim =
 static const char* const G_FdumpFileChannelArch =
     "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\EngBase\\Channel\\channel_arch.cpp";
 static const char* const G_AnonymousFormat = "anonymous-%d";
-static unsigned long G_AnonymousIndex = 0;
+static uint32_t G_AnonymousIndex = 0;
 // .data:0662a51c / .data:0662a510 (PE bytes): the status word of the load_engine_components
 // aggregation NOTICE (0661fb18 / 0661fb6c).
 static const char* const G_StatusOk = "[OK]";
@@ -84,19 +85,19 @@ static const char* const G_StatusFailed = "[FAILED]";
 // Local copy of DALib FFileSystemAggDesc (0x34). Do not include DALib.h.
 struct FEngBaseFileSystemDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* ComponentName;
     const char* BackendName;
     const char* DataPath;
-    unsigned long Field10;
-    unsigned long Field14;
-    unsigned long Field18;
-    unsigned long Field1C;
-    unsigned long Field20;
-    unsigned long Field24;
-    unsigned long Field28;
-    unsigned long Field2C;
-    unsigned long Field30;
+    uint32_t Field10;
+    uint32_t Field14;
+    void* Field18;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    uint32_t Field1C;
+    uint32_t Field20;
+    void* Field24;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    void* Field28;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    uint32_t Field2C;
+    uint32_t Field30;
 };
 
 // FEngineObject holds a real std::map (the instance-root map), so only the facet offset is
@@ -148,7 +149,7 @@ static_assert(sizeof(FAggDescC) == 0xC, "AGGDESC 0xC");
 struct FInnerIidEntry
 {
     const char* Iid;
-    long Offset;
+    int32_t Offset;
 };
 
 // Preserve imported FDUMP formatting and call behavior.
@@ -216,17 +217,17 @@ GENRESULT DACOM_API FDacomFactory::QueryInterface(const char* Iid, void** Out)
     return GR_OK;
 }
 
-unsigned long DACOM_API FDacomFactory::AddRef()
+uint32_t DACOM_API FDacomFactory::AddRef()
 {
     RefCount += 1;
     return RefCount;
 }
 
-unsigned long DACOM_API FDacomFactory::Release()
+uint32_t DACOM_API FDacomFactory::Release()
 {
     if (RefCount != 0)
         RefCount -= 1;
-    const unsigned long Count = RefCount;
+    const uint32_t Count = RefCount;
     if (Count == 0)
     {
         RefCount = 1;
@@ -337,13 +338,13 @@ static GENRESULT DACOM_API StubRet24(void* This, void* A, void* B, void* C, void
 
 // LAB_06627ef0 (RET 4), ICF-shared by six inner/factory vtables: INC [this+4] and return it.
 // No check of This (the port's null guard is gone, 2026-09-30).
-unsigned long DACOM_API FAnimationInner::AddRef()
+uint32_t DACOM_API FAnimationInner::AddRef()
 {
     RefCount += 1;
     return RefCount;
 }
 
-unsigned long DACOM_API FHardpointInner::AddRef()
+uint32_t DACOM_API FHardpointInner::AddRef()
 {
     RefCount += 1;
     return RefCount;
@@ -358,7 +359,7 @@ static char* DuplicateLoweredName(char const* Name)
 }
 
 // FUN_06626310 (create_archetype, 0662604b) / FUN_066265e0 behind DAT_0662ace4 (add_hardpoint,
-FHardpointRecord::FHardpointRecord(unsigned long InCrc, char const* InName)
+FHardpointRecord::FHardpointRecord(uint32_t InCrc, char const* InName)
     : Crc(InCrc)
     , Name(DuplicateLoweredName(InName != nullptr ? InName : ""))
 {
@@ -415,7 +416,7 @@ static void DestroyAnimationLists(FAnimationObject* Object);
 // LAB_06627f00 (RET 4): count > 0 (JBE, unsigned) -> count--; count != 0 -> return it. At zero:
 // count = 1, and when the object pointer is non-null run the dtor FUN_06625d00 and free it;
 // return 0.
-unsigned long DACOM_API FHardpointInner::Release()
+uint32_t DACOM_API FHardpointInner::Release()
 {
     if (RefCount > 0)
         RefCount -= 1;
@@ -434,7 +435,7 @@ unsigned long DACOM_API FHardpointInner::Release()
 // LAB_0661a940 (RET 4): count > 0 (JBE, unsigned) -> count--; count != 0 -> return it. At
 // zero: count = 1, and when the object pointer (+8) is non-null run the dtor FUN_06616d90 and
 // free it; return 0.
-unsigned long DACOM_API FAnimationInner::Release()
+uint32_t DACOM_API FAnimationInner::Release()
 {
     if (RefCount > 0)
         RefCount -= 1;
@@ -450,61 +451,53 @@ unsigned long DACOM_API FAnimationInner::Release()
     return 0;
 }
 
-// The {iid, offset} walk both inner unknowns inline (LAB_0661a880 over 06629478,
-static GENRESULT InnerQueryTable(void* Object, const char* Iid, void** Out,
-                                 const FInnerIidEntry* Table)
+// Retail answered inner QueryInterface from {iid, byte-offset} tables over the object (the tables
+// at 06629478 / 06629844), which bakes the 32-bit multiple-inheritance layout into data. The offsets
+// do not exist on a 64-bit ABI (vptrs are 8 bytes), so the facets are named by type instead:
+//   animation : {IAnimation2, 0} {IAnimation, 0} {IChannel, 8} {IRootData, 0xC} {IAggregateComponent, 4}
+//   hardpoint : {IHardpoint, 0} {IEngineComponent, 4} {IAggregateComponent, 4}
+static GENRESULT AnswerQuery(IDAComponent* Interface, void** Out)
 {
-    for (int Index = 0; Table[Index].Iid != nullptr; ++Index)
-    {
-        if (std::strcmp(Table[Index].Iid, Iid) != 0)
-            continue;
-        unsigned char* Base = (unsigned char*)Object;
-        const long Offset = Table[Index].Offset;
-        IDAComponent* Interface = nullptr;
-        if (Offset < 0)
-            std::memcpy(&Interface, Base + ((unsigned long)Offset & 0x7FFFFFFFu),
-                        sizeof(Interface));
-        else
-            Interface = (IDAComponent*)(Base + Offset);
-        Interface->AddRef();
-        *Out = Interface;
-        return GR_OK;
-    }
+    Interface->AddRef();
+    *Out = Interface;
+    return GR_OK;
+}
+
+static GENRESULT AnimationInnerQuery(FAnimationObject* Object, const char* Iid, void** Out)
+{
+    if (std::strcmp(Iid, Iids::Animation2) == 0 || std::strcmp(Iid, Iids::Animation) == 0)
+        return AnswerQuery(static_cast<FAnimation2Facet*>(Object), Out);
+    if (std::strcmp(Iid, Iids::Channel) == 0)
+        return AnswerQuery(static_cast<FAnimationChannelFacet*>(Object), Out);
+    if (std::strcmp(Iid, Iids::RootData) == 0)
+        return AnswerQuery(static_cast<IRootData*>(Object), Out);
+    if (std::strcmp(Iid, Iids::AggregateComponent) == 0)
+        return AnswerQuery(static_cast<IAggregateComponent*>(Object), Out);
     *Out = nullptr;
     return GR_INTERFACE_UNSUPPORTED;
 }
 
-// Inner QI table @ 06629478 (PE bytes): {IAnimation2, 0}, {IAnimation, 0}, {IChannel, 8},
-// {IRootData, 0xC}, {IAggregateComponent, 4}, then a null iid.
-static const FInnerIidEntry G_AnimationInnerIids[] = {
-    {Iids::Animation2, 0},
-    {Iids::Animation, 0},
-    {Iids::Channel, 0x08},
-    {Iids::RootData, 0x0C},
-    {Iids::AggregateComponent, 0x04},
-    {nullptr, 0},
-};
-
-// Inner QI table @ 06629844 (PE bytes): {IHardpoint, 0}, {IEngineComponent, 4},
-// {IAggregateComponent, 4}, then a null iid. IAggregateComponent answers with the IEC facet.
-static const FInnerIidEntry G_HardpointInnerIids[] = {
-    {Iids::Hardpoint, 0},
-    {Iids::EngineComponent, 0x04},
-    {Iids::AggregateComponent, 0x04},
-    {nullptr, 0},
-};
+static GENRESULT HardpointInnerQuery(FHardpointObject* Object, const char* Iid, void** Out)
+{
+    if (std::strcmp(Iid, Iids::Hardpoint) == 0)
+        return AnswerQuery(static_cast<IHardpoint*>(Object), Out);
+    if (std::strcmp(Iid, Iids::EngineComponent) == 0 || std::strcmp(Iid, Iids::AggregateComponent) == 0)
+        return AnswerQuery(static_cast<IEngineComponent*>(Object), Out);   // IAggregateComponent answers with the IEC facet
+    *Out = nullptr;
+    return GR_INTERFACE_UNSUPPORTED;
+}
 
 // LAB_0661a880 (inner QI, RET 0xC) over 06629478; the facet offsets are added to the object
 // pointer at inner +8.
 GENRESULT DACOM_API FAnimationInner::QueryInterface(const char* Iid, void** Out)
 {
-    return InnerQueryTable(Object, Iid, Out, G_AnimationInnerIids);
+    return AnimationInnerQuery(Object, Iid, Out);
 }
 
 // LAB_06627e30 (inner QI, RET 0xC) over 06629844.
 GENRESULT DACOM_API FHardpointInner::QueryInterface(const char* Iid, void** Out)
 {
-    return InnerQueryTable(Object, Iid, Out, G_HardpointInnerIids);
+    return HardpointInnerQuery(Object, Iid, Out);
 }
 
 // EngBase plumbs the FileSystem component around as void*; this is the one place that
@@ -528,19 +521,27 @@ static GENRESULT DACOM_API AnimationQueryInterface(FAnimationObject* This, const
     return This->Controller->QueryInterface(Iid, Out);
 }
 
-static unsigned long DACOM_API AnimationAddRef(FAnimationObject* This)
+static uint32_t DACOM_API AnimationAddRef(FAnimationObject* This)
 {
     return This->Controller->AddRef();
 }
 
-static unsigned long DACOM_API AnimationRelease(FAnimationObject* This)
+static uint32_t DACOM_API AnimationRelease(FAnimationObject* This)
 {
     return This->Controller->Release();
 }
 
-static FAnimationObject* AnimationFromNested(void* Nested, unsigned long Offset)
+// PORT: retail subtracted the facet's byte offset (4 = IAggregateComponent, 8 = channel, 0xC = IRootData).
+// Offsets are 32-bit-ABI specific; the facet type recovers the object on any ABI.
+static FAnimationObject* AnimationFromNested(void* Nested, uint32_t Offset)
 {
-    return (FAnimationObject*)((unsigned char*)Nested - Offset);
+    switch (Offset)
+    {
+    case 0x4: return static_cast<FAnimationObject*>(static_cast<IAggregateComponent*>(Nested));
+    case 0x8: return static_cast<FAnimationObject*>(static_cast<FAnimationChannelFacet*>(Nested));
+    case 0xC: return static_cast<FAnimationObject*>(static_cast<IRootData*>(Nested));
+    default:  return static_cast<FAnimationObject*>(static_cast<FAnimation2Facet*>(Nested));
+    }
 }
 
 // Shared engine cache; Engine2 has its own QI output slot.
@@ -569,7 +570,7 @@ static FAnimScript* const G_InvalidAnimScript =
 struct FAnimHandleNode
 {
     FAnimHandleNode* Next;
-    unsigned long Key;
+    uint32_t Key;
 };
 
 static FAnimHandleNode* G_AnimHandleHead = nullptr;
@@ -577,7 +578,7 @@ static FAnimHandleNode* G_AnimHandleHead = nullptr;
 static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, void* FileSystem);
 static GENRESULT DACOM_API ChannelArchetypeGetDuration(FChannelArchetypeObject* This, float* Out);
 static GENRESULT DACOM_API ChannelArchetypeGetFlags(FChannelArchetypeObject* This,
-                                                   unsigned long* Out);
+                                                   uint32_t* Out);
 static GENRESULT DACOM_API ChannelArchetypeSample(FChannelArchetypeObject* This, float Time,
                                                  const unsigned char** OutA,
                                                  const unsigned char** OutB, float* Alpha);
@@ -589,51 +590,51 @@ static GENRESULT DACOM_API ChannelArchetypeGetFrame(FChannelArchetypeObject* Thi
                                                    unsigned char bLast, const unsigned char** Out);
 static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject* This, float Time0,
                                                        float Time1, float* OutKeys,
-                                                       unsigned long Capacity, unsigned long* Count);
+                                                       uint32_t Capacity, uint32_t* Count);
 static GENRESULT DACOM_API ChannelArchetypeCollectAt(FChannelArchetypeObject* This, float Time,
-                                                    float* OutKeys, unsigned long Capacity,
-                                                    unsigned long* Count);
+                                                    float* OutKeys, uint32_t Capacity,
+                                                    uint32_t* Count);
 static void ChannelDecompressFrames(FChannelArchetypeObject* Channel);
 static void FillFileSystemDesc(FEngBaseFileSystemDesc* Desc, const char* Path, const char* Backend);
-static unsigned long DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This);
-static unsigned long DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* This);
+static uint32_t DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This);
+static uint32_t DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* This);
 static void ChannelArchetypeInnerCtor(FChannelArchetypeObject* This);
 static void ChannelArchetypeTeardown(FChannelArchetypeObject* This);
 static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* FileSystem);
-static FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc);
-static unsigned char FindPlaybackRecord(FAnimationObject* Animation, unsigned long Key,
+static FAnimNameEntry* FindAnimName(FAnimScript* Script, uint32_t Crc);
+static unsigned char FindPlaybackRecord(FAnimationObject* Animation, uint32_t Key,
                                         FAnimPlayback** Out);
 static void FreePlaybackTyped(FAnimPlayback* Playback);
 static void ClonePlaybackTypedChannels(FAnimPlayback* Playback, FAnimNameEntry* Entry);
-static unsigned long PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter);
-static unsigned long PlaybackHasTyped(FAnimPlayback* Playback, void* Object);
-static unsigned long PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* ArgA, void* ArgB);
+static uint32_t PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter);
+static uint32_t PlaybackHasTyped(FAnimPlayback* Playback, void* Object);
+static uint32_t PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* ArgA, void* ArgB);
 static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, void* ArgD,
                                void* ArgE);
 static void PlaybackStopTyped(FAnimPlayback* Playback);
 static void PlaybackApplyTyped(FAnimPlayback* Playback);
-static unsigned long PlaybackEvalTyped(FAnimPlayback* Playback, unsigned long Flags, float Start,
-                                      float Speed, unsigned long P3, unsigned long P4,
-                                      unsigned long P5, unsigned long P6);
-static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback);
+static uint32_t PlaybackEvalTyped(FAnimPlayback* Playback, uint32_t Flags, float Start,
+                                      float Speed, uint32_t P3, uint32_t P4,
+                                      uint32_t P5, uint32_t P6);
+static uint32_t PlaybackEvalStoredTyped(FAnimPlayback* Playback);
 static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const FAnimBindOut* Header);
 static void PlaybackSetTypedTime(FAnimPlayback* Playback, float Time);
 static float PlaybackStoredDuration(FAnimPlayback* Playback);
-static unsigned long DACOM_API AnimationPlayScript(FAnimationObject* This, FAnimScript* Script,
+static uint32_t DACOM_API AnimationPlayScript(FAnimationObject* This, FAnimScript* Script,
                                                   FEngineInstance* Root, const char* Name,
                                                   void* ArgD, void* ArgE);
-static unsigned long DACOM_API AnimationEvalPlayback(FAnimationObject* This, unsigned long PlaybackId,
-                                                    unsigned long Flags, float Time, float Scale,
+static uint32_t DACOM_API AnimationEvalPlayback(FAnimationObject* This, uint32_t PlaybackId,
+                                                    uint32_t Flags, float Time, float Scale,
                                                     void* UnusedA, void* UnusedB, void* UnusedC,
                                                     void* UnusedD);
-static unsigned long DACOM_API AnimationEvalStored(FAnimationObject* This, unsigned long PlaybackId);
-static unsigned long DACOM_API AnimationStopPlayback(FAnimationObject* This, unsigned long PlaybackId);
-static unsigned long DACOM_API ChannelPlay(void* ChannelThis, unsigned long Key, float* Time);
-static unsigned char DACOM_API RootDataEval(void* RootThis, unsigned long PlaybackId,
-                                           void* TouchArg, unsigned long Flags, float Time,
+static uint32_t DACOM_API AnimationEvalStored(FAnimationObject* This, uint32_t PlaybackId);
+static uint32_t DACOM_API AnimationStopPlayback(FAnimationObject* This, uint32_t PlaybackId);
+static uint32_t DACOM_API ChannelPlay(void* ChannelThis, uint32_t Key, float* Time);
+static unsigned char DACOM_API RootDataEval(void* RootThis, uint32_t PlaybackId,
+                                           void* TouchArg, uint32_t Flags, float Time,
                                            float Scale, void* Arg6, void* Arg7, float Arg8);
 
-static void UnregisterAnimHandle(unsigned long Key);
+static void UnregisterAnimHandle(uint32_t Key);
 
 static bool IsValidAnimScript(FAnimScript* Script)
 {
@@ -641,23 +642,23 @@ static bool IsValidAnimScript(FAnimScript* Script)
 }
 
 // formerly Slot00
-unsigned long DACOM_API FAnimScript::RejectOperation(void* ArgA, void* ArgB)
+uint32_t DACOM_API FAnimScript::RejectOperation(void* ArgA, void* ArgB)
 {
     (void)ArgA;
     (void)ArgB;
     return 0xFFFFFFFF;
 }
 
-unsigned long DACOM_API FAnimScript::AddRef()
+uint32_t DACOM_API FAnimScript::AddRef()
 {
     RefCount += 1;
     return RefCount;
 }
 
-unsigned long DACOM_API FAnimScript::Release()
+uint32_t DACOM_API FAnimScript::Release()
 {
     RefCount -= 1;
-    const unsigned long Left = RefCount;
+    const uint32_t Left = RefCount;
     if (Left != 0)
         return Left;
     delete this;
@@ -708,12 +709,12 @@ static FAnimScript* AllocAnimScript()
     return new (std::nothrow) FAnimScript();
 }
 
-static FAnimNameEntry* InsertAnimName(FAnimScript* Script, unsigned long Crc)
+static FAnimNameEntry* InsertAnimName(FAnimScript* Script, uint32_t Crc)
 {
     return &Script->Names[Crc];
 }
 
-static FTypedChannel* FindTypedChannel(FAnimationObject* Animation, unsigned long Key)
+static FTypedChannel* FindTypedChannel(FAnimationObject* Animation, uint32_t Key)
 {
     if (Key == 0xFFFFFFFF)
         return nullptr;
@@ -742,18 +743,18 @@ static void DestroyAnimationLists(FAnimationObject* Object)
     Object->Playbacks = nullptr;
 }
 
-static unsigned long G_JointMapLength = 0;
-static unsigned long G_ObjectMapLength = 0;
-static unsigned long G_EventMapLength = 0;
+static uint32_t G_JointMapLength = 0;
+static uint32_t G_ObjectMapLength = 0;
+static uint32_t G_EventMapLength = 0;
 
 static void StoreAnimMapNameLengths()
 {
-    G_JointMapLength = (unsigned long)(std::strlen(G_NameJointMap));
-    G_ObjectMapLength = (unsigned long)(std::strlen(G_NameObjectMap));
-    G_EventMapLength = (unsigned long)(std::strlen(G_NameEventMap));
+    G_JointMapLength = (uint32_t)(std::strlen(G_NameJointMap));
+    G_ObjectMapLength = (uint32_t)(std::strlen(G_NameObjectMap));
+    G_EventMapLength = (uint32_t)(std::strlen(G_NameEventMap));
 }
 
-static unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
+static uint32_t LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
     if (Fs->OpenNode(G_NameScript) == 0)
@@ -770,7 +771,7 @@ static unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.Field30 = (uint32_t)FindHandle;
             void* NestedFs = nullptr;
             Fs->CreateInstance((AGGDESC*)(&Desc), &NestedFs);
             if (((FindData.dwFileAttributes >> 4) & 1) != 0)
@@ -781,16 +782,16 @@ static unsigned long LoadAnimScriptNames(FAnimScript* Script, void* FileSystem)
             }
             if (NestedFs != nullptr)
                 ((IDAComponent*)NestedFs)->Release();
-        } while (Fs->FindNext((unsigned long)FindHandle,
+        } while (Fs->FindNext((uint32_t)FindHandle,
                             &FindData) != 0);
         Fs->GetFileSystemError();
-        Fs->FindClose((unsigned long)FindHandle);
+        Fs->FindClose((uint32_t)FindHandle);
     }
     Fs->OpenNode(G_NameParentDot);
     return 0;
 }
 
-static unsigned long LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
+static uint32_t LoadAnimScriptsByNameList(FAnimScript* Script, void* FileSystem,
                                               const char** Names, int Count)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
@@ -910,19 +911,19 @@ static GENRESULT DACOM_API AnimationFindScriptName(FAnimationObject* This, void*
     return 0;
 }
 
-static unsigned char FindPlaybackRecord(FAnimationObject* Animation, unsigned long Key,
+static unsigned char FindPlaybackRecord(FAnimationObject* Animation, uint32_t Key,
                                         FAnimPlayback** Out)
 {
-    FAnimPlaybackMap::iterator It = Animation->Playbacks->find((long)Key);
+    FAnimPlaybackMap::iterator It = Animation->Playbacks->find((int32_t)Key);
     if (It == Animation->Playbacks->end())
         return 0;
     *Out = &It->second;
     return 1;
 }
 
-static GENRESULT DACOM_API AnimationDestroyScript(FAnimationObject* This, unsigned long PlaybackId)
+static GENRESULT DACOM_API AnimationDestroyScript(FAnimationObject* This, uint32_t PlaybackId)
 {
-    FAnimPlaybackMap::iterator It = This->Playbacks->find((long)PlaybackId);
+    FAnimPlaybackMap::iterator It = This->Playbacks->find((int32_t)PlaybackId);
     if (It == This->Playbacks->end())
         return GR_OK;
     FAnimPlayback* Playback = &It->second;
@@ -940,7 +941,7 @@ static GENRESULT DACOM_API AnimationDestroyScript(FAnimationObject* This, unsign
     return GR_OK;
 }
 
-static float DACOM_API AnimationGetScriptDuration(FAnimationObject* This, unsigned long PlaybackId)
+static float DACOM_API AnimationGetScriptDuration(FAnimationObject* This, uint32_t PlaybackId)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -964,7 +965,7 @@ static float DACOM_API AnimationGetNamedDuration(FAnimationObject* This, FAnimSc
     return Duration;
 }
 
-static float DACOM_API AnimationGetStoredDuration(FAnimationObject* This, unsigned long PlaybackId)
+static float DACOM_API AnimationGetStoredDuration(FAnimationObject* This, uint32_t PlaybackId)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -972,32 +973,32 @@ static float DACOM_API AnimationGetStoredDuration(FAnimationObject* This, unsign
     return PlaybackStoredDuration(Playback);
 }
 
-static unsigned long DACOM_API AnimationHasScriptName(FAnimationObject* This, FAnimScript* Script,
+static uint32_t DACOM_API AnimationHasScriptName(FAnimationObject* This, FAnimScript* Script,
                                                     const char* Name)
 {
     (void)This;
     if (!IsValidAnimScript(Script) || Name == nullptr)
         return 0xFFFFFFFF;
 
-    const unsigned long Crc = DACOM_CRC::GetCRC32(Name);
+    const uint32_t Crc = DACOM_CRC::GetCRC32(Name);
     if (Script->Names.find(Crc) != Script->Names.end())
         return 0;
     return 0xFFFFFFFF;
 }
 
-static unsigned long DACOM_API AnimationGetScriptNameCount(FAnimationObject* This,
+static uint32_t DACOM_API AnimationGetScriptNameCount(FAnimationObject* This,
                                                          FAnimScript* Script,
-                                                         unsigned long* Out)
+                                                         uint32_t* Out)
 {
 
     (void)This;
     if (!IsValidAnimScript(Script))
         return 0xFFFFFFFF;
-    *Out = (unsigned long)(Script->Names.size());
+    *Out = (uint32_t)(Script->Names.size());
     return 0;
 }
 
-static FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc)
+static FAnimNameEntry* FindAnimName(FAnimScript* Script, uint32_t Crc)
 {
     FAnimNameMap::iterator It = Script->Names.find(Crc);
     if (It == Script->Names.end())
@@ -1005,12 +1006,12 @@ static FAnimNameEntry* FindAnimName(FAnimScript* Script, unsigned long Crc)
     return &It->second;
 }
 
-static bool RemoveAnimNameByCrc(FAnimScript* Script, unsigned long Crc)
+static bool RemoveAnimNameByCrc(FAnimScript* Script, uint32_t Crc)
 {
     return Script->Names.erase(Crc) != 0;
 }
 
-static bool FindAnimHandle(unsigned long Key)
+static bool FindAnimHandle(uint32_t Key)
 {
     FAnimHandleNode* Node = G_AnimHandleHead;
     while (Node != nullptr)
@@ -1022,7 +1023,7 @@ static bool FindAnimHandle(unsigned long Key)
     return false;
 }
 
-static unsigned long RegisterAnimHandle(unsigned long Key)
+static uint32_t RegisterAnimHandle(uint32_t Key)
 {
     if (Key == 0xFFFFFFFF)
         return 0xFFFFFFFF;
@@ -1037,7 +1038,7 @@ static unsigned long RegisterAnimHandle(unsigned long Key)
     return 0;
 }
 
-static void UnregisterAnimHandle(unsigned long Key)
+static void UnregisterAnimHandle(uint32_t Key)
 {
     FAnimHandleNode* Prev = nullptr;
     FAnimHandleNode* Node = G_AnimHandleHead;
@@ -1057,7 +1058,7 @@ static void UnregisterAnimHandle(unsigned long Key)
     }
 }
 
-static unsigned long DACOM_API AnimationFilterObjects(FAnimationObject* This, unsigned long PlaybackId)
+static uint32_t DACOM_API AnimationFilterObjects(FAnimationObject* This, uint32_t PlaybackId)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -1066,7 +1067,7 @@ static unsigned long DACOM_API AnimationFilterObjects(FAnimationObject* This, un
     return PlaybackFilterTyped(Playback, ChannelFacet);
 }
 
-static unsigned long DACOM_API AnimationHasObject(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationHasObject(FAnimationObject* This, uint32_t PlaybackId,
                                                  void* Object)
 {
     FAnimPlayback* Playback = nullptr;
@@ -1075,11 +1076,11 @@ static unsigned long DACOM_API AnimationHasObject(FAnimationObject* This, unsign
     return PlaybackHasTyped(Playback, Object);
 }
 
-static unsigned long DACOM_API AnimationGetFirstInstanceField(FAnimationObject* This,
-                                                            unsigned long PlaybackId,
-                                                            unsigned long* Out)
+static uint32_t DACOM_API AnimationGetFirstInstanceField(FAnimationObject* This,
+                                                            uint32_t PlaybackId,
+                                                            uint32_t* Out)
 {
-    FAnimPlaybackMap::iterator It = This->Playbacks->find((long)PlaybackId);
+    FAnimPlaybackMap::iterator It = This->Playbacks->find((int32_t)PlaybackId);
     if (It == This->Playbacks->end())
         return 0;
     FAnimNameMap& Names = It->second.Script->Names;
@@ -1088,7 +1089,7 @@ static unsigned long DACOM_API AnimationGetFirstInstanceField(FAnimationObject* 
     {
         if (&Cursor->second == It->second.Name)
         {
-            *Out = (unsigned long)((size_t)(Cursor->second.Name));
+            *Out = (uint32_t)((size_t)(Cursor->second.Name));
             return 1;
         }
         ++Cursor;
@@ -1096,8 +1097,8 @@ static unsigned long DACOM_API AnimationGetFirstInstanceField(FAnimationObject* 
     return 0;
 }
 
-static unsigned long DACOM_API AnimationGetDurationIfNamed(FAnimationObject* This,
-                                                          unsigned long PlaybackId, float* Out)
+static uint32_t DACOM_API AnimationGetDurationIfNamed(FAnimationObject* This,
+                                                          uint32_t PlaybackId, float* Out)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -1110,7 +1111,7 @@ static unsigned long DACOM_API AnimationGetDurationIfNamed(FAnimationObject* Thi
     return 1;
 }
 
-static unsigned long DACOM_API AnimationGetNamedDurationOut(FAnimationObject* This,
+static uint32_t DACOM_API AnimationGetNamedDurationOut(FAnimationObject* This,
                                                            FAnimScript* Script, const char* Name,
                                                            float* Out)
 {
@@ -1126,17 +1127,17 @@ static unsigned long DACOM_API AnimationGetNamedDurationOut(FAnimationObject* Th
     return 1;
 }
 
-static unsigned long DACOM_API AnimationFindObject(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationFindObject(FAnimationObject* This, uint32_t PlaybackId,
                                                   void* Query)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0xFFFFFFFF;
-    return (unsigned long)(
-        PlaybackFindTypedByHeader(Playback, (const FAnimBindOut*)Query));
+    return (uint32_t)fl::PtrToHandle((
+        PlaybackFindTypedByHeader(Playback, (const FAnimBindOut*)Query)));
 }
 
-static unsigned long DACOM_API AnimationAddScriptNames(FAnimationObject* This, FAnimScript* Script,
+static uint32_t DACOM_API AnimationAddScriptNames(FAnimationObject* This, FAnimScript* Script,
                                                      void* FileSystem, const char** Names,
                                                      int Count)
 {
@@ -1146,12 +1147,12 @@ static unsigned long DACOM_API AnimationAddScriptNames(FAnimationObject* This, F
     IFileSystem* Fs = AsFileSystem(FileSystem);
     if (Fs->OpenNode(G_NameAnimation) == 0)
         return 0xFFFFFFFF;
-    const unsigned long Result = LoadAnimScriptsByNameList(Script, FileSystem, Names, Count);
+    const uint32_t Result = LoadAnimScriptsByNameList(Script, FileSystem, Names, Count);
     Fs->OpenNode(G_NameParentDot);
     return Result;
 }
 
-static unsigned long DACOM_API AnimationRemoveScriptNames(FAnimationObject* This, FAnimScript* Script,
+static uint32_t DACOM_API AnimationRemoveScriptNames(FAnimationObject* This, FAnimScript* Script,
                                                         const char** Names, int Count)
 {
     (void)This;
@@ -1172,7 +1173,7 @@ static unsigned long DACOM_API AnimationRemoveScriptNames(FAnimationObject* This
     return 0;
 }
 
-static unsigned long DACOM_API AnimationEnumFsScripts(FAnimationObject* This, void* Callback,
+static uint32_t DACOM_API AnimationEnumFsScripts(FAnimationObject* This, void* Callback,
                                                     void* FileSystem, void* Context)
 {
     (void)This;
@@ -1210,8 +1211,8 @@ static unsigned long DACOM_API AnimationEnumFsScripts(FAnimationObject* This, vo
     return 0;
 }
 
-static unsigned long DACOM_API AnimationEnumObjects(FAnimationObject* This, void* Callback,
-                                                   unsigned long PlaybackId, void* Context)
+static uint32_t DACOM_API AnimationEnumObjects(FAnimationObject* This, void* Callback,
+                                                   uint32_t PlaybackId, void* Context)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
@@ -1228,13 +1229,13 @@ static unsigned long DACOM_API AnimationEnumObjects(FAnimationObject* This, void
     return 0;
 }
 
-static unsigned long DACOM_API AnimationRegisterHandle(FAnimationObject* This, unsigned long Key)
+static uint32_t DACOM_API AnimationRegisterHandle(FAnimationObject* This, uint32_t Key)
 {
     (void)This;
     return RegisterAnimHandle(Key);
 }
 
-static unsigned long DACOM_API AnimationHasHandle(FAnimationObject* This, unsigned long Key,
+static uint32_t DACOM_API AnimationHasHandle(FAnimationObject* This, uint32_t Key,
                                                  unsigned char* Out)
 {
     (void)This;
@@ -1243,7 +1244,7 @@ static unsigned long DACOM_API AnimationHasHandle(FAnimationObject* This, unsign
     return 0;
 }
 
-static unsigned long DACOM_API AnimationHasAnyHandle(FAnimationObject* This, unsigned long Key)
+static uint32_t DACOM_API AnimationHasAnyHandle(FAnimationObject* This, uint32_t Key)
 {
     (void)This;
     if (!FindAnimHandle(Key))
@@ -1252,12 +1253,12 @@ static unsigned long DACOM_API AnimationHasAnyHandle(FAnimationObject* This, uns
     return 0;
 }
 
-static bool IsTypedChannelType(unsigned long Type)
+static bool IsTypedChannelType(uint32_t Type)
 {
     return Type == 1 || Type == 2 || Type == 4 || Type == 6 || Type == 8;
 }
 
-static unsigned long TypedKindFromType(unsigned long Type)
+static uint32_t TypedKindFromType(uint32_t Type)
 {
     if (Type == 1 || Type == 2)
         return G_MixKindScalar;
@@ -1272,9 +1273,9 @@ static unsigned long TypedKindFromType(unsigned long Type)
     return G_MixKindScalar;
 }
 
-static unsigned long DACOM_API TypedSetTime(FTypedChannel* This, float Time);
+static uint32_t DACOM_API TypedSetTime(FTypedChannel* This, float Time);
 
-static unsigned long DACOM_API TypedBind(FTypedChannel* This, unsigned long* Header)
+static uint32_t DACOM_API TypedBind(FTypedChannel* This, uint32_t* Header)
 {
     const float* HeaderF = (const float*)Header;
     This->LoopFlags = Header[1];
@@ -1306,7 +1307,7 @@ static void TypedStoreIdentityMatrix(float* Matrix)
     Matrix[8] = 1.0f;
 }
 
-static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsigned long* Header)
+static uint32_t DACOM_API TypedBindType6(FPosQuatTypedChannel* This, uint32_t* Header)
 {
     TypedBind(This, Header);
     if (This->Kind != 1)
@@ -1326,7 +1327,7 @@ static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsign
         {
             std::memcpy(This->Matrix, Block, sizeof(This->Matrix));
             TypedCopyVec3(This->Delta, Block + 9);
-            unsigned long Bits = 0;
+            uint32_t Bits = 0;
             std::memcpy(&Bits, &Block[9], sizeof(Bits));
             return Bits;
         }
@@ -1334,7 +1335,7 @@ static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsign
         std::memcpy(This->Matrix, Orient, sizeof(This->Matrix));
         float* Position = G_AnimEngine->GetInstancePosition(Instance);
         TypedCopyVec3(This->Delta, Position);
-        return (unsigned long)((size_t)Position);
+        return (uint32_t)((size_t)Position);
     }
     const unsigned char* KeyA = nullptr;
     const unsigned char* KeyB = nullptr;
@@ -1383,21 +1384,21 @@ static unsigned long DACOM_API TypedBindType6(FPosQuatTypedChannel* This, unsign
         This->Delta[1] = Position[1] - Xformed[1];
         This->Delta[2] = Position[2] - Xformed[2];
     }
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &This->Delta[1], sizeof(Bits));
     return Bits;
 }
 
-static unsigned long DACOM_API TypedGetFlags(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetFlags(FTypedChannel* This)
 {
     if (This == nullptr || This->Archetype == nullptr)
         return 0;
     return This->Archetype->Flags;
 }
 
-static unsigned long ChannelPayloadBytesFromFlags(unsigned long Flags)
+static uint32_t ChannelPayloadBytesFromFlags(uint32_t Flags)
 {
-    unsigned long Bytes = 0;
+    uint32_t Bytes = 0;
     if ((Flags & 1) != 0)
         Bytes = 4;
     if ((Flags & 2) != 0)
@@ -1415,7 +1416,7 @@ static unsigned long ChannelPayloadBytesFromFlags(unsigned long Flags)
     return Bytes;
 }
 
-static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* Map, void* Bind)
+static uint32_t DACOM_API TypedBindMap(FTypedChannel* This, uint32_t* Map, void* Bind)
 {
     This->Kind = Map[0];
     This->Field0C = Map[1];
@@ -1424,17 +1425,17 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     This->Bind = Bind;
     if (This->Owner != nullptr)
         return 1;
-    unsigned long Flags = 0;
+    uint32_t Flags = 0;
     This->Archetype->GetFlags(&Flags);
-    const unsigned long Bytes = ChannelPayloadBytesFromFlags(Flags);
+    const uint32_t Bytes = ChannelPayloadBytesFromFlags(Flags);
     if (This->Kind == 0 && G_AnimEngine != nullptr)
     {
-        unsigned long* Relative = G_AnimEngine->GetInstanceRelative(
-            (void*)(This->Field14));
-        unsigned long MixKind = 0;
+        uint32_t* Relative = G_AnimEngine->GetInstanceRelative(
+            (void*)fl::HandleToPtr((This->Field14)));
+        uint32_t MixKind = 0;
         if (Relative != nullptr)
         {
-            const unsigned long Case = Relative[0] - 1;
+            const uint32_t Case = Relative[0] - 1;
             if (Case == 0 || Case == 1)
                 MixKind = 1;
             else if (Case == 2)
@@ -1455,56 +1456,56 @@ static unsigned long DACOM_API TypedBindMap(FTypedChannel* This, unsigned long* 
     return Bytes == 0x1C ? 1 : 0;
 }
 
-static unsigned long DACOM_API TypedBindMapType1(FScalarTypedChannel* This, unsigned long* Map, void* Bind)
+static uint32_t DACOM_API TypedBindMapType1(FScalarTypedChannel* This, uint32_t* Map, void* Bind)
 {
-    const unsigned long bBound = TypedBindMap(This, Map, Bind);
+    const uint32_t bBound = TypedBindMap(This, Map, Bind);
     if (bBound != 0)
     {
-        unsigned long* Relative = (unsigned long*)(
-            G_AnimEngine->GetInstanceRelative((void*)(Map[3])));
+        uint32_t* Relative = (uint32_t*)(
+            G_AnimEngine->GetInstanceRelative((void*)fl::HandleToPtr((Map[3]))));
         if (Relative != nullptr)
             This->JointType = Relative[0];
     }
     return bBound;
 }
 
-static unsigned long DACOM_API TypedNop(FTypedChannel* This)
+static uint32_t DACOM_API TypedNop(FTypedChannel* This)
 {
     (void)This;
     return 0;
 }
 
-static unsigned long DACOM_API TypedReturnZero(FTypedChannel* This)
+static uint32_t DACOM_API TypedReturnZero(FTypedChannel* This)
 {
     (void)This;
     return 0;
 }
 
-static unsigned long DACOM_API TypedGetType8(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetType8(FTypedChannel* This)
 {
     (void)This;
     return 8;
 }
 
-static unsigned long DACOM_API TypedGetType1(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetType1(FTypedChannel* This)
 {
     (void)This;
     return 1;
 }
 
-static unsigned long DACOM_API TypedGetType2(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetType2(FTypedChannel* This)
 {
     (void)This;
     return 2;
 }
 
-static unsigned long DACOM_API TypedGetType4(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetType4(FTypedChannel* This)
 {
     (void)This;
     return 4;
 }
 
-static unsigned long DACOM_API TypedWrapLerpType2(FScalarTypedChannel* This, float* Out, const float* A,
+static uint32_t DACOM_API TypedWrapLerpType2(FScalarTypedChannel* This, float* Out, const float* A,
                                                  const float* B, double Alpha)
 {
 
@@ -1530,10 +1531,10 @@ static unsigned long DACOM_API TypedWrapLerpType2(FScalarTypedChannel* This, flo
     Out[0] = (float)Sum;
     Out[0] = This->Scale * Out[0];
 
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
-static unsigned long DACOM_API TypedSlerpType4(FQuatTypedChannel* This, float* Out, const float* Left,
+static uint32_t DACOM_API TypedSlerpType4(FQuatTypedChannel* This, float* Out, const float* Left,
                                               const float* Right, double Alpha)
 {
     float RightCopy[4];
@@ -1553,10 +1554,10 @@ static unsigned long DACOM_API TypedSlerpType4(FQuatTypedChannel* This, float* O
     Out[1] = Result[1];
     Out[2] = Result[2];
     Out[3] = Result[3];
-    unsigned long ScaleBits = 0;
+    uint32_t ScaleBits = 0;
     std::memcpy(&ScaleBits, &This->Scale, sizeof(ScaleBits));
     if (ScaleBits == 0x3F800000)
-        return (unsigned long)((size_t)Out);
+        return (uint32_t)((size_t)Out);
     Result[0] = 1.0f;
     Result[1] = 0.0f;
     Result[2] = 0.0f;
@@ -1566,14 +1567,14 @@ static unsigned long DACOM_API TypedSlerpType4(FQuatTypedChannel* This, float* O
     Out[1] = LeftCopy[1];
     Out[2] = LeftCopy[2];
     Out[3] = LeftCopy[3];
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 static void TypedStoreMatrix3x3(float* Dest, const float* M00)
 {
     if (Dest == nullptr || M00 == nullptr)
         return;
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < 9)
     {
         Dest[Index] = M00[Index];
@@ -1581,7 +1582,7 @@ static void TypedStoreMatrix3x3(float* Dest, const float* M00)
     }
 }
 
-static unsigned long DACOM_API TypedLerpScaledVec3(FVectorTypedChannel* This, float* Out, const float* A,
+static uint32_t DACOM_API TypedLerpScaledVec3(FVectorTypedChannel* This, float* Out, const float* A,
                                                   const float* B, double Alpha)
 {
     const double D0 = (double)(B[0]) - (double)(A[0]);
@@ -1601,11 +1602,11 @@ static unsigned long DACOM_API TypedLerpScaledVec3(FVectorTypedChannel* This, fl
     Out[0] = (float)(Factor * (double)(Out[0]));
     Out[1] = (float)(Factor * (double)(Out[1]));
     Out[2] = (float)(Factor * (double)(Out[2]));
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 // formerly TypedNopRet10; TODO: derive the retail return contract.
-static unsigned long DACOM_API NoOpTypedChannelApply(FTypedChannel* This, const float* Left,
+static uint32_t DACOM_API NoOpTypedChannelApply(FTypedChannel* This, const float* Left,
                                             const float* Right, double Alpha)
 {
     (void)This;
@@ -1616,7 +1617,7 @@ static unsigned long DACOM_API NoOpTypedChannelApply(FTypedChannel* This, const 
 }
 
 // formerly TypedNopSlot0; TODO: derive the retail return contract.
-static unsigned long DACOM_API NoOpTypedChannelInterpolate(FTypedChannel* This, float* Out, const float* Left,
+static uint32_t DACOM_API NoOpTypedChannelInterpolate(FTypedChannel* This, float* Out, const float* Left,
                                              const float* Right, double Alpha)
 {
     (void)This;
@@ -1628,7 +1629,7 @@ static unsigned long DACOM_API NoOpTypedChannelInterpolate(FTypedChannel* This, 
 }
 
 // formerly TypedNopArg1; TODO: derive the retail return contract.
-static unsigned long DACOM_API NoOpTypedChannelCopy(FTypedChannel* This, void* A)
+static uint32_t DACOM_API NoOpTypedChannelCopy(FTypedChannel* This, void* A)
 {
     (void)This;
     (void)A;
@@ -1636,7 +1637,7 @@ static unsigned long DACOM_API NoOpTypedChannelCopy(FTypedChannel* This, void* A
 }
 
 // formerly TypedNopArg2; TODO: derive the retail return contract.
-static unsigned long DACOM_API NoOpTypedChannelMapped(FTypedChannel* This, void* A, void* B)
+static uint32_t DACOM_API NoOpTypedChannelMapped(FTypedChannel* This, void* A, void* B)
 {
     (void)This;
     (void)A;
@@ -1647,7 +1648,7 @@ static unsigned long DACOM_API NoOpTypedChannelMapped(FTypedChannel* This, void*
 // LAB_06612170 RET 0x8: zero three floats through the first argument, ignore the second.
 // Slot 0x38 of every table except type-6's, whose LAB_0661bd30 shows the second argument is a
 // float -- so that is how it is spelled here, one signature for the slot.
-static unsigned long DACOM_API TypedZeroVec3(FTypedChannel* This, float* Out, float Dt)
+static uint32_t DACOM_API TypedZeroVec3(FTypedChannel* This, float* Out, float Dt)
 {
     (void)This;
     (void)Dt;
@@ -1660,9 +1661,9 @@ static unsigned long DACOM_API TypedZeroVec3(FTypedChannel* This, float* Out, fl
 }
 
 // FUN_0661af70 thiscall RET 4 (Header): header[0] is the start time.
-static unsigned long DACOM_API TypedTimePlayable(FTypedChannel* This, float* Time)
+static uint32_t DACOM_API TypedTimePlayable(FTypedChannel* This, float* Time)
 {
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, Time, sizeof(Bits));
     if (Bits == 0xBF800000)
         return 1;
@@ -1681,12 +1682,12 @@ static unsigned long DACOM_API TypedTimePlayable(FTypedChannel* This, float* Tim
 
 // FUN_0661ad90 thiscall RET 4: FUN_0661af70; if AL != 0, virtual slot 1 (Bind) with the same
 // header (0661ada5..aa). Returns the check's AL.
-static unsigned long DACOM_API TypedTryBindIfTimeValid(FTypedChannel* This, float* Header)
+static uint32_t DACOM_API TypedTryBindIfTimeValid(FTypedChannel* This, float* Header)
 {
-    const unsigned long Ok = TypedTimePlayable(This, Header);
+    const uint32_t Ok = TypedTimePlayable(This, Header);
     if (Ok != 0)
     {
-        This->BindHeader((unsigned long*)Header);
+        This->BindHeader((uint32_t*)Header);
     }
     return Ok;
 }
@@ -1698,7 +1699,7 @@ void TypedApplyFromArchetype(FTypedChannel* This)
     This->PlayFlags |= 1;                                        // 0661b076..81
     if (This->Archetype == nullptr)                              // 0661b07f..84
         return;
-    unsigned long Flags = 0;
+    uint32_t Flags = 0;
     This->Archetype->GetFlags(&Flags);                           // 0661b08a..92 vtbl+0x14
     if (Flags == 8)                                              // 0661b095..9a
         return;
@@ -1726,12 +1727,12 @@ void TypedApplyFromArchetype(FTypedChannel* This)
 }
 
 // FUN_0661b120 thiscall RET 0x18 (T0, T1, Mode, Buf, Cap, Count): gather the keys an event
-static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsigned long Mode,
-                                  float* Buf, unsigned long Cap, unsigned long* Count)
+static uint32_t TypedCollect(FTypedChannel* This, float T0, float T1, uint32_t Mode,
+                                  float* Buf, uint32_t Cap, uint32_t* Count)
 {
     float Duration = 0.0f;
     This->Archetype->GetDuration(&Duration);                     // 0661b12d..36 vtbl+0x10
-    unsigned long Found = 0;                                     // frame +0x10
+    uint32_t Found = 0;                                     // frame +0x10
 
     // 0661b139..5c / 0661b228..37. Weight: FCOMP qword 0.0; TEST AH,5; JP -- taken for >= 0
     unsigned char bWrap = 0;
@@ -1794,7 +1795,7 @@ static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsig
         }
     }
 
-    const unsigned long Loop = This->LoopFlags;                  // 0661b319
+    const uint32_t Loop = This->LoopFlags;                  // 0661b319
     const bool bForward = !(This->Weight < 0.0f);                // 0661b31c..1f, TEST AH,5 / JP
     if ((Loop & 2) != 0)                                         // 0661b325..0661b389
     {
@@ -1826,9 +1827,9 @@ static unsigned long TypedCollect(FTypedChannel* This, float T0, float T1, unsig
 // FUN_0661b420 thiscall RET 4 (Dt): advance the channel by Dt * Weight and pose it. Answers 1
 // when a non-looping channel has run off its end this tick and nothing has posed it since
 // (PlayFlags bit 0 clear); an owner-driven channel answers whatever its owner does.
-unsigned long TypedTick(FTypedChannel* This, float Dt)
+uint32_t TypedTick(FTypedChannel* This, float Dt)
 {
-    unsigned long Result = 0;                                    // frame +0x10
+    uint32_t Result = 0;                                    // frame +0x10
     This->PlayFlags |= 4;                                        // 0661b42c..38
     if ((This->PlayFlags & 3) != 0)                              // 0661b43b..3d
         return 0;
@@ -1842,17 +1843,17 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
     {
         float* Sampled = This->GetSampled();
         IChannelOwner* Owner = This->Owner;
-        return (unsigned long)(Owner->Apply(
-            Sampled, (unsigned long)((size_t)This),
+        return (uint32_t)(Owner->Apply(
+            Sampled, (uint32_t)((size_t)This),
             TypedBindDesc(This), NewTime));                       // 0661b466..7e
     }
 
-    unsigned long Flags = 0;
+    uint32_t Flags = 0;
     This->Archetype->GetFlags(&Flags);                           // 0661b490..9b vtbl+0x14
     if (Flags == 8)                                              // 0661b49e..a3
     {
         float Keys[0x40][2];                                     // frame +0x2A4
-        unsigned long KeyCount = 0;
+        uint32_t KeyCount = 0;
         Result = TypedCollect(This, OldTime, This->Time, 3, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)                                       // 0661b4d6..d8
             return Result;
@@ -1864,7 +1865,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
         // REP MOVSD of (count & 0x1FFFFFFF) * 2 dwords (0661b4f4..0661b50a).
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
         IChannelSink* KeySink = (IChannelSink*)Sink;
-        KeySink->OnKeys((unsigned long)((size_t)This),
+        KeySink->OnKeys((uint32_t)((size_t)This),
                         (void*)((size_t)(This->Field10)),
                         &Batch);                                  // 0661b50c..1c
         return Result;
@@ -1880,18 +1881,18 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
     if (Remaining <= 0.0)
     {
         // FLD Duration; FCOMP 0.0f; TEST AH,0x44; JNP -- a zero-length clip keeps 0 wraps.
-        unsigned long Wraps = 0;                                 // EBX
+        uint32_t Wraps = 0;                                 // EBX
         if (Duration != 0.0f)
         {
             // FDIVR -> Remaining / Duration; _ftol; CDQ / XOR / SUB: |low dword|.
-            const long Low = (long)((long long)(Remaining / Duration));
-            Wraps = (unsigned long)((Low ^ (Low >> 31)) - (Low >> 31));
+            const int32_t Low = (int32_t)((long long)(Remaining / Duration));
+            Wraps = (uint32_t)((Low ^ (Low >> 31)) - (Low >> 31));
         }
         // FABS; FILD qword {Wraps, 0}; FMUL Duration; FSUBP; FSTP dword.
         const float Frac = (float)(std::fabs(Remaining) -
                                               (double)Wraps * Duration);
-        const unsigned long Loop = This->LoopFlags;              // 0661b59d
-        unsigned long Header[7];                                 // frame +0x1C
+        const uint32_t Loop = This->LoopFlags;              // 0661b59d
+        uint32_t Header[7];                                 // frame +0x1C
         if ((Loop & 2) != 0)                                     // 0661b5a0..ad
         {
             // Frame +0x50: a 3x3 orientation (0..8), the applied position (9..11) and the
@@ -1920,7 +1921,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
                 if (Sink != nullptr)                             // 0661b65b..6e
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
-                    LoopSink->OnLoop((unsigned long)((size_t)This),
+                    LoopSink->OnLoop((uint32_t)((size_t)This),
                                      Frame,
                                      (void*)((size_t)(This->Field10)));
                 }
@@ -1936,7 +1937,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
             std::memcpy(&Header[4], &This->Scale, sizeof(float));
             std::memcpy(&Header[5], &This->Field_0x30, sizeof(float));
             Header[6] = This->Kind == 1
-                            ? (unsigned long)((size_t)(&Frame[0]))
+                            ? (uint32_t)((size_t)(&Frame[0]))
                             : 0;
             This->BindHeader(Header);
             // FLD Duration (frame +0x10); FCOMP 0.0f; TEST AH,0x44; JNP -- skipped only when the
@@ -1988,7 +1989,7 @@ unsigned long TypedTick(FTypedChannel* This, float Dt)
 
 // LAB_0661caf0, the type-6 table's slot 8 (+0x20, .rdata:06629110), thiscall RET 0x4 (Target),
 // formerly TypedEvalType6Caf0
-static unsigned long DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* This, const float* Target)
+static uint32_t DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* This, const float* Target)
 {
     if (This->Kind != 1)
         return 0;
@@ -2019,13 +2020,13 @@ static unsigned long DACOM_API SetChannelOverlayPosition(FPosQuatTypedChannel* T
     This->AppliedPos[0] = Target[0];
     This->AppliedPos[1] = Target[1];
     This->AppliedPos[2] = Target[2];
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &Target[2], sizeof(Bits));
     return Bits;
 }
 
 // LAB_0661bc80 RET 0x14: lerp pos + 3DMath +0x58 slerp quat. Not IK.
-static unsigned long DACOM_API TypedLerpPosQuat(FPosQuatTypedChannel* This, float* Out, const float* Left,
+static uint32_t DACOM_API TypedLerpPosQuat(FPosQuatTypedChannel* This, float* Out, const float* Left,
                                                const float* Right, double Alpha)
 {
     (void)This;
@@ -2040,18 +2041,18 @@ static unsigned long DACOM_API TypedLerpPosQuat(FPosQuatTypedChannel* This, floa
     Out[4] = Quat[1];
     Out[5] = Quat[2];
     Out[6] = Quat[3];
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &Quat[1], sizeof(Bits));
     return Bits;
 }
 
 // LAB_0661ba60, the type-6 table's slot 0 (.rdata:PTR_LAB_066290f0[0]). Recovered
-static unsigned long DACOM_API TypedLerpPosQuatScaled(FPosQuatTypedChannel* This, float* Out,
+static uint32_t DACOM_API TypedLerpPosQuatScaled(FPosQuatTypedChannel* This, float* Out,
                                                       const float* Left, const float* Right,
                                                       double Alpha)
 {
     This->InterpolatePose(Out, Left, Right, Alpha);
-    unsigned long ScaleBits = 0;
+    uint32_t ScaleBits = 0;
     std::memcpy(&ScaleBits, &This->Scale, sizeof(ScaleBits));
     if (ScaleBits == 0x3F800000)
         return ScaleBits;
@@ -2063,14 +2064,14 @@ static unsigned long DACOM_API TypedLerpPosQuatScaled(FPosQuatTypedChannel* This
     Out[4] = Slerped[1];
     Out[5] = Slerped[2];
     Out[6] = Slerped[3];
-    unsigned long LastBits = 0;
+    uint32_t LastBits = 0;
     std::memcpy(&LastBits, &Slerped[3], sizeof(LastBits));
     return LastBits;
 }
 
 // LAB_0661b880, slot 2 of the type 1 / 2 / 4 tables (.rdata:066291ac, 06629170, 06629134; one
 // formerly TypedApplySlot2
-static unsigned long DACOM_API ApplyInterpolatedChannelSample(FTypedChannel* This, float* Sampled,
+static uint32_t DACOM_API ApplyInterpolatedChannelSample(FTypedChannel* This, float* Sampled,
                                                const float* Left, const float* Right, double Alpha)
 {
     return This->InterpolatePose(Sampled, Left, Right, Alpha);
@@ -2078,12 +2079,12 @@ static unsigned long DACOM_API ApplyInterpolatedChannelSample(FTypedChannel* Thi
 
 // LAB_0661bb10, the type-6 table's slot 2 (.rdata:066290f8), thiscall RET 0x10 (Left, Right,
 // formerly TypedApplySlot2Type6
-static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChannel* This, const float* Left,
+static uint32_t DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChannel* This, const float* Left,
                                                     const float* Right, double Alpha)
 {
     float Local[7];
     This->Interpolate(Local, Left, Right, Alpha);
-    const unsigned long Kind = This->Kind;
+    const uint32_t Kind = This->Kind;
     if (Kind == 1)
     {
         const double Factor = (double)(This->Field_0x30) * (double)(This->Scale);
@@ -2107,7 +2108,7 @@ static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChanne
         This->AppliedQuat[1] = Composed[1];
         This->AppliedQuat[2] = Composed[2];
         This->AppliedQuat[3] = Composed[3];
-        unsigned long Bits = 0;
+        uint32_t Bits = 0;
         std::memcpy(&Bits, &Composed[3], sizeof(Bits));
         return Bits;
     }
@@ -2118,7 +2119,7 @@ static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChanne
         This->AppliedQuat[1] = Local[4];
         This->AppliedQuat[2] = Local[5];
         This->AppliedQuat[3] = Local[6];
-        unsigned long Bits = 0;
+        uint32_t Bits = 0;
         std::memcpy(&Bits, &Local[6], sizeof(Bits));
         return Bits;
     }
@@ -2126,7 +2127,7 @@ static unsigned long DACOM_API ApplyPositionQuaternionSample(FPosQuatTypedChanne
 }
 
 // LAB_0661afe0 thiscall RET 0x4 (Time), 0661afe0..66. Each test is FCOMP + TEST AH,0x44:
-static unsigned long DACOM_API TypedSetTime(FTypedChannel* This, float Time)
+static uint32_t DACOM_API TypedSetTime(FTypedChannel* This, float Time)
 {
     if (Time == -1.0f)
     {
@@ -2149,7 +2150,7 @@ static unsigned long DACOM_API TypedSetTime(FTypedChannel* This, float Time)
 }
 
 // LAB_0661cf90: MOV EAX,6; RET.
-static unsigned long DACOM_API TypedGetType6(FTypedChannel* This)
+static uint32_t DACOM_API TypedGetType6(FTypedChannel* This)
 {
     (void)This;
     return 6;
@@ -2157,54 +2158,54 @@ static unsigned long DACOM_API TypedGetType6(FTypedChannel* This)
 
 // LAB_06612190 RET 4 (06612190..99): MOV EAX,[ECX+0x3C]; *Out = EAX. EAX -- the copied dword
 // -- is the answer. No null checks.
-static unsigned long DACOM_API TypedCopySampledDword(FScalarTypedChannel* This, float* Out)
+static uint32_t DACOM_API TypedCopySampledDword(FScalarTypedChannel* This, float* Out)
 {
     Out[0] = This->Sampled[0];
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &This->Sampled[0], sizeof(Bits));
     return Bits;
 }
 
 // LAB_066121b0 RET 4 (066121b0..cd): copy 16 bytes from this+0x3C; EAX = Out is the answer.
 // No null checks. Type-4 slot 6.
-static unsigned long DACOM_API TypedCopySampled16(FQuatTypedChannel* This, float* Out)
+static uint32_t DACOM_API TypedCopySampled16(FQuatTypedChannel* This, float* Out)
 {
     Out[0] = This->Sampled[0];
     Out[1] = This->Sampled[1];
     Out[2] = This->Sampled[2];
     Out[3] = This->Sampled[3];
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 // LAB_066121d0 RET 4 (066121d0..e7): copy 12 bytes from this+0x3C; EAX = Out. No null checks.
 // Type-2 slot 6.
-static unsigned long DACOM_API TypedCopySampled12(FVectorTypedChannel* This, float* Out)
+static uint32_t DACOM_API TypedCopySampled12(FVectorTypedChannel* This, float* Out)
 {
     TypedCopyVec3(Out, This->Sampled);
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 // LAB_066121f0 RET 0x4 (066121f0..2e): copy 12 bytes from +0x78 and 16 from +0x84 into
 // Out / Out+0xC; EAX = Out+0xC is the answer. No null checks.
-static unsigned long DACOM_API TypedCopyApplied(FPosQuatTypedChannel* This, float* Out)
+static uint32_t DACOM_API TypedCopyApplied(FPosQuatTypedChannel* This, float* Out)
 {
     TypedCopyVec3(Out, This->AppliedPos);
     Out[3] = This->AppliedQuat[0];
     Out[4] = This->AppliedQuat[1];
     Out[5] = This->AppliedQuat[2];
     Out[6] = This->AppliedQuat[3];
-    return (unsigned long)((size_t)(Out + 3));
+    return (uint32_t)((size_t)(Out + 3));
 }
 
 // LAB_0661c6d0 thiscall RET 0x4 (Add), 0661c6d0..f9: Delta (+0x60) [i] = float(Delta[i] +
-static unsigned long DACOM_API TypedAddDelta(FPosQuatTypedChannel* This, const float* Add)
+static uint32_t DACOM_API TypedAddDelta(FPosQuatTypedChannel* This, const float* Add)
 {
     This->Delta[0] += Add[0];
     This->Delta[1] += Add[1];
     This->Delta[2] += Add[2];
     if ((This->PlayFlags & G_ChannelPlayFlag) != 0)
         TypedApplyFromArchetype(This);
-    return (unsigned long)((size_t)Add);
+    return (uint32_t)((size_t)Add);
 }
 
 // LAB_06612240: LEA EAX,[ECX+0x78]; RET. No null check.
@@ -2214,7 +2215,7 @@ static float* DACOM_API TypedAppliedPtr(FPosQuatTypedChannel* This)
 }
 
 // LAB_0661c5c0, the type-6 table's slot 0x30, thiscall RET 0x8 (Out, OutSampled),
-static unsigned long DACOM_API TypedSampleXformType6(FPosQuatTypedChannel* This, float* Out,
+static uint32_t DACOM_API TypedSampleXformType6(FPosQuatTypedChannel* This, float* Out,
                                                      float* OutSampled)
 {
     const unsigned char* KeyA = nullptr;
@@ -2241,7 +2242,7 @@ static unsigned long DACOM_API TypedSampleXformType6(FPosQuatTypedChannel* This,
     Out[0] = Xformed[0] + This->Delta[0];
     Out[1] = Xformed[1] + This->Delta[1];
     Out[2] = Xformed[2] + This->Delta[2];
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 // One pass of LAB_0661c320 (retail inlines it twice, 0661c34d..0661c423 and
@@ -2267,7 +2268,7 @@ static void TypedType6SampleXform(FPosQuatTypedChannel* This, float Time, const 
 }
 
 // LAB_0661c320, the type-6 table's slot 0x34, thiscall RET 0x4 (Dt), 0661c320..0661c5b2.
-static unsigned long DACOM_API TypedStepDeltaType6(FPosQuatTypedChannel* This, float Dt)
+static uint32_t DACOM_API TypedStepDeltaType6(FPosQuatTypedChannel* This, float Dt)
 {
     const float Shifted = (double)(This->Weight) < 0.0
                               ? (float)((double)(This->Time) - (double)Dt)
@@ -2292,7 +2293,7 @@ static unsigned long DACOM_API TypedStepDeltaType6(FPosQuatTypedChannel* This, f
     This->StepDelta[0] = (float)((double)Dx * Inv);
     This->StepDelta[1] = (float)(Dy * Inv);
     This->StepDelta[2] = (float)(Dz * Inv);
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &This->StepDelta[1], sizeof(Bits));
     return Bits;
 }
@@ -2312,7 +2313,7 @@ static void TypedType6ScaledFrame(FPosQuatTypedChannel* This, unsigned char bLas
 }
 
 // LAB_0661bd30, the type-6 table's slot 0x38, thiscall RET 0x8 (Out, Dt), 0661bd30..0661c26b.
-static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, float* Out, float Dt)
+static uint32_t DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, float* Out, float Dt)
 {
     const float WeightedDt = Dt * This->Weight;
     float Duration = 0.0f;
@@ -2408,12 +2409,12 @@ static unsigned long DACOM_API TypedStepPosType6(FPosQuatTypedChannel* This, flo
     Out[0] = Xformed[0];
     Out[1] = Xformed[1];
     Out[2] = Xformed[2];
-    return (unsigned long)((size_t)Out);
+    return (uint32_t)((size_t)Out);
 }
 
 // LAB_0661cc40, the type-6 table's slot 9 (+0x24, .rdata:06629114), thiscall RET 0x4 (Orient:
 // formerly TypedEvalType6Cc40
-static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel* This, const float* Orient)
+static uint32_t DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel* This, const float* Orient)
 {
     if (This->Kind != 1)
         return 0;
@@ -2470,7 +2471,7 @@ static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel
     float R3[9];
     MathMulMatrix(Acquire3DMathEngine(), R3, R2, QuatMatrix);
     MathMatrixToQuat(Acquire3DMathEngine(), This->AppliedQuat, R3);
-    unsigned long Bits = 0;
+    uint32_t Bits = 0;
     std::memcpy(&Bits, &This->AppliedQuat[3], sizeof(Bits));
     return Bits;
 }
@@ -2478,60 +2479,60 @@ static unsigned long DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel
 // The typed-channel vtable, as four retail tables actually have it (cross-DLL ABI pass 34).
 // The 15 slots below follow retail's __thiscall table order (PTR_LAB_066294ac,
 // PTR_LAB_0662912c/168/a4 and PTR_LAB_066290f0). Member dispatch puts this in ECX.
-unsigned long FTypedChannel::Interpolate(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
-unsigned long FTypedChannel::BindHeader(unsigned long* Header) { return TypedBind(this, Header); }
-unsigned long FTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelApply(this, Left, Right, Alpha); }
-unsigned long FTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
-unsigned long FTypedChannel::SetTime(float Time) { return TypedSetTime(this, Time); }
-unsigned long FTypedChannel::GetType() { return TypedGetType8(this); }
-unsigned long FTypedChannel::CopySampled(float* Out) { return NoOpTypedChannelCopy(this, Out); }
-unsigned long FTypedChannel::BindMap(unsigned long* Map, void* Bind) { return TypedBindMap(this, Map, Bind); }
-unsigned long FTypedChannel::SetOverlayPos(const float* Pos) { (void)Pos; return 0; }
-unsigned long FTypedChannel::SetOverlayExtra(const float* Extra) { (void)Extra; return 0; }
-unsigned long FTypedChannel::AddOverlayPos(const float* Delta) { (void)Delta; return 0; }
+uint32_t FTypedChannel::Interpolate(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
+uint32_t FTypedChannel::BindHeader(uint32_t* Header) { return TypedBind(this, Header); }
+uint32_t FTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelApply(this, Left, Right, Alpha); }
+uint32_t FTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return NoOpTypedChannelInterpolate(this, Out, Left, Right, Alpha); }
+uint32_t FTypedChannel::SetTime(float Time) { return TypedSetTime(this, Time); }
+uint32_t FTypedChannel::GetType() { return TypedGetType8(this); }
+uint32_t FTypedChannel::CopySampled(float* Out) { return NoOpTypedChannelCopy(this, Out); }
+uint32_t FTypedChannel::BindMap(uint32_t* Map, void* Bind) { return TypedBindMap(this, Map, Bind); }
+uint32_t FTypedChannel::SetOverlayPos(const float* Pos) { (void)Pos; return 0; }
+uint32_t FTypedChannel::SetOverlayExtra(const float* Extra) { (void)Extra; return 0; }
+uint32_t FTypedChannel::AddOverlayPos(const float* Delta) { (void)Delta; return 0; }
 float* FTypedChannel::GetSampled() { return nullptr; }
-unsigned long FTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return NoOpTypedChannelMapped(this, ArgA, ArgB); }
-unsigned long FTypedChannel::UpdateDeltaRate(float Dt) { (void)Dt; return 0; } // formerly Slot13
-unsigned long FTypedChannel::Step(float* Out, float Dt) { return TypedZeroVec3(this, Out, Dt); }
+uint32_t FTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return NoOpTypedChannelMapped(this, ArgA, ArgB); }
+uint32_t FTypedChannel::UpdateDeltaRate(float Dt) { (void)Dt; return 0; } // formerly Slot13
+uint32_t FTypedChannel::Step(float* Out, float Dt) { return TypedZeroVec3(this, Out, Dt); }
 
 // Type 1 (066291a4): slots 0/1/4/8..10/12..14 inherited (the shared bodies), 2 LAB_0661b880,
 // 3 LAB_0661b8a0, 5 LAB_0661b870, 6 LAB_06612190, 7 FUN_0661b830, 11 LAB_066121a0.
-unsigned long FScalarTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
-unsigned long FScalarTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedWrapLerpType2(this, Out, Left, Right, Alpha); }
-unsigned long FScalarTypedChannel::GetType() { return TypedGetType1(this); }
-unsigned long FScalarTypedChannel::CopySampled(float* Out) { return TypedCopySampledDword(this, Out); }
-unsigned long FScalarTypedChannel::BindMap(unsigned long* Map, void* Bind) { return TypedBindMapType1(this, Map, Bind); }
+uint32_t FScalarTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
+uint32_t FScalarTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedWrapLerpType2(this, Out, Left, Right, Alpha); }
+uint32_t FScalarTypedChannel::GetType() { return TypedGetType1(this); }
+uint32_t FScalarTypedChannel::CopySampled(float* Out) { return TypedCopySampledDword(this, Out); }
+uint32_t FScalarTypedChannel::BindMap(uint32_t* Map, void* Bind) { return TypedBindMapType1(this, Map, Bind); }
 float* FScalarTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0: LEA EAX,[ECX+0x3C]
 
 // Type 2 (06629168): 2 LAB_0661b880, 3 LAB_0661cfa0, 5 LAB_0661d040, 6 LAB_066121d0,
 // 7 FUN_0661adc0 (the base's), 11 LAB_066121a0; the rest as the base.
-unsigned long FVectorTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
-unsigned long FVectorTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpScaledVec3(this, Out, Left, Right, Alpha); }
-unsigned long FVectorTypedChannel::GetType() { return TypedGetType2(this); }
-unsigned long FVectorTypedChannel::CopySampled(float* Out) { return TypedCopySampled12(this, Out); }
+uint32_t FVectorTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
+uint32_t FVectorTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpScaledVec3(this, Out, Left, Right, Alpha); }
+uint32_t FVectorTypedChannel::GetType() { return TypedGetType2(this); }
+uint32_t FVectorTypedChannel::CopySampled(float* Out) { return TypedCopySampled12(this, Out); }
 float* FVectorTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0
 
 // Type 4 (0662912c): 2 LAB_0661b880, 3 LAB_0661b950, 5 LAB_0661b940, 6 LAB_066121b0,
 // 7 FUN_0661adc0 (the base's), 11 LAB_066121a0; the rest as the base.
-unsigned long FQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
-unsigned long FQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedSlerpType4(this, Out, Left, Right, Alpha); }
-unsigned long FQuatTypedChannel::GetType() { return TypedGetType4(this); }
-unsigned long FQuatTypedChannel::CopySampled(float* Out) { return TypedCopySampled16(this, Out); }
+uint32_t FQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyInterpolatedChannelSample(this, Sampled, Left, Right, Alpha); }
+uint32_t FQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedSlerpType4(this, Out, Left, Right, Alpha); }
+uint32_t FQuatTypedChannel::GetType() { return TypedGetType4(this); }
+uint32_t FQuatTypedChannel::CopySampled(float* Out) { return TypedCopySampled16(this, Out); }
 float* FQuatTypedChannel::GetSampled() { return Sampled; } // LAB_066121a0
 
-unsigned long FPosQuatTypedChannel::Interpolate(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpPosQuatScaled(this, Out, Left, Right, Alpha); }
-unsigned long FPosQuatTypedChannel::BindHeader(unsigned long* Header) { return TypedBindType6(this, Header); }
-unsigned long FPosQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyPositionQuaternionSample(this, Left, Right, Alpha); }
-unsigned long FPosQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpPosQuat(this, Out, Left, Right, Alpha); }
-unsigned long FPosQuatTypedChannel::GetType() { return TypedGetType6(this); }
-unsigned long FPosQuatTypedChannel::CopySampled(float* Out) { return TypedCopyApplied(this, Out); }
-unsigned long FPosQuatTypedChannel::SetOverlayPos(const float* Pos) { return SetChannelOverlayPosition(this, Pos); }
-unsigned long FPosQuatTypedChannel::SetOverlayExtra(const float* Extra) { return SetChannelOverlayOrientation(this, Extra); }
-unsigned long FPosQuatTypedChannel::AddOverlayPos(const float* Delta) { return TypedAddDelta(this, Delta); }
+uint32_t FPosQuatTypedChannel::Interpolate(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpPosQuatScaled(this, Out, Left, Right, Alpha); }
+uint32_t FPosQuatTypedChannel::BindHeader(uint32_t* Header) { return TypedBindType6(this, Header); }
+uint32_t FPosQuatTypedChannel::Apply(const float* Left, const float* Right, double Alpha) { return ApplyPositionQuaternionSample(this, Left, Right, Alpha); }
+uint32_t FPosQuatTypedChannel::InterpolatePose(float* Out, const float* Left, const float* Right, double Alpha) { return TypedLerpPosQuat(this, Out, Left, Right, Alpha); }
+uint32_t FPosQuatTypedChannel::GetType() { return TypedGetType6(this); }
+uint32_t FPosQuatTypedChannel::CopySampled(float* Out) { return TypedCopyApplied(this, Out); }
+uint32_t FPosQuatTypedChannel::SetOverlayPos(const float* Pos) { return SetChannelOverlayPosition(this, Pos); }
+uint32_t FPosQuatTypedChannel::SetOverlayExtra(const float* Extra) { return SetChannelOverlayOrientation(this, Extra); }
+uint32_t FPosQuatTypedChannel::AddOverlayPos(const float* Delta) { return TypedAddDelta(this, Delta); }
 float* FPosQuatTypedChannel::GetSampled() { return TypedAppliedPtr(this); }
-unsigned long FPosQuatTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return TypedSampleXformType6(this, (float*)ArgA, (float*)ArgB); }
-unsigned long FPosQuatTypedChannel::UpdateDeltaRate(float Dt) { return TypedStepDeltaType6(this, Dt); } // formerly Slot13
-unsigned long FPosQuatTypedChannel::Step(float* Out, float Dt) { return TypedStepPosType6(this, Out, Dt); }
+uint32_t FPosQuatTypedChannel::TouchMapped(void* ArgA, void* ArgB) { return TypedSampleXformType6(this, (float*)ArgA, (float*)ArgB); }
+uint32_t FPosQuatTypedChannel::UpdateDeltaRate(float Dt) { return TypedStepDeltaType6(this, Dt); } // formerly Slot13
+uint32_t FPosQuatTypedChannel::Step(float* Out, float Dt) { return TypedStepPosType6(this, Out, Dt); }
 
 // ---- Typed-channel construction (retail operator new + ctor chain) ----------------------------
 static void TypedResetPlayState(FTypedChannel* This)
@@ -2585,7 +2586,7 @@ FPosQuatTypedChannel::FPosQuatTypedChannel(IChannelOwner* NewOwner) : FTypedChan
 FPosQuatTypedChannel::FPosQuatTypedChannel(FChannelArchetypeObject* NewArchetype) : FTypedChannel(NewArchetype) {}
 
 // The switch every creation site runs on the type (1 / 2 / 4 / 6 / 8): operator new at the
-static FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner* Owner)
+static FTypedChannel* NewTypedChannelWithOwner(uint32_t Type, IChannelOwner* Owner)
 {
     if (Type == 1)
         return new FScalarTypedChannel(Owner);
@@ -2600,7 +2601,7 @@ static FTypedChannel* NewTypedChannelWithOwner(unsigned long Type, IChannelOwner
     return nullptr;
 }
 
-static FTypedChannel* NewTypedChannelWithArchetype(unsigned long Type, FChannelArchetypeObject* Archetype)
+static FTypedChannel* NewTypedChannelWithArchetype(uint32_t Type, FChannelArchetypeObject* Archetype)
 {
     if (Type == 1)
         return new FScalarTypedChannel(Archetype);
@@ -2646,7 +2647,7 @@ static void ClonePlaybackTypedChannels(FAnimPlayback* Playback, FAnimNameEntry* 
     std::vector<FAnimTrack>::iterator Cursor = Entry->Tracks.begin();
     while (Cursor != Entry->Tracks.end())
     {
-        unsigned long Type = 0;
+        uint32_t Type = 0;
         Cursor->Channel->GetFlags(&Type);
         FTypedChannel* Typed = NewTypedChannelWithArchetype(Type, Cursor->Channel);
         Typed->PlayState &= 0xFE;
@@ -2657,16 +2658,16 @@ static void ClonePlaybackTypedChannels(FAnimPlayback* Playback, FAnimNameEntry* 
 }
 
 // FUN_06612250 thiscall RET 4 (Filter), 06612250..96: answer 1 up front (06612259); for every
-static unsigned long PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter)
+static uint32_t PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
     while (Cursor != Playback->Typed.end())
     {
         FTypedChannel* Typed = *Cursor;
-        const unsigned long Type = Typed->GetType();
+        const uint32_t Type = Typed->GetType();
         if (Type != 8)
         {
-            if (Filter->InMixer((unsigned long)((size_t)Typed)) != 0)
+            if (Filter->InMixer((uint32_t)((size_t)Typed)) != 0)
                 return 0;
         }
         ++Cursor;
@@ -2676,7 +2677,7 @@ static unsigned long PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filt
 
 // FUN_066122a0 thiscall RET 4 (Object), 066122a0..c6: 1 when the vector holds exactly that
 // pointer (066122b1..b3), else 0 (also for an empty vector). Sole XREF LAB_066150a0 066150c3.
-static unsigned long PlaybackHasTyped(FAnimPlayback* Playback, void* Object)
+static uint32_t PlaybackHasTyped(FAnimPlayback* Playback, void* Object)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
     while (Cursor != Playback->Typed.end())
@@ -2689,13 +2690,13 @@ static unsigned long PlaybackHasTyped(FAnimPlayback* Playback, void* Object)
 }
 
 // FUN_066122d0 thiscall RET 8 (ArgA, ArgB), 066122d0..12: the first channel whose typed slot
-static unsigned long PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* ArgA, void* ArgB)
+static uint32_t PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* ArgA, void* ArgB)
 {
     std::vector<FTypedChannel*>::iterator Cursor = Playback->Typed.begin();
     while (Cursor != Playback->Typed.end())
     {
         FTypedChannel* Typed = *Cursor;
-        const unsigned long Type = Typed->GetType();
+        const uint32_t Type = Typed->GetType();
         if ((Type & 2) != 0)
         {
             Typed->TouchMapped(ArgA, ArgB);
@@ -2707,11 +2708,11 @@ static unsigned long PlaybackTouchMappedTyped(FAnimPlayback* Playback, void* Arg
 }
 
 // The shared tail of IChannel::CreateTyped (06615a73..06615adc) and CreateFromObject
-static unsigned long ChannelBindAndInsert(FAnimationObject* Animation, FTypedChannel* Typed,
+static uint32_t ChannelBindAndInsert(FAnimationObject* Animation, FTypedChannel* Typed,
                                           void* BindA, void* BindB, unsigned char bFreeOnRefusal)
 {
-    const unsigned long bBound =
-        Typed->BindMap((unsigned long*)BindA, BindB);
+    const uint32_t bBound =
+        Typed->BindMap((uint32_t*)BindA, BindB);
     if ((bBound & 0xFF) == 0)
     {
         if (bFreeOnRefusal != 0)                                 // 06615aab..06615ad1
@@ -2726,11 +2727,11 @@ static unsigned long ChannelBindAndInsert(FAnimationObject* Animation, FTypedCha
         return 0xFFFFFFFF;
     }
     Animation->Channels->insert(Typed);
-    return (unsigned long)((size_t)Typed);
+    return (uint32_t)((size_t)Typed);
 }
 
 // LAB_06615950 / IChannel+0x0C RET 0x14 (Owner, Type, BindA, BindB). Owner null -> -1
-static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner, unsigned long Type,
+static uint32_t DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner, uint32_t Type,
                                                 void* BindA, void* BindB)
 {
     if (Owner == nullptr)
@@ -2739,12 +2740,11 @@ static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner
     {
         EngBaseFdump(kFdumpFatal, G_FdumpFileAnimComponent, 0x44D, "FATAL", "Unknown data type!\n");
         // Retail's invalid-type continuation reinterprets the owner as a channel.
-        const unsigned long bBound =
-            ((FTypedChannel*)Owner)->BindMap((unsigned long*)BindA, BindB); // 06615a81
+        const uint32_t bBound =
+            ((FTypedChannel*)Owner)->BindMap((uint32_t*)BindA, BindB); // 06615a81
         if ((bBound & 0xFF) == 0)
         {
-            IDAComponent** Held =
-                (IDAComponent**)((unsigned char*)Owner + 0x24);
+            IDAComponent** Held = reinterpret_cast<IDAComponent**>(&static_cast<FTypedChannel*>(Owner)->Archetype);   // retail Owner+0x24
             if (*Held != nullptr)                                // 06615ab5..c5
             {
                 (*Held)->Release();
@@ -2754,7 +2754,7 @@ static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner
             return 0xFFFFFFFF;
         }
         AnimationFromNested(ChannelThis, 8)->Channels->insert((FTypedChannel*)Owner);
-        return (unsigned long)((size_t)Owner);
+        return (uint32_t)((size_t)Owner);
     }
     // 0661597a..06615a40: operator new at the type's size, FUN_0661ad50 with the owner, the
     // class tail (type 1: +0x40 = EBX = -1, OR EBX,-1 at 0661595a).
@@ -2763,14 +2763,14 @@ static unsigned long DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner
 }
 
 // LAB_06615b00 / IChannel+0x10 RET 0x10 (Object, BindA, BindB): the type is the archetype's
-static unsigned long DACOM_API ChannelCreateFromObject(void* ChannelThis, void* Object, void* BindA,
+static uint32_t DACOM_API ChannelCreateFromObject(void* ChannelThis, void* Object, void* BindA,
                                                      void* BindB)
 {
     if (Object == nullptr)
         return 0xFFFFFFFF;
     FChannelArchetypeObject* Archetype =
         (FChannelArchetypeObject*)((IChannelArchetype*)Object);
-    unsigned long Type = 0;
+    uint32_t Type = 0;
     Archetype->GetFlags(&Type);
     if (!IsTypedChannelType(Type))
     {
@@ -2786,7 +2786,7 @@ static unsigned long DACOM_API ChannelCreateFromObject(void* ChannelThis, void* 
 // FUN_06615e10 / IChannel+0x14 RET 8: set lookup; FUN_06615ec0 (leave the mixer); release the
 // archetype (vtbl+8) and zero the field; free the channel; FUN_06617c90 erase; 0. Key -1 or
 // a miss -> -1.
-static unsigned long DACOM_API ChannelDestroy(void* ChannelThis, unsigned long Key)
+static uint32_t DACOM_API ChannelDestroy(void* ChannelThis, uint32_t Key)
 {
     FAnimationObject* Animation = AnimationFromNested(ChannelThis, 8);
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
@@ -2805,7 +2805,7 @@ static unsigned long DACOM_API ChannelDestroy(void* ChannelThis, unsigned long K
 
 // LAB_06615d80 / IChannel+0x18 RET 0xC: *Out = the channel's archetype (+0x24), AddRef'd when
 // non-null; 0. Key -1 or a miss -> -1 with Out untouched.
-static unsigned long DACOM_API ChannelGetObject(void* ChannelThis, unsigned long Key, void** Out)
+static uint32_t DACOM_API ChannelGetObject(void* ChannelThis, uint32_t Key, void** Out)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2818,7 +2818,7 @@ static unsigned long DACOM_API ChannelGetObject(void* ChannelThis, unsigned long
 
 // FUN_06616640 / IChannel+0x2C RET 0xC: the dword goes to typed +0x2C (Scale). Key -1 or a
 // miss writes nothing.
-static GENRESULT DACOM_API ChannelSetUser(void* ChannelThis, unsigned long Key, unsigned long User)
+static GENRESULT DACOM_API ChannelSetUser(void* ChannelThis, uint32_t Key, uint32_t User)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2828,7 +2828,7 @@ static GENRESULT DACOM_API ChannelSetUser(void* ChannelThis, unsigned long Key, 
 }
 
 // FUN_066166a0 / IChannel+0x30 RET 8: FLD typed +0x2C (Scale); key -1 or a miss -> 0.0.
-static float DACOM_API ChannelGetUser(void* ChannelThis, unsigned long Key)
+static float DACOM_API ChannelGetUser(void* ChannelThis, uint32_t Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2838,7 +2838,7 @@ static float DACOM_API ChannelGetUser(void* ChannelThis, unsigned long Key)
 
 // FUN_06616ac0 / IChannel+0x48 RET 0xC: *Out = !(Weight < 0) -- FCOMP qword 0.0 on typed
 // +0x28, unordered counts as forward -- and 0. Key -1 or a miss -> -2, Out untouched.
-static GENRESULT DACOM_API ChannelGetMapped(void* ChannelThis, unsigned long Key, unsigned char* Out)
+static GENRESULT DACOM_API ChannelGetMapped(void* ChannelThis, uint32_t Key, unsigned char* Out)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2849,7 +2849,7 @@ static GENRESULT DACOM_API ChannelGetMapped(void* ChannelThis, unsigned long Key
 
 // LAB_06616550 / IChannel+0x24 RET 8: FLD typed +0x1C (the channel's current time, despite
 // the slot's name); key -1 or a miss -> -1.0f (0661655f / 066165b8).
-static float DACOM_API ChannelGetDuration(void* ChannelThis, unsigned long Key)
+static float DACOM_API ChannelGetDuration(void* ChannelThis, uint32_t Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2858,24 +2858,24 @@ static float DACOM_API ChannelGetDuration(void* ChannelThis, unsigned long Key)
 }
 
 // LAB_066169b0 / IChannel+0x40 RET 0xC: Out always receives 16 bytes -- the channel's bind
-static unsigned long* DACOM_API ChannelGetHeader(void* ChannelThis, unsigned long* Out, unsigned long Key)
+static uint32_t* DACOM_API ChannelGetHeader(void* ChannelThis, uint32_t* Out, uint32_t Key)
 {
-    unsigned long Default[4];
+    uint32_t Default[4];
     Default[0] = 2;
     Default[1] = 0;
     Default[2] = 0;
     Default[3] = 0xFFFFFFFF;
-    const unsigned long* Source = Default;
+    const uint32_t* Source = Default;
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed != nullptr)
-        Source = (const unsigned long*)(TypedBindDesc(Typed));
+        Source = (const uint32_t*)(TypedBindDesc(Typed));
     std::memcpy(Out, Source, sizeof(Default));
     return Out;
 }
 
 // FUN_066164d0 / IChannel+0x20 RET 8: a playing channel (PlayState bit 0) is posed where it
 // stands (FUN_0661b070), stops playing, and the call answers 1. Otherwise 0.
-static unsigned long DACOM_API ChannelStopGraph(void* ChannelThis, unsigned long Key)
+static uint32_t DACOM_API ChannelStopGraph(void* ChannelThis, uint32_t Key)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr || (Typed->PlayState & 1) == 0)         // 06616527..2b
@@ -2887,7 +2887,7 @@ static unsigned long DACOM_API ChannelStopGraph(void* ChannelThis, unsigned long
 
 // FUN_066165d0 / IChannel+0x28 RET 0xC: typed slot 0x10 (SetTime) with the float, answering
 // what it answers (06616625..36); key -1 or a miss -> 0.
-static unsigned long DACOM_API ChannelBlend(void* ChannelThis, unsigned long Key, float Duration)
+static uint32_t DACOM_API ChannelBlend(void* ChannelThis, uint32_t Key, float Duration)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2897,7 +2897,7 @@ static unsigned long DACOM_API ChannelBlend(void* ChannelThis, unsigned long Key
 
 // FUN_06616720 / IChannel+0x34 RET 0xC: typed slot 0x20 with the vector and nothing else --
 // unlike IAnimation2's playback setter (FUN_06612a70), no mixer overlay is touched here.
-static GENRESULT DACOM_API ChannelSetOverlayPos(void* ChannelThis, unsigned long Key, float* Pos)
+static GENRESULT DACOM_API ChannelSetOverlayPos(void* ChannelThis, uint32_t Key, float* Pos)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2907,7 +2907,7 @@ static GENRESULT DACOM_API ChannelSetOverlayPos(void* ChannelThis, unsigned long
 }
 
 // FUN_06616790 / IChannel+0x38 RET 0xC: typed slot 0x24 only (066167e2..ee).
-static GENRESULT DACOM_API ChannelSetOverlayExtra(void* ChannelThis, unsigned long Key, float* Extra)
+static GENRESULT DACOM_API ChannelSetOverlayExtra(void* ChannelThis, uint32_t Key, float* Extra)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2917,7 +2917,7 @@ static GENRESULT DACOM_API ChannelSetOverlayExtra(void* ChannelThis, unsigned lo
 }
 
 // FUN_066168f0 / IChannel+0x3C RET 8: 1 when the channel is a leaf of its mixer list.
-static unsigned long DACOM_API ChannelInMixer(void* ChannelThis, unsigned long Key)
+static uint32_t DACOM_API ChannelInMixer(void* ChannelThis, uint32_t Key)
 {
     FAnimationObject* Animation = AnimationFromNested(ChannelThis, 8);
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
@@ -2927,7 +2927,7 @@ static unsigned long DACOM_API ChannelInMixer(void* ChannelThis, unsigned long K
 }
 
 // FUN_06616a50 / IChannel+0x44 RET 0xC: typed slot 0x28 only.
-static GENRESULT DACOM_API ChannelAddOverlayPos(void* ChannelThis, unsigned long Key, float* Delta)
+static GENRESULT DACOM_API ChannelAddOverlayPos(void* ChannelThis, uint32_t Key, float* Delta)
 {
     FTypedChannel* Typed = FindTypedChannel(AnimationFromNested(ChannelThis, 8), Key);
     if (Typed == nullptr)
@@ -2944,19 +2944,22 @@ static GENRESULT DACOM_API HardpointQueryInterface(FHardpointObject* This, const
     return This->Controller->QueryInterface(Iid, Out);
 }
 
-static unsigned long DACOM_API HardpointAddRef(FHardpointObject* This)
+static uint32_t DACOM_API HardpointAddRef(FHardpointObject* This)
 {
     return This->Controller->AddRef();
 }
 
-static unsigned long DACOM_API HardpointRelease(FHardpointObject* This)
+static uint32_t DACOM_API HardpointRelease(FHardpointObject* This)
 {
     return This->Controller->Release();
 }
 
-static FHardpointObject* HardpointFromNested(void* Nested, unsigned long Offset)
+static FHardpointObject* HardpointFromNested(void* Nested, uint32_t Offset)
 {
-    return (FHardpointObject*)((unsigned char*)Nested - Offset);
+    // PORT: facet-type based (retail offset 4 = IEngineComponent); see AnimationFromNested.
+    if (Offset == 4)
+        return static_cast<FHardpointObject*>(static_cast<IEngineComponent*>(Nested));
+    return static_cast<FHardpointObject*>(static_cast<IHardpoint*>(Nested));
 }
 
 static GENRESULT DACOM_API HardpointEngineComponentQueryInterface(void* Nested, const char* Iid,
@@ -2965,29 +2968,29 @@ static GENRESULT DACOM_API HardpointEngineComponentQueryInterface(void* Nested, 
     return HardpointQueryInterface(HardpointFromNested(Nested, 4), Iid, Out);
 }
 
-static unsigned long DACOM_API HardpointEngineComponentAddRef(void* Nested)
+static uint32_t DACOM_API HardpointEngineComponentAddRef(void* Nested)
 {
     return HardpointAddRef(HardpointFromNested(Nested, 4));
 }
 
-static unsigned long DACOM_API HardpointEngineComponentRelease(void* Nested)
+static uint32_t DACOM_API HardpointEngineComponentRelease(void* Nested)
 {
     return HardpointRelease(HardpointFromNested(Nested, 4));
 }
 
 // LAB_0661e990, RET 4: INC +0x1c and return it. No check (until 2026-09-30 the port returned 0
 // for a null This).
-static unsigned long DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This)
+static uint32_t DACOM_API ChannelArchetypeAddRef(FChannelArchetypeObject* This)
 {
     This->RefCount += 1;
     return This->RefCount;
 }
 
 // DAT_0662b10c: live ChannelArchetype count (INC in FUN_0661d730, DEC in FUN_0661d750).
-static unsigned long G_ChannelArchetypeLive = 0;
+static uint32_t G_ChannelArchetypeLive = 0;
 // Shared compressed-frame scratch; freed with the last channel archetype.
 static unsigned char* G_ChannelFramePool = nullptr;
-static unsigned long G_ChannelFramePoolSize = 0;
+static uint32_t G_ChannelFramePoolSize = 0;
 
 // FUN_0661d730, thiscall: zero +0x10 / +0x14 / +0x18, vtable PTR_LAB_0662952c, INC
 // DAT_0662b10c. No check (until 2026-09-30 the port returned for a null This).
@@ -3015,7 +3018,7 @@ static void ChannelArchetypeTeardown(FChannelArchetypeObject* This)
 
 // FUN_0661e9a0, RET 4: DEC +0x1c when above 0; at 0 set it to 1, FUN_0661d750, operator
 // delete, return 0; else return the count. No check (the port used to test This).
-static unsigned long DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* This)
+static uint32_t DACOM_API ChannelArchetypeRelease(FChannelArchetypeObject* This)
 {
     if (This->RefCount != 0)
         This->RefCount -= 1;
@@ -3115,7 +3118,7 @@ static void DestroyChildNodeValue(FEngineChildNode* Node)
 
 // FUN_06623620 (list erase(first, last), RET 0xC): unlink each node, zero name[0] and +0x38,
 // operator delete, count - 1.
-static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, unsigned long* Count)
+static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, uint32_t* Count)
 {
     FEngineChildNode* Node = First;
     while (Node != Last)
@@ -3133,7 +3136,7 @@ static void EraseChildNodes(FEngineChildNode* First, FEngineChildNode* Last, uns
 // FUN_066235d0 (list insert(where, value), RET 0xC): operator new(0x3c), link before Where
 // (Prev = Where->Prev, or the node itself when that is null), copy the 0x34-byte value (MOVSD
 // x 0xD), count + 1.
-static void InsertChildNode(FEngineChildNode* Where, unsigned long* Count, const char* Name,
+static void InsertChildNode(FEngineChildNode* Where, uint32_t* Count, const char* Name,
                             IDAComponent* Object)
 {
     FEngineChildNode* Node = new FEngineChildNode;
@@ -3206,7 +3209,7 @@ static void EngineDestruct(FEngineObject* This)
 }
 
 // LAB_06625460 (RET 4): INC [this+0x60], return it.
-static unsigned long DACOM_API EngineAddRef(FEngineObject* This)
+static uint32_t DACOM_API EngineAddRef(FEngineObject* This)
 {
     This->RefCount += 1;
     return This->RefCount;
@@ -3214,7 +3217,7 @@ static unsigned long DACOM_API EngineAddRef(FEngineObject* This)
 
 // FUN_06625470 (RET 4): 06625478 TEST / JBE -- decrement only while above 0; at 0 the count
 // is pinned to 1, FUN_0661f750 runs, the block is freed and 0 returned; otherwise the count.
-static unsigned long DACOM_API EngineRelease(FEngineObject* This)
+static uint32_t DACOM_API EngineRelease(FEngineObject* This)
 {
     if (This->RefCount > 0)
         This->RefCount -= 1;
@@ -3466,7 +3469,7 @@ static GENRESULT DACOM_API EngineSetFilesystem(FEngineObject* This, IDAComponent
 }
 
 // FUN_0661ff20 / IEngine +0x1C (RET 0xC). Local smart pointer = 0.
-static GENRESULT DACOM_API EngineQuerySearchPath(FEngineObject* This, char* Dest, unsigned long MaxChars)
+static GENRESULT DACOM_API EngineQuerySearchPath(FEngineObject* This, char* Dest, uint32_t MaxChars)
 {
     ISearchPath* SearchPathIface = nullptr;
     if (This->SearchPath != nullptr &&
@@ -3539,7 +3542,7 @@ FArchetypeHandle::FArchetypeHandle(const FArchetypeName* Source)
 // FUN_0661eab0 (thiscall on the handle, RET 4): ref (+0x14) + 1, then every child of the
 // vector +0x1C..+0x20 (stride 0x48) goes through the engine's vtable +0x38 (slot 14) with its
 // +0x44 handle. No tests. Returns the new count.
-static unsigned long ArchetypeHandleAddRef(FArchetypeHandle* Handle, FEngineObject* Engine)
+static uint32_t ArchetypeHandleAddRef(FArchetypeHandle* Handle, FEngineObject* Engine)
 {
     Handle->RefCount += 1;
     for (std::vector<FArchetypeChild>::iterator Child = Handle->Children.begin();
@@ -3550,7 +3553,7 @@ static unsigned long ArchetypeHandleAddRef(FArchetypeHandle* Handle, FEngineObje
 
 // FUN_0661eaf0 (thiscall on the handle, RET 4): ref - 1 (no floor, 0661eafe DEC), then every
 // child through vtable +0x3C (slot 15). Returns the new count.
-static unsigned long ArchetypeHandleRelease(FArchetypeHandle* Handle, FEngineObject* Engine)
+static uint32_t ArchetypeHandleRelease(FArchetypeHandle* Handle, FEngineObject* Engine)
 {
     Handle->RefCount -= 1;
     for (std::vector<FArchetypeChild>::iterator Child = Handle->Children.begin();
@@ -3561,7 +3564,7 @@ static unsigned long ArchetypeHandleRelease(FArchetypeHandle* Handle, FEngineObj
 
 // LAB_066213b0 / IEngine +0x38 (RET 8): -1 or 0 -> return (EAX is not written on that path;
 // the port returns 0); otherwise FUN_0661eab0.
-static unsigned long DACOM_API EngineAddRefHandle(FEngineObject* This, FArchetypeHandle* Handle)
+static uint32_t DACOM_API EngineAddRefHandle(FEngineObject* This, FArchetypeHandle* Handle)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return 0;
@@ -3569,11 +3572,11 @@ static unsigned long DACOM_API EngineAddRefHandle(FEngineObject* This, FArchetyp
 }
 
 // LAB_066213d0 / IEngine +0x3C (RET 8):
-static unsigned long DACOM_API EngineReleaseHandle(FEngineObject* This, FArchetypeHandle* Handle)
+static uint32_t DACOM_API EngineReleaseHandle(FEngineObject* This, FArchetypeHandle* Handle)
 {
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return 0;
-    const unsigned long Count = ArchetypeHandleRelease(Handle, This);
+    const uint32_t Count = ArchetypeHandleRelease(Handle, This);
     if (Count != 0)
         return Count;
 
@@ -3622,7 +3625,7 @@ static void FanoutIecDuplicateArchetype(FEngineObject* This, FArchetypeHandle* N
 // LAB_0661fda0 / IEngine +0x10 (RET 8): a null callback returns the +0x5C count at once;
 // otherwise walk +0x54 calling cdecl callback(name @ +8, pointer @ +0x38) and stop when the
 // returned AL is 0 (0661fdc7 TEST AL,AL); return the count.
-static unsigned long DACOM_API EngineEnumerateEngineComponents(FEngineObject* This,
+static uint32_t DACOM_API EngineEnumerateEngineComponents(FEngineObject* This,
                                                               int(__cdecl* Callback)(const char*,
                                                                                     void*))
 {
@@ -3639,7 +3642,7 @@ static unsigned long DACOM_API EngineEnumerateEngineComponents(FEngineObject* Th
 }
 
 static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Instance,
-                                    unsigned long Flags, void* Arg);
+                                    uint32_t Flags, void* Arg);
 
 // FUN_06621de0 / IEngine+0x14 (stdcall RET 8). No checks.
 static GENRESULT DACOM_API EngineNotifyEngineComponents(FEngineObject* This, void* Arg)
@@ -3756,19 +3759,19 @@ static int FileSystemFindFirst(void* FileSystem, const char* Pattern, WIN32_FIND
 
 static int FileSystemFindNext(void* FileSystem, int FindHandle, WIN32_FIND_DATAA* FindData)
 {
-    return AsFileSystem(FileSystem)->FindNext((unsigned long)FindHandle, // +0x4C
+    return AsFileSystem(FileSystem)->FindNext((uint32_t)FindHandle, // +0x4C
                                             FindData);
 }
 
 static void FileSystemFindClose(void* FileSystem, int FindHandle)
 {
-    AsFileSystem(FileSystem)->FindClose((unsigned long)FindHandle); // +0x50
+    AsFileSystem(FileSystem)->FindClose((uint32_t)FindHandle); // +0x50
 }
 
 
-static unsigned long ChannelStrideFromHeader(unsigned long Flags, float SampleRate)
+static uint32_t ChannelStrideFromHeader(uint32_t Flags, float SampleRate)
 {
-    unsigned long Stride = 0;
+    uint32_t Stride = 0;
     if ((Flags & G_ChannelFlagScalar) != 0)
         Stride = 4;
     if ((Flags & G_ChannelFlagPosition) != 0)
@@ -3794,14 +3797,14 @@ static unsigned long ChannelStrideFromHeader(unsigned long Flags, float SampleRa
 
 // FUN_0661d7a0, thiscall RET 0x4 (Index), 0661d7a0..dc: Frames (+0x10) + Stride (+0x14) *
 static const unsigned char* ChannelFramePayload(const FChannelArchetypeObject* Channel,
-                                                unsigned long Index)
+                                                uint32_t Index)
 {
-    const unsigned long Skip = (double)(Channel->SampleRate) < 0.0 ? 4 : 0;
+    const uint32_t Skip = (double)(Channel->SampleRate) < 0.0 ? 4 : 0;
     return Channel->Frames + Channel->Stride * Index + Skip;
 }
 
 // The frame-time idiom every ChannelArchetype sampler inlines (0661d872..a5 in FUN_0661d820,
-static double ChannelFrameTime(const FChannelArchetypeObject* Channel, unsigned long Index)
+static double ChannelFrameTime(const FChannelArchetypeObject* Channel, uint32_t Index)
 {
     if (!((double)(Channel->SampleRate) >= 0.0))
     {
@@ -3814,19 +3817,19 @@ static double ChannelFrameTime(const FChannelArchetypeObject* Channel, unsigned 
 }
 
 // FUN_0661d820, thiscall RET 0x4 (Time), 0661d820..c8. No checks.
-static unsigned long ChannelFrameIndexAt(const FChannelArchetypeObject* Channel, float Time)
+static uint32_t ChannelFrameIndexAt(const FChannelArchetypeObject* Channel, float Time)
 {
     if ((double)(Channel->SampleRate) > 0.0)
     {
-        const unsigned long Last = Channel->FrameCount - 1;
+        const uint32_t Last = Channel->FrameCount - 1;
         const long long Truncated = (long long)((double)Time /
                                                            (double)(Channel->SampleRate));
-        const unsigned long Index = (unsigned long)Truncated + 1;
+        const uint32_t Index = (uint32_t)Truncated + 1;
         return Last < Index ? Last : Index;
     }
-    unsigned long Lo = 0;
-    unsigned long Hi = Channel->FrameCount - 1;
-    unsigned long Mid = Hi >> 1;
+    uint32_t Lo = 0;
+    uint32_t Hi = Channel->FrameCount - 1;
+    uint32_t Mid = Hi >> 1;
     if (Hi == 0)
         return Mid;
     do
@@ -3864,7 +3867,7 @@ static double ChannelUnpackShort(const unsigned char* Src)
 // FUN_0661db70, thiscall, plain RET (called only from ChannelArchetype::Load at 0661dad6).
 static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
 {
-    const unsigned long Flags = Channel->Flags;
+    const uint32_t Flags = Channel->Flags;
     if ((Flags & 0xF0) == 0 && (Flags & 0x100) == 0)
         return;
     if ((Flags & 9) != 0)
@@ -3898,7 +3901,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
         return;
     }
 
-    unsigned long Words = bStamp ? 1 : 0;
+    uint32_t Words = bStamp ? 1 : 0;
     if (bHasPos)
         Words += 3;
     if (bHasQuat)
@@ -3914,7 +3917,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
 
     const unsigned char* Src = Channel->Frames;
     unsigned char* Dst = Out;
-    for (unsigned long Frame = 0; Frame < Channel->FrameCount; ++Frame)
+    for (uint32_t Frame = 0; Frame < Channel->FrameCount; ++Frame)
     {
         if (bStamp)
         {
@@ -4050,11 +4053,11 @@ static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, v
     const int HeaderHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
     if (HeaderHandle == -1)
         return (GENRESULT)0xFFFFFFFA;
-    unsigned long Header[3];
-    unsigned long BytesRead = 0;
-    const int HeaderOk = Fs->Read((unsigned long)HeaderHandle, Header, 0xC,
+    uint32_t Header[3];
+    uint32_t BytesRead = 0;
+    const int HeaderOk = Fs->Read((uint32_t)HeaderHandle, Header, 0xC,
                                   &BytesRead, 0); // +0x14
-    Fs->CloseFile((unsigned long)HeaderHandle); // +0x10
+    Fs->CloseFile((uint32_t)HeaderHandle); // +0x10
     if (HeaderOk == 0 || BytesRead != 0xC)
         return (GENRESULT)0xFFFFFFFA;
 
@@ -4067,10 +4070,10 @@ static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, v
     const int FramesHandle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
     if (FramesHandle == -1)
         return (GENRESULT)0xFFFFFFFA;
-    const unsigned long FileSize = Fs->GetSize((unsigned long)FramesHandle, 0); // +0x28
+    const uint32_t FileSize = Fs->GetSize((uint32_t)FramesHandle, 0); // +0x28
     if (This->Flags != G_ChannelFlagScalarOnly && FileSize != This->FrameCount * This->Stride)
     {
-        Fs->CloseFile((unsigned long)FramesHandle); // +0x10
+        Fs->CloseFile((uint32_t)FramesHandle); // +0x10
         return GR_GENERIC;
     }
     if ((This->Flags & 0xF0) != 0 || (This->Flags & 0x100) != 0)
@@ -4088,14 +4091,14 @@ static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, v
     }
     if (This->Frames == nullptr)
         return GR_OUT_OF_MEMORY;
-    const int FramesOk = Fs->Read((unsigned long)FramesHandle, This->Frames, FileSize,
+    const int FramesOk = Fs->Read((uint32_t)FramesHandle, This->Frames, FileSize,
                                   &BytesRead, 0); // +0x14
-    Fs->CloseFile((unsigned long)FramesHandle); // +0x10
+    Fs->CloseFile((uint32_t)FramesHandle); // +0x10
     if (FramesOk == 0 || BytesRead != FileSize)
         return (GENRESULT)0xFFFFFFFA;
 
     ChannelDecompressFrames(This);
-    const unsigned long Last = This->FrameCount - 1;
+    const uint32_t Last = This->FrameCount - 1;
     if ((double)(This->SampleRate) < 0.0)
     {
         float Time = 0.0f;
@@ -4120,7 +4123,7 @@ static GENRESULT DACOM_API ChannelArchetypeGetDuration(FChannelArchetypeObject* 
 
 // LAB_0661d7e0, IChannelArchetype slot 5, RET 0x8: *Out = Flags (+0xC), EAX = 0. No checks
 // (the port used to test Out and This).
-static GENRESULT DACOM_API ChannelArchetypeGetFlags(FChannelArchetypeObject* This, unsigned long* Out)
+static GENRESULT DACOM_API ChannelArchetypeGetFlags(FChannelArchetypeObject* This, uint32_t* Out)
 {
     *Out = This->Flags;
     return GR_OK;
@@ -4137,7 +4140,7 @@ static GENRESULT DACOM_API ChannelArchetypeSample(FChannelArchetypeObject* This,
         return (GENRESULT)0xFFFFFFFE;
     if (!(Time <= Duration))
         return (GENRESULT)0xFFFFFFFE;
-    const unsigned long Hi = ChannelFrameIndexAt(This, Time);
+    const uint32_t Hi = ChannelFrameIndexAt(This, Time);
     const double TimeHi = ChannelFrameTime(This, Hi);
     if (!(TimeHi > (double)Time))
     {
@@ -4147,7 +4150,7 @@ static GENRESULT DACOM_API ChannelArchetypeSample(FChannelArchetypeObject* This,
         *Alpha = 0.0f;
         return GR_OK;
     }
-    const unsigned long Lo = Hi - 1;
+    const uint32_t Lo = Hi - 1;
     const double TimeLo = ChannelFrameTime(This, Lo);
     *Alpha = (float)(((double)Time - TimeLo) / (TimeHi - TimeLo));
     *OutA = ChannelFramePayload(This, Lo);
@@ -4167,7 +4170,7 @@ static GENRESULT DACOM_API ChannelArchetypeSamplePair(FChannelArchetypeObject* T
         return (GENRESULT)0xFFFFFFFE;
     if (!(Time <= Duration))
         return (GENRESULT)0xFFFFFFFE;
-    const unsigned long Hi = ChannelFrameIndexAt(This, Time);
+    const uint32_t Hi = ChannelFrameIndexAt(This, Time);
     const double FrameTime = ChannelFrameTime(This, Hi);
     if (!(FrameTime > (double)Time))
     {
@@ -4180,7 +4183,7 @@ static GENRESULT DACOM_API ChannelArchetypeSamplePair(FChannelArchetypeObject* T
         *Alpha = 0.0f;
         return GR_OK;
     }
-    const unsigned long Lo = Hi - 1;
+    const uint32_t Lo = Hi - 1;
     *TimeLo = (float)(ChannelFrameTime(This, Lo));
     *TimeHi = (float)FrameTime;
     *Alpha = (float)(((double)Time - (double)(*TimeLo)) /
@@ -4194,14 +4197,14 @@ static GENRESULT DACOM_API ChannelArchetypeSamplePair(FChannelArchetypeObject* T
 static GENRESULT DACOM_API ChannelArchetypeGetFrame(FChannelArchetypeObject* This,
                                                    unsigned char bLast, const unsigned char** Out)
 {
-    long Index = 0;
+    int32_t Index = 0;
     if (bLast != 0)
     {
-        Index = (long)(This->FrameCount - 1);
+        Index = (int32_t)(This->FrameCount - 1);
         if (Index < 0)
             return (GENRESULT)0xFFFFFFFF;
     }
-    *Out = ChannelFramePayload(This, (unsigned long)Index);
+    *Out = ChannelFramePayload(This, (uint32_t)Index);
     return GR_OK;
 }
 
@@ -4212,19 +4215,19 @@ static const float G_ChannelTimeEpsPos = 1.0000000116860974e-07f;
 // FUN_0661e3d0, thiscall RET 0x4 (Index), 0661e3d0..ee: *(dword*)FUN_0661d7a0(Index) +
 // Frames (+0x10) + Stride (+0x14) * FrameCount (+4). No checks (the port used to return 0
 // for a null payload, channel or Frames).
-static unsigned long ChannelRelocatedKey(const FChannelArchetypeObject* Channel, unsigned long Index)
+static uint32_t ChannelRelocatedKey(const FChannelArchetypeObject* Channel, uint32_t Index)
 {
     const unsigned char* Payload = ChannelFramePayload(Channel, Index);
-    unsigned long Reloc = 0;
+    uint32_t Reloc = 0;
     std::memcpy(&Reloc, Payload, sizeof(Reloc));
-    return Channel->Stride * Channel->FrameCount + (unsigned long)(Channel->Frames) +
+    return Channel->Stride * Channel->FrameCount + (uint32_t)fl::PtrToHandle((Channel->Frames)) +
            Reloc;
 }
 
 // LAB_0661e400, IChannelArchetype slot 9, RET 0x18 (Time0, Time1, OutKeys, Capacity, Count),
 static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject* This, float Time0,
                                                        float Time1, float* OutKeys,
-                                                       unsigned long Capacity, unsigned long* Count)
+                                                       uint32_t Capacity, uint32_t* Count)
 {
     *Count = 0;
     if (This->Flags != G_ChannelFlagScalarOnly)
@@ -4239,16 +4242,16 @@ static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject*
     if (Time0 == Time1)
         return (GENRESULT)0xFFFFFFFE;
 
-    long Start = 0;
+    int32_t Start = 0;
     std::memcpy(&Start, &Time0, sizeof(Start));
-    long Stop = 0;
+    int32_t Stop = 0;
     std::memcpy(&Stop, &DurEps, sizeof(Stop));
-    long Step = 1;
+    int32_t Step = 1;
     if (Time0 < Time1)
     {
-        for (long Index = 0; Index < (long)(This->FrameCount); ++Index)
+        for (int32_t Index = 0; Index < (int32_t)(This->FrameCount); ++Index)
         {
-            const double FrameTime = ChannelFrameTime(This, (unsigned long)Index);
+            const double FrameTime = ChannelFrameTime(This, (uint32_t)Index);
             if (FrameTime <= (double)Time0)
                 Start = Index;
             if (!(FrameTime < (double)Time1))
@@ -4261,9 +4264,9 @@ static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject*
     else
     {
         Step = -1;
-        for (long Index = (long)(This->FrameCount) - 1; Index >= 0; --Index)
+        for (int32_t Index = (int32_t)(This->FrameCount) - 1; Index >= 0; --Index)
         {
-            const double FrameTime = ChannelFrameTime(This, (unsigned long)Index);
+            const double FrameTime = ChannelFrameTime(This, (uint32_t)Index);
             if (FrameTime >= (double)Time0)
                 Start = Index;
             if (!(FrameTime > (double)Time1))
@@ -4279,8 +4282,8 @@ static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject*
         if (*Count < Capacity)
         {
             OutKeys[*Count * 2] =
-                (float)(ChannelFrameTime(This, (unsigned long)Start));
-            const unsigned long Key = ChannelRelocatedKey(This, (unsigned long)Start);
+                (float)(ChannelFrameTime(This, (uint32_t)Start));
+            const uint32_t Key = ChannelRelocatedKey(This, (uint32_t)Start);
             std::memcpy(OutKeys + *Count * 2 + 1, &Key, sizeof(Key));
         }
         Start += Step;
@@ -4291,21 +4294,21 @@ static GENRESULT DACOM_API ChannelArchetypeCollectRange(FChannelArchetypeObject*
 
 // LAB_0661e310, IChannelArchetype slot 10, RET 0x14 (Time, OutKeys, Capacity, Count),
 static GENRESULT DACOM_API ChannelArchetypeCollectAt(FChannelArchetypeObject* This, float Time,
-                                                    float* OutKeys, unsigned long Capacity,
-                                                    unsigned long* Count)
+                                                    float* OutKeys, uint32_t Capacity,
+                                                    uint32_t* Count)
 {
     *Count = 0;
     if (This->Flags != G_ChannelFlagScalarOnly)
         return (GENRESULT)0xFFFFFFFF;
     GENRESULT Result = GR_OK;
-    for (unsigned long Index = 0; Index < This->FrameCount; ++Index)
+    for (uint32_t Index = 0; Index < This->FrameCount; ++Index)
     {
         if (ChannelFrameTime(This, Index) == (double)Time)
         {
             if (*Count < Capacity)
             {
                 OutKeys[*Count * 2] = Time;
-                const unsigned long Key = ChannelRelocatedKey(This, Index);
+                const uint32_t Key = ChannelRelocatedKey(This, Index);
                 std::memcpy(OutKeys + *Count * 2 + 1, &Key, sizeof(Key));
             }
             else
@@ -4364,7 +4367,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         FEngineInstance* Inst = AnimEngineFindInstanceByName(Root, ChildName);
         if (Inst == Invalid)
             return 0;
-        const bool bMapped = FindAnimHandle((unsigned long)((size_t)Inst));
+        const bool bMapped = FindAnimHandle((uint32_t)((size_t)Inst));
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
@@ -4385,7 +4388,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         FEngineInstance* Inst = AnimEngineFindInstanceByName(Root, ParentName);
         if (Inst == Invalid)
             Inst = Root;
-        const bool bMapped = FindAnimHandle((unsigned long)((size_t)Inst));
+        const bool bMapped = FindAnimHandle((uint32_t)((size_t)Inst));
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
@@ -4427,7 +4430,7 @@ static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, v
             FTypedChannel* Typed = *Cursor;
             bBound = (unsigned char)(
                 Typed->BindMap(
-                    (unsigned long*)(&Bind), Root));
+                    (uint32_t*)(&Bind), Root));
         }
         if (bBound != 0)
         {
@@ -4485,7 +4488,7 @@ static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, v
 // where it stands (FUN_0661b070).
 static void PlaybackStopTyped(FAnimPlayback* Playback)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         FTypedChannel* Typed = Playback->Typed[Index];
@@ -4498,7 +4501,7 @@ static void PlaybackStopTyped(FAnimPlayback* Playback)
 // FUN_06612920 thiscall RET 0: FUN_0661b070 on every channel, nothing else.
 static void PlaybackApplyTyped(FAnimPlayback* Playback)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         TypedApplyFromArchetype(Playback->Typed[Index]);    // 0661292e
@@ -4507,9 +4510,9 @@ static void PlaybackApplyTyped(FAnimPlayback* Playback)
 }
 
 // Rebind every channel with one play header (FUN_0661ad90 each; 066127af..d0 / 066128b7..d8).
-static unsigned long PlaybackBindAll(FAnimPlayback* Playback, float* Header, unsigned long Result)
+static uint32_t PlaybackBindAll(FAnimPlayback* Playback, float* Header, uint32_t Result)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         if ((TypedTryBindIfTimeValid(Playback->Typed[Index], Header) & 0xFF) == 0)
@@ -4520,11 +4523,11 @@ static unsigned long PlaybackBindAll(FAnimPlayback* Playback, float* Header, uns
 }
 
 // Reverse playback requires compatible track durations.
-static unsigned long PlaybackDurationsDiffer(FAnimPlayback* Playback)
+static uint32_t PlaybackDurationsDiffer(FAnimPlayback* Playback)
 {
-    unsigned long Result = 0;
+    uint32_t Result = 0;
     float First = -1.0f;                                         // 0661274f / 06612857
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         FTypedChannel* Typed = Playback->Typed[Index];
@@ -4543,16 +4546,16 @@ static unsigned long PlaybackDurationsDiffer(FAnimPlayback* Playback)
 }
 
 // FUN_066126e0 thiscall RET 0x1C (Flags, Start, Speed, P3, P4, P5, P6): build the seven-dword
-static unsigned long PlaybackEvalTyped(FAnimPlayback* Playback, unsigned long Flags, float Start,
-                                      float Speed, unsigned long P3, unsigned long P4,
-                                      unsigned long P5, unsigned long P6)
+static uint32_t PlaybackEvalTyped(FAnimPlayback* Playback, uint32_t Flags, float Start,
+                                      float Speed, uint32_t P3, uint32_t P4,
+                                      uint32_t P5, uint32_t P6)
 {
     // SETZ DL on (Flags & 1); LEA EDX,[EDX*2-1]: +1 when the bit is clear, -1 when set.
     // FLD Speed; FABS; FILD sign; FMULP; FSTP dword.
-    const long Sign = (Flags & 1) == 0 ? 1 : -1;
+    const int32_t Sign = (Flags & 1) == 0 ? 1 : -1;
     const float Rate = (float)(std::fabs((double)Speed) *
                                           (double)Sign);
-    unsigned long Header[7];
+    uint32_t Header[7];
     std::memcpy(&Header[0], &Start, sizeof(float));
     Header[1] = Flags & 0xFE;
     std::memcpy(&Header[2], &Rate, sizeof(float));
@@ -4560,18 +4563,18 @@ static unsigned long PlaybackEvalTyped(FAnimPlayback* Playback, unsigned long Fl
     Header[4] = P4;
     Header[5] = P5;
     Header[6] = P6;
-    unsigned long Result = 0;
+    uint32_t Result = 0;
     if ((Flags & 1) != 0 && Playback->Typed.size() != 0)      // 0661273d..57
         Result = PlaybackDurationsDiffer(Playback);
     return PlaybackBindAll(Playback, (float*)Header, Result);
 }
 
 // FUN_066127e0 thiscall RET 0: rebind every channel from the longest one's own state:
-static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback)
+static uint32_t PlaybackEvalStoredTyped(FAnimPlayback* Playback)
 {
     FTypedChannel* Longest = Playback->LongestTyped;
     const float Start = -2.0f;
-    unsigned long Header[7];
+    uint32_t Header[7];
     std::memcpy(&Header[0], &Start, sizeof(float));
     Header[1] = Longest->LoopFlags & 0xFE;
     std::memcpy(&Header[2], &Longest->Weight, sizeof(float));
@@ -4587,7 +4590,7 @@ static unsigned long PlaybackEvalStoredTyped(FAnimPlayback* Playback)
 // never match. Miss -> -1.
 static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const FAnimBindOut* Header)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         FTypedChannel* Typed = Playback->Typed[Index];
@@ -4613,7 +4616,7 @@ static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const F
 // FUN_066129c0 thiscall RET 4: typed slot 0x10 (SetTime) on every channel.
 static void PlaybackSetTypedTime(FAnimPlayback* Playback, float Time)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         FTypedChannel* Typed = Playback->Typed[Index];
@@ -4629,7 +4632,7 @@ static float PlaybackStoredDuration(FAnimPlayback* Playback)
 }
 
 // FUN_06611290, thiscall on the track (unused), RET 0xC (FileSystem, Name, Out). No checks.
-static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** Out)
+static uint32_t ReadUtfNameCrc(void* FileSystem, const char* Name, char** Out)
 {
     IFileSystem* Fs = AsFileSystem(FileSystem);
     FEngBaseFileSystemDesc Desc;
@@ -4637,11 +4640,11 @@ static unsigned long ReadUtfNameCrc(void* FileSystem, const char* Name, char** O
     const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
     if (Handle != -1)
     {
-        const unsigned long Size = Fs->GetSize((unsigned long)Handle, 0); // +0x28
+        const uint32_t Size = Fs->GetSize((uint32_t)Handle, 0); // +0x28
         *Out = (char*)(std::malloc(Size));
-        unsigned long BytesRead = 0;
-        Fs->Read((unsigned long)Handle, *Out, Size, &BytesRead, 0); // +0x14
-        Fs->CloseFile((unsigned long)Handle); // +0x10
+        uint32_t BytesRead = 0;
+        Fs->Read((uint32_t)Handle, *Out, Size, &BytesRead, 0); // +0x14
+        Fs->CloseFile((uint32_t)Handle); // +0x10
     }
     return DACOM_CRC::GetCRC32(*Out);
 }
@@ -4686,13 +4689,13 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.Field30 = (uint32_t)FindHandle;
             const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
             if (Handle == -1)
                 continue;
-            unsigned long BytesRead = 0;
-            Fs->Read((unsigned long)Handle, &Entry->RootHeight, 4, &BytesRead, 0); // +0x14
-            Fs->CloseFile((unsigned long)Handle); // +0x10
+            uint32_t BytesRead = 0;
+            Fs->Read((uint32_t)Handle, &Entry->RootHeight, 4, &BytesRead, 0); // +0x14
+            Fs->CloseFile((uint32_t)Handle); // +0x10
             Entry->bHasRootHeight = 1;
             continue;
         }
@@ -4700,7 +4703,7 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
             continue;
         FEngBaseFileSystemDesc Desc;
         FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-        Desc.Field30 = (unsigned long)FindHandle;
+        Desc.Field30 = (uint32_t)FindHandle;
         void* MapFs = nullptr;
         Fs->CreateInstance((AGGDESC*)(&Desc), &MapFs); // +0xC
         if (std::strncmp(FindData.cFileName, G_NameEventMap, G_EventMapLength) != 0)
@@ -4743,14 +4746,14 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
         }
         if (MapFs != nullptr)
             ((IDAComponent*)MapFs)->Release();
-    } while (Fs->FindNext((unsigned long)FindHandle, // +0x4C
+    } while (Fs->FindNext((uint32_t)FindHandle, // +0x4C
                         &FindData) != 0);
     Fs->GetFileSystemError(); // +0x78
-    Fs->FindClose((unsigned long)FindHandle); // +0x50
+    Fs->FindClose((uint32_t)FindHandle); // +0x50
 }
 
 // LAB_06614920 / IAnimation2+9 RET 0x18 (Script, Root, Name, ArgD, ArgE), 06614920..06614a4b.
-static unsigned long DACOM_API AnimationPlayScript(FAnimationObject* This, FAnimScript* Script,
+static uint32_t DACOM_API AnimationPlayScript(FAnimationObject* This, FAnimScript* Script,
                                                   FEngineInstance* Root, const char* Name,
                                                   void* ArgD, void* ArgE)
 {
@@ -4774,29 +4777,29 @@ static unsigned long DACOM_API AnimationPlayScript(FAnimationObject* This, FAnim
         ++Cursor;
     }
     Script->AddRef(); // vtable +4 (066149cd..d0)
-    const unsigned long Id = This->NextPlaybackId;
+    const uint32_t Id = This->NextPlaybackId;
     This->NextPlaybackId = Id + 1;
-    This->Playbacks->insert(FAnimPlaybackMap::value_type((long)Id, Record));
+    This->Playbacks->insert(FAnimPlaybackMap::value_type((int32_t)Id, Record));
     return Id;
 }
 
 // LAB_06614bb0 / IAnimation2+0x2C RET 0x24 (Id, Flags, Time, Scale, A, B, C, D): FUN_066126e0
-static unsigned long DACOM_API AnimationEvalPlayback(FAnimationObject* This, unsigned long PlaybackId,
-                                                    unsigned long Flags, float Time, float Scale,
+static uint32_t DACOM_API AnimationEvalPlayback(FAnimationObject* This, uint32_t PlaybackId,
+                                                    uint32_t Flags, float Time, float Scale,
                                                     void* A, void* B, void* C, void* D)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)          // 06614bc5..cc
         return 0xFFFFFFFF;
-    const unsigned long Result = PlaybackEvalTyped(
-        Playback, Flags, Time, Scale, (unsigned long)((size_t)A),
-        (unsigned long)((size_t)B),
-        (unsigned long)((size_t)C),
-        (unsigned long)((size_t)D));
+    const uint32_t Result = PlaybackEvalTyped(
+        Playback, Flags, Time, Scale, (uint32_t)((size_t)A),
+        (uint32_t)((size_t)B),
+        (uint32_t)((size_t)C),
+        (uint32_t)((size_t)D));
     if (Result == 0xFFFFFFFF)                                    // 06614bfc..03
         return Result;
     const float BlendDuration = FloatFromOpaqueDword(A);
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())
     {
         MixerBlendAttach(This, Playback->Typed[Index], BlendDuration, Flags);
@@ -4806,7 +4809,7 @@ static unsigned long DACOM_API AnimationEvalPlayback(FAnimationObject* This, uns
 }
 
 // LAB_06614c40 / IAnimation2+0x30 RET 8: FUN_066127e0, or -1 for an unknown id.
-static unsigned long DACOM_API AnimationEvalStored(FAnimationObject* This, unsigned long PlaybackId)
+static uint32_t DACOM_API AnimationEvalStored(FAnimationObject* This, uint32_t PlaybackId)
 {
     (void)This;
     FAnimPlayback* Playback = nullptr;
@@ -4817,13 +4820,13 @@ static unsigned long DACOM_API AnimationEvalStored(FAnimationObject* This, unsig
 
 // LAB_06614c70 / IAnimation2+0x38 RET 8: FUN_066128f0 (stop and pose every channel), then
 // every channel leaves its mixer (FUN_06615ec0).
-static unsigned long DACOM_API AnimationStopPlayback(FAnimationObject* This, unsigned long PlaybackId)
+static uint32_t DACOM_API AnimationStopPlayback(FAnimationObject* This, uint32_t PlaybackId)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
     PlaybackStopTyped(Playback);                                 // 06614c92
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Playback->Typed.size())                    // 06614c97..b3
     {
         MixerUnbindTyped(This, Playback->Typed[Index]);
@@ -4833,7 +4836,7 @@ static unsigned long DACOM_API AnimationStopPlayback(FAnimationObject* This, uns
 }
 
 // LAB_06614cc0 / IAnimation2+0x34 RET 8: FUN_06612920 -- pose every channel, nothing more.
-static unsigned long DACOM_API AnimationApplyChannels(FAnimationObject* This, unsigned long PlaybackId)
+static uint32_t DACOM_API AnimationApplyChannels(FAnimationObject* This, uint32_t PlaybackId)
 {
     (void)This;
     FAnimPlayback* Playback = nullptr;
@@ -4844,7 +4847,7 @@ static unsigned long DACOM_API AnimationApplyChannels(FAnimationObject* This, un
 
 // LAB_06614860 / IAnimation2+0x3C RET 0xC: FUN_066129c0 -- typed slot 0x10 (SetTime) with the
 // third argument on every channel. The interface carries that dword as void*.
-static unsigned long DACOM_API AnimationStopChannels(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationStopChannels(FAnimationObject* This, uint32_t PlaybackId,
                                                     void* Time)
 {
     (void)This;
@@ -4857,28 +4860,28 @@ static unsigned long DACOM_API AnimationStopChannels(FAnimationObject* This, uns
 // LAB_06614de0 / IAnimation2+0x48 RET 0xC: the playback's root entry in the mixer map
 // (FUN_06614f70 on playback +4); when there is one, FUN_06612a70 writes the position into the
 // channels and the object overlays.
-static unsigned long DACOM_API AnimationSetOverlayPos(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationSetOverlayPos(FAnimationObject* This, uint32_t PlaybackId,
                                                      float* Pos)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
     FMixerDescMap* Inner =
-        MixerFindKey(This, (long)((ptrdiff_t)(Playback->Root)));
+        MixerFindKey(This, (int32_t)((ptrdiff_t)(Playback->Root)));
     if (Inner != nullptr)
         PlaybackWriteOverlayPos(Playback, Pos, Inner);
     return 0;
 }
 
 // LAB_06614fd0 / IAnimation2+0x4C RET 0xC: as above with FUN_06612b80 (orientation matrix).
-static unsigned long DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, uint32_t PlaybackId,
                                                        float* Extra)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
     FMixerDescMap* Inner =
-        MixerFindKey(This, (long)((ptrdiff_t)(Playback->Root)));
+        MixerFindKey(This, (int32_t)((ptrdiff_t)(Playback->Root)));
     if (Inner != nullptr)
         PlaybackWriteOverlayOrient(Playback, Extra, Inner);
     return 0;
@@ -4887,7 +4890,7 @@ static unsigned long DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, 
 // LAB_066150e0 / IAnimation2+0x54 RET 0x10 (PlaybackId, Pos, Extra): FUN_06614580; a miss
 // answers 0 (ESI, 066150ef / 06615111), a hit FUN_066122d0(Pos, Extra) (06615102..08). Until
 // 2026-09-30 the port resolved the id through its global list with a script-pointer retry.
-static unsigned long DACOM_API AnimationTouchMapped(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationTouchMapped(FAnimationObject* This, uint32_t PlaybackId,
                                                    float* Pos, float* Extra)
 {
     FAnimPlayback* Playback = nullptr;
@@ -4897,14 +4900,14 @@ static unsigned long DACOM_API AnimationTouchMapped(FAnimationObject* This, unsi
 }
 
 // LAB_06615120 / IAnimation2+0x58 RET 0xC: as SetOverlayPos with FUN_06612c60 (add a delta).
-static unsigned long DACOM_API AnimationAddOverlayPos(FAnimationObject* This, unsigned long PlaybackId,
+static uint32_t DACOM_API AnimationAddOverlayPos(FAnimationObject* This, uint32_t PlaybackId,
                                                      float* Delta)
 {
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
     FMixerDescMap* Inner =
-        MixerFindKey(This, (long)((ptrdiff_t)(Playback->Root)));
+        MixerFindKey(This, (int32_t)((ptrdiff_t)(Playback->Root)));
     if (Inner != nullptr)
         PlaybackAddOverlayPos(Playback, Delta, Inner);
     return 0;
@@ -4912,23 +4915,23 @@ static unsigned long DACOM_API AnimationAddOverlayPos(FAnimationObject* This, un
 
 // LAB_06616800 / IAnimation2+0x6C RET 0xC (Key, Dt): walk every mixer list under one bind key
 // -- a playback's root, or the cookie an IChannel caller bound with. Not a playback id.
-static unsigned long DACOM_API AnimationMixerWalk(FAnimationObject* This, unsigned long Key,
+static uint32_t DACOM_API AnimationMixerWalk(FAnimationObject* This, uint32_t Key,
                                                  float Time)
 {
-    MixerWalkKey(This, (long)Key, Time);
+    MixerWalkKey(This, (int32_t)Key, Time);
     return 0;
 }
 
 // LAB_066157f0 / IAnimation2+0x70 RET 8 (Dt): every mixer list, then every playing channel no
 // mixer leaf ticked.
-static unsigned long DACOM_API AnimationMixerWalkAll(FAnimationObject* This, float Time)
+static uint32_t DACOM_API AnimationMixerWalkAll(FAnimationObject* This, float Time)
 {
     MixerWalkAll(This, Time);
     return 0;
 }
 
 // LAB_06616430 / IChannel+0x1C RET 0xC (Key, Header): rebind the channel with the caller's
-static unsigned long DACOM_API ChannelPlay(void* ChannelThis, unsigned long Key, float* Time)
+static uint32_t DACOM_API ChannelPlay(void* ChannelThis, uint32_t Key, float* Time)
 {
     if (Key == 0xFFFFFFFF || Time == nullptr)                    // 06616439..49
         return 0;
@@ -4936,21 +4939,21 @@ static unsigned long DACOM_API ChannelPlay(void* ChannelThis, unsigned long Key,
     FTypedChannel* Typed = FindTypedChannel(Animation, Key);
     if (Typed == nullptr)
         return 0;
-    const unsigned long Bound = TypedTryBindIfTimeValid(Typed, Time);
+    const uint32_t Bound = TypedTryBindIfTimeValid(Typed, Time);
     Typed->PlayState = (unsigned char)(
         ((Typed->PlayState ^ (unsigned char)Bound) & 1) ^ Typed->PlayState);
     const unsigned char bPlaying = Typed->PlayState & 1;
     if (bPlaying != 0)
     {
-        const unsigned long* Header = (const unsigned long*)Time;
+        const uint32_t* Header = (const uint32_t*)Time;
         MixerBlendAttach(Animation, Typed, Time[3], Header[1]);
     }
     return bPlaying;
 }
 
 // LAB_06614b30 / IRootData+0x0C RET 0x24 (Id, TouchArg, Flags, Time, Scale, Arg6, Arg7, Arg8):
-static unsigned char DACOM_API RootDataEval(void* RootThis, unsigned long PlaybackId,
-                                           void* TouchArg, unsigned long Flags, float Time,
+static unsigned char DACOM_API RootDataEval(void* RootThis, uint32_t PlaybackId,
+                                           void* TouchArg, uint32_t Flags, float Time,
                                            float Scale, void* Arg6, void* Arg7, float Arg8)
 {
     // 06614b43: LEA ECX,[EDX-0xC] -- the IRootData facet sits at Animation+0xC.
@@ -4958,11 +4961,11 @@ static unsigned char DACOM_API RootDataEval(void* RootThis, unsigned long Playba
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
-    unsigned long Arg8Bits = 0;
+    uint32_t Arg8Bits = 0;
     std::memcpy(&Arg8Bits, &Arg8, sizeof(Arg8Bits));
-    const unsigned long Eval = PlaybackEvalTyped(
-        Playback, Flags, Time, Scale, (unsigned long)((size_t)Arg6),
-        (unsigned long)((size_t)Arg7), Arg8Bits, 0);
+    const uint32_t Eval = PlaybackEvalTyped(
+        Playback, Flags, Time, Scale, (uint32_t)((size_t)Arg6),
+        (uint32_t)((size_t)Arg7), Arg8Bits, 0);
     if (Eval == 0xFFFFFFFF)
         return 0;
     // 0x06614b85: the first argument is the address of a caller-frame local, the second is
@@ -4990,24 +4993,24 @@ static bool ReadPartNameField(IFileSystem* Fs, const char* Field, char* Buffer)
     const int Handle = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
     if (Handle == -1)
         return false;
-    unsigned long Size = Fs->GetSize((unsigned long)Handle, 0); // +0x28
+    uint32_t Size = Fs->GetSize((uint32_t)Handle, 0); // +0x28
     if (!(Size < 0x3F))
         Size = 0x3F;
     bool bRead = false;
-    unsigned long BytesRead = 0;
-    if (Fs->Read((unsigned long)Handle, Buffer, Size, &BytesRead, 0) != 0 && // +0x14
+    uint32_t BytesRead = 0;
+    if (Fs->Read((uint32_t)Handle, Buffer, Size, &BytesRead, 0) != 0 && // +0x14
         BytesRead == Size)
     {
         bRead = true;
         Buffer[BytesRead] = '\0';
     }
-    Fs->CloseFile((unsigned long)Handle); // +0x10
+    Fs->CloseFile((uint32_t)Handle); // +0x10
     return bRead;
 }
 
 // FUN_066201b0, thiscall on the engine, RET 0x14 (Name, CmpndFs, FindHandle, ParentFs, Child).
 static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, void* CmpndFs,
-                                    unsigned long FindHandle, void* ParentFs, FArchetypeChild* Child)
+                                    uint32_t FindHandle, void* ParentFs, FArchetypeChild* Child)
 {
     FEngBaseFileSystemDesc PartDesc;
     FillFileSystemDesc(&PartDesc, Name, nullptr);
@@ -5063,18 +5066,18 @@ static GENRESULT LinkCmpndPartHandle(FEngineObject* Engine, const char* Name, vo
     return GR_OK;
 }
 
-static const unsigned long G_JointTypeFix = 0;
-static const unsigned long G_JointTypePris = 1;
-static const unsigned long G_JointTypeRev = 2;
-static const unsigned long G_JointTypeCyl = 3;
-static const unsigned long G_JointTypeSphere = 4;
-static const unsigned long G_JointTypeTrans = 5;
-static const unsigned long G_JointTypeLoose = 6;
-static const unsigned long G_JointUtfNameBytes = 0x40;
-static const unsigned long G_JointUtfHeaderBytes = 0x80;
-static const unsigned long G_JointUtfMaxBytes = 0xD8;
+static const uint32_t G_JointTypeFix = 0;
+static const uint32_t G_JointTypePris = 1;
+static const uint32_t G_JointTypeRev = 2;
+static const uint32_t G_JointTypeCyl = 3;
+static const uint32_t G_JointTypeSphere = 4;
+static const uint32_t G_JointTypeTrans = 5;
+static const uint32_t G_JointTypeLoose = 6;
+static const uint32_t G_JointUtfNameBytes = 0x40;
+static const uint32_t G_JointUtfHeaderBytes = 0x80;
+static const uint32_t G_JointUtfMaxBytes = 0xD8;
 
-static unsigned long JointTypeFromName(const char* Name)
+static uint32_t JointTypeFromName(const char* Name)
 {
     if (Name == nullptr)
         return 0xFFFFFFFF;
@@ -5095,10 +5098,10 @@ static unsigned long JointTypeFromName(const char* Name)
     return 0xFFFFFFFF;
 }
 
-static void CopyPayloadDwords(unsigned long* Dest, const unsigned long* Source,
-                              unsigned long Count)
+static void CopyPayloadDwords(uint32_t* Dest, const uint32_t* Source,
+                              uint32_t Count)
 {
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Count)
     {
         Dest[Index] = Source[Index];
@@ -5107,10 +5110,10 @@ static void CopyPayloadDwords(unsigned long* Dest, const unsigned long* Source,
 }
 
 // Decode the type-specific joint payload from the UTF record.
-static void RemapJointPayload(unsigned long Type, const unsigned char* UtfExtra,
-                              unsigned long* Payload)
+static void RemapJointPayload(uint32_t Type, const unsigned char* UtfExtra,
+                              uint32_t* Payload)
 {
-    const unsigned long* Source = (const unsigned long*)UtfExtra;
+    const uint32_t* Source = (const uint32_t*)UtfExtra;
     switch (Type)
     {
     case G_JointTypeFix:
@@ -5137,7 +5140,7 @@ static void RemapJointPayload(unsigned long Type, const unsigned char* UtfExtra,
 }
 
 // PTR_LAB_06621118: type → UTF record size only (not FUN_06625560 apply).
-static unsigned long JointUtfRecordSize(unsigned long Type)
+static uint32_t JointUtfRecordSize(uint32_t Type)
 {
     if (Type == G_JointTypeFix || Type == G_JointTypeTrans || Type == G_JointTypeLoose)
         return 0xB0;
@@ -5152,7 +5155,7 @@ static unsigned long JointUtfRecordSize(unsigned long Type)
 
 // FUN_0661eb30 (thiscall on the handle, RET 4): the first child whose +0x40 equals the CRC
 // (+4) of the caller's {text, crc} wrapper, or 0. No tests.
-static FArchetypeChild* FindArchetypeChildByCrc(FArchetypeHandle* Handle, unsigned long Crc)
+static FArchetypeChild* FindArchetypeChildByCrc(FArchetypeHandle* Handle, uint32_t Crc)
 {
     for (std::vector<FArchetypeChild>::iterator Child = Handle->Children.begin();
          Child != Handle->Children.end(); ++Child)
@@ -5165,14 +5168,14 @@ static FArchetypeChild* FindArchetypeChildByCrc(FArchetypeHandle* Handle, unsign
 
 // The record loop of FUN_06620500 for one open Cons file (06620a75..066210c5, the part Ghidra
 static void ApplyConsFileRecords(FArchetypeHandle* Handle, IFileSystem* Fs, int File,
-                                 unsigned long Type, unsigned long RecordSize, unsigned long FileSize)
+                                 uint32_t Type, uint32_t RecordSize, uint32_t FileSize)
 {
-    unsigned long Left = FileSize / RecordSize;
+    uint32_t Left = FileSize / RecordSize;
     while (Left != 0)
     {
         unsigned char Buffer[G_JointUtfMaxBytes];
-        unsigned long BytesRead = 0;
-        if (Fs->Read((unsigned long)File, Buffer, RecordSize, &BytesRead, 0) != 0 && // +0x14
+        uint32_t BytesRead = 0;
+        if (Fs->Read((uint32_t)File, Buffer, RecordSize, &BytesRead, 0) != 0 && // +0x14
             BytesRead == RecordSize)
         {
             const char* FirstName = (const char*)Buffer;
@@ -5220,21 +5223,21 @@ static void ParseConsConstraints(FArchetypeHandle* Handle, IFileSystem* Fs)
                 continue;
             FEngBaseFileSystemDesc Desc;
             FillFileSystemDesc(&Desc, FindData.cFileName, nullptr);
-            Desc.Field30 = (unsigned long)FindHandle;
+            Desc.Field30 = (uint32_t)FindHandle;
             const int File = Fs->OpenByDesc((FFileSystemDesc*)(&Desc)); // +0x7C
             if (File == -1)
                 continue;
-            const unsigned long FileSize = Fs->GetSize((unsigned long)File, 0); // +0x28
-            const unsigned long Type = JointTypeFromName(FindData.cFileName);
-            const unsigned long RecordSize = JointUtfRecordSize(Type);
+            const uint32_t FileSize = Fs->GetSize((uint32_t)File, 0); // +0x28
+            const uint32_t Type = JointTypeFromName(FindData.cFileName);
+            const uint32_t RecordSize = JointUtfRecordSize(Type);
             if (Type == 0xFFFFFFFF)
                 EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x376, "WARNING",
                              "Engine: unknown joint type, probably random garbage");
             ApplyConsFileRecords(Handle, Fs, File, Type, RecordSize, FileSize);
-            Fs->CloseFile((unsigned long)File); // +0x10
-        } while (Fs->FindNext((unsigned long)FindHandle, // +0x4C
+            Fs->CloseFile((uint32_t)File); // +0x10
+        } while (Fs->FindNext((uint32_t)FindHandle, // +0x4C
                             &FindData) != 0);
-        Fs->FindClose((unsigned long)FindHandle); // +0x50
+        Fs->FindClose((uint32_t)FindHandle); // +0x50
     }
     Fs->OpenNode(G_NameParentDot); // +0x60
 }
@@ -5269,15 +5272,15 @@ static GENRESULT ParseCmpndChildren(FEngineObject* Engine, FArchetypeHandle* Han
             Count = Handle->Children.size();
             Child = AppendArchetypeChild(Handle);
             if (LinkCmpndPartHandle(Engine, FindData.cFileName, CmpndFs,
-                                    (unsigned long)FindHandle, ParentFs, Child) < 0)
+                                    (uint32_t)FindHandle, ParentFs, Child) < 0)
             {
                 ShrinkArchetypeChildren(Handle, Count);
                 EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x345, "WARNING",
                              G_CmpndPartFailText);
             }
-        } while (Fs->FindNext((unsigned long)FindHandle, // +0x4C
+        } while (Fs->FindNext((uint32_t)FindHandle, // +0x4C
                             &FindData) != 0);
-        Fs->FindClose((unsigned long)FindHandle); // +0x50
+        Fs->FindClose((uint32_t)FindHandle); // +0x50
     }
 
     ParseConsConstraints(Handle, Fs);
@@ -5346,7 +5349,7 @@ static FArchetypeHandle* DACOM_API EngineFindArchetype(FEngineObject* This, FArc
 }
 
 // LAB_06622400 / IEngine+0x4C RET 8: AL=1 if child count != 0.
-static unsigned long DACOM_API EngineIsCompoundArchetype(FEngineObject* This,
+static uint32_t DACOM_API EngineIsCompoundArchetype(FEngineObject* This,
                                                         FArchetypeHandle* Handle)
 {
     (void)This;
@@ -5474,7 +5477,7 @@ GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra,
 }
 
 // LAB_0661f460 (slot 11, RET 0xC): +0x44 = User.
-GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, unsigned long NewUser)
+GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, uint32_t NewUser)
 {
     (void)Instance;
     User = NewUser;
@@ -5482,14 +5485,14 @@ GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, unsigned long Ne
 }
 
 // LAB_0661f470 (slot 12, RET 8): +0x44.
-unsigned long DACOM_API FInstanceTransform::GetUser(void* Instance)
+uint32_t DACOM_API FInstanceTransform::GetUser(void* Instance)
 {
     (void)Instance;
     return User;
 }
 
 // LAB_0661f320 (slot 13, RET 8): XOR AL,AL.
-unsigned long DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance) // formerly Slot13
+uint32_t DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance) // formerly Slot13
 {
     (void)Instance;
     return 0;
@@ -5524,7 +5527,7 @@ static void CopyTransformState(IInstanceTransform* Dest, IInstanceTransform* Sou
     float ExtraVec[3] = {0.0f, 0.0f, 0.0f};
     Source->GetExtra(Instance, &Extra, ExtraVec);
     Dest->SetExtra(Instance, Extra, ExtraVec);
-    const unsigned long User = Source->GetUser(Instance);
+    const uint32_t User = Source->GetUser(Instance);
     Dest->SetUser(Instance, User);
 }
 
@@ -5556,9 +5559,9 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 }
 
 // The instance-root map key: the instance pointer as a signed int (FUN_06612e70, JGE).
-static long EngineInstanceKey(FEngineInstance* Instance)
+static int32_t EngineInstanceKey(FEngineInstance* Instance)
 {
-    return (long)((intptr_t)Instance);
+    return (int32_t)fl::PtrToHandle(Instance);
 }
 
 // FUN_06623ac0 with the pair {Instance, Instance} and the cache update every caller does
@@ -5581,7 +5584,7 @@ static void InsertRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
 // erase equal_range(Instance) (FUN_06625220 / FUN_06624ca0 / FUN_06625500 / FUN_06623200).
 static void EraseRootInstance(FEngineObject* Engine, FEngineInstance* Instance)
 {
-    const long Key = EngineInstanceKey(Instance);
+    const int32_t Key = EngineInstanceKey(Instance);
     if (Engine->bInstanceCacheValid != 0 && Engine->CachedInstance->first == Key)
         Engine->bInstanceCacheValid = 0;
     Engine->Instances.erase(Key);
@@ -5770,12 +5773,12 @@ static void ApplyLooseJoint(float* Dest, const float* Rel, const float* JointSta
 }
 
 // FUN_06625560 (thiscall on inst+0x5C, RET 8 (Dest, bForce); only caller FUN_0661f250 with
-static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char bForce)
+static uint32_t ApplyJointToLocal(FEngineInstance* Instance, unsigned char bForce)
 {
     if (Instance->bWorldDirty == 0 && bForce == 0)
         return 0;
     Instance->bWorldDirty = 0;
-    const unsigned long Type = Instance->Relative[0];
+    const uint32_t Type = Instance->Relative[0];
     if (Type == 0xFFFFFFFF)
         return 0;
 
@@ -5803,7 +5806,7 @@ static unsigned long ApplyJointToLocal(FEngineInstance* Instance, unsigned char 
 
 // FUN_0661ec90: memcpy 0x17 dwords from constraint+8 → inst+0x5C, then link.
 static unsigned char ConnectInstanceChild(FEngineInstance* Parent, FEngineInstance* Child,
-                                          const unsigned long* Payload)
+                                          const uint32_t* Payload)
 {
     Child->bWorldDirty = 1;                                             // 0661eca4 [child+0xD4]
     std::memcpy(Child->Relative, Payload, sizeof(Child->Relative));     // 0661eca8 REP MOVSD 0x17
@@ -5830,7 +5833,7 @@ static unsigned char EngineInvalidateExtentChain(FEngineInstance* This, unsigned
         Cursor = Cursor->Parent;
     while (Cursor != nullptr)
     {
-        unsigned long Bits = 0;
+        uint32_t Bits = 0;
         std::memcpy(&Bits, &Cursor->Extent, sizeof(Bits));
         if (Bits == 0xBF800000)
             break;
@@ -5903,7 +5906,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
 
-    std::map<unsigned long, FEngineInstance*> Parts; // 0662289e FUN_06623730, dtor 06622ac2..
+    std::map<uint32_t, FEngineInstance*> Parts; // 0662289e FUN_06623730, dtor 06622ac2..
 
     // 066228a9 / 066228bd / 06622908: the caller's transform (EBP) goes to every child
     // until the first one is created successfully; EBP is then zeroed, so every later part
@@ -5936,7 +5939,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
         // 06622930..0662293f: a record with a null child or parent part is skipped silently.
         if (Constraint->ChildPart != nullptr && Constraint->ParentPart != nullptr)
         {
-            std::map<unsigned long, FEngineInstance*>::iterator ChildIt =
+            std::map<uint32_t, FEngineInstance*>::iterator ChildIt =
                 Parts.find(Constraint->ChildPart->Crc); // 06622952
             if (ChildIt == Parts.end())
             {
@@ -5954,7 +5957,7 @@ static FEngineInstance* EngineCreateInstanceTree(FEngineObject* This, FArchetype
             else
             {
                 FEngineInstance* ChildInst = ChildIt->second; // 066229bd
-                std::map<unsigned long, FEngineInstance*>::iterator ParentIt =
+                std::map<uint32_t, FEngineInstance*>::iterator ParentIt =
                     Parts.find(Constraint->ParentPart->Crc); // 066229cd
                 if (ParentIt == Parts.end())
                 {
@@ -6168,7 +6171,7 @@ static GENRESULT DACOM_API EngineSetInstanceTransform(FEngineObject* This, FEngi
     (void)This;
     if (Instance == G_InvalidInstance || Instance == nullptr)
         return GR_OK;
-    const unsigned long OldFlags = Instance->Flags;
+    const uint32_t OldFlags = Instance->Flags;
     IInstanceTransform* Old = Instance->Transform;
     IInstanceTransform* Attached = NewTransform;
     if (Attached == nullptr)
@@ -6220,7 +6223,7 @@ static void FanoutIecUpdateInstance(FEngineObject* This, FEngineInstance* Instan
 static unsigned char EngineComposeWorld(FEngineInstance* Instance);
 
 static void EngineUpdateInstanceTree(FEngineObject* This, FEngineInstance* Instance,
-                                    unsigned long Flags, void* Arg)
+                                    uint32_t Flags, void* Arg)
 {
     if ((Flags & 2) == 2)
         FanoutIecUpdateInstance(This, Instance, Arg);
@@ -6262,7 +6265,7 @@ static unsigned char EngineComposeWorld(FEngineInstance* Instance)
 {
     if (Instance->Parent == nullptr)
         return 0;
-    const unsigned long bApplied = ApplyJointToLocal(Instance, 0);
+    const uint32_t bApplied = ApplyJointToLocal(Instance, 0);
     const float* ParentWorld = Instance->Parent->Transform->GetMatrix(Instance->Parent);
     if (G_ComposeMath == nullptr)
         G_ComposeMath = Create3DMathEngine();
@@ -6294,7 +6297,7 @@ static void EngineComposeAncestors(FEngineInstance* Instance)
 
 // FUN_06621e60 / IEngine+0x6C RET 0x10: compose ancestors, IEC+0x28, walk children.
 static GENRESULT DACOM_API EngineUpdateInstance(FEngineObject* This, FEngineInstance* Instance,
-                                               unsigned long Flags, void* Arg)
+                                               uint32_t Flags, void* Arg)
 {
     if (!IsValidInstance(Instance))
         return GR_OK;
@@ -6328,7 +6331,7 @@ static void* DACOM_API EngineGetInstanceUserData(FEngineObject* This, FEngineIns
 // FUN_0661ece0(inst, Extent, Vec, Flags & 1). EAX is left from the callee (AL = 1 over the
 // instance pointer); the port returns 0.
 static GENRESULT DACOM_API EngineSetInstanceExtent(FEngineObject* This, FEngineInstance* Instance,
-                                                  unsigned long Flags, float Extent, const float* Vec)
+                                                  uint32_t Flags, float Extent, const float* Vec)
 {
     (void)This;
     if (Instance == G_InvalidInstance || Instance == nullptr)
@@ -6376,7 +6379,7 @@ static void EngineComputeInstanceExtent(FEngineInstance* Instance, unsigned char
 
     float MinV[3];
     float MaxV[3];
-    for (unsigned long Axis = 0; Axis < 3; ++Axis)
+    for (uint32_t Axis = 0; Axis < 3; ++Axis)
     {
         MinV[Axis] = OwnWorld[Axis] - OwnR;
         MaxV[Axis] = OwnWorld[Axis] + OwnR;
@@ -6393,7 +6396,7 @@ static void EngineComputeInstanceExtent(FEngineInstance* Instance, unsigned char
         Acquire3DMathEngine()->TransformXform(*(FVector*)ChildWorld,
                                                       *(const FTransform*)ChildXf,
                                                       *(const FVector*)ChildLocal);
-        for (unsigned long Axis = 0; Axis < 3; ++Axis)
+        for (uint32_t Axis = 0; Axis < 3; ++Axis)
         {
             const float Lo = ChildWorld[Axis] - ChildR;
             if (Lo < MinV[Axis])
@@ -6454,7 +6457,7 @@ static void EngineComputeInstanceExtent(FEngineInstance* Instance, unsigned char
 
 // LAB_06621ab0, IEngine slot 34 (+0x88), RET 0x14 (Instance, Flags, OutExtent, OutVec),
 static GENRESULT DACOM_API EngineGetInstanceExtent(FEngineObject* This, FEngineInstance* Instance,
-                                                  unsigned long Flags, float* OutExtent,
+                                                  uint32_t Flags, float* OutExtent,
                                                   float* OutVec)
 {
     (void)This;
@@ -6548,11 +6551,11 @@ static GENRESULT DACOM_API EngineSetTransformUser(FEngineObject* This, FEngineIn
     (void)This;
     if (!IsValidInstance(Instance))
         return GR_OK;
-    return Instance->Transform->SetUser(Instance, (unsigned long)User);
+    return Instance->Transform->SetUser(Instance, (uint32_t)fl::PtrToHandle(User));
 }
 
 // LAB_06621c70 / IEngine +0xB8 (RET 8) -> transform +0x30; fallback 0.
-static unsigned long DACOM_API EngineGetTransformUser(FEngineObject* This, FEngineInstance* Instance)
+static uint32_t DACOM_API EngineGetTransformUser(FEngineObject* This, FEngineInstance* Instance)
 {
     (void)This;
     if (!IsValidInstance(Instance))
@@ -6561,7 +6564,7 @@ static unsigned long DACOM_API EngineGetTransformUser(FEngineObject* This, FEngi
 }
 
 // LAB_06622580 / IEngine+0xC4 RET 8: parent ? inst+0x5C : 0.
-static unsigned long* DACOM_API EngineGetInstanceRelative(FEngineObject* This,
+static uint32_t* DACOM_API EngineGetInstanceRelative(FEngineObject* This,
                                                          FEngineInstance* Instance)
 {
     (void)This;
@@ -6570,11 +6573,11 @@ static unsigned long* DACOM_API EngineGetInstanceRelative(FEngineObject* This,
     return Instance->Relative;
 }
 
-static void CopyJointFloats(float* Dest, const float* Source, unsigned long Count)
+static void CopyJointFloats(float* Dest, const float* Source, uint32_t Count)
 {
     if (Dest == nullptr || Source == nullptr)
         return;
-    unsigned long Index = 0;
+    uint32_t Index = 0;
     while (Index < Count)
     {
         Dest[Index] = Source[Index];
@@ -6583,8 +6586,8 @@ static void CopyJointFloats(float* Dest, const float* Source, unsigned long Coun
 }
 
 // LAB_066226e0 / IEngine+0xC8 RET 0x10: set stored joint state. No solver.
-static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngineInstance* Instance,
-                                                   unsigned long Index, const float* Values)
+static uint32_t DACOM_API EngineSetJointParams(FEngineObject* This, FEngineInstance* Instance,
+                                                   uint32_t Index, const float* Values)
 {
     (void)This;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr || Values == nullptr)
@@ -6597,7 +6600,7 @@ static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngine
     }
 
     Instance->bWorldDirty = 1;
-    const unsigned long Type = Instance->Relative[0];
+    const uint32_t Type = Instance->Relative[0];
     if (Type == G_JointTypePris || Type == G_JointTypeRev)
     {
         const float Input = Values[0];
@@ -6635,8 +6638,8 @@ static unsigned long DACOM_API EngineSetJointParams(FEngineObject* This, FEngine
 }
 
 // LAB_066225b0 / IEngine+0xCC RET 0x10: get stored joint state. No solver.
-static unsigned long DACOM_API EngineGetJointParams(FEngineObject* This, FEngineInstance* Instance,
-                                                   unsigned long Index, float* Out)
+static uint32_t DACOM_API EngineGetJointParams(FEngineObject* This, FEngineInstance* Instance,
+                                                   uint32_t Index, float* Out)
 {
     (void)This;
     if (!IsValidInstance(Instance) || Instance->Parent == nullptr || Out == nullptr)
@@ -6647,7 +6650,7 @@ static unsigned long DACOM_API EngineGetJointParams(FEngineObject* This, FEngine
         return 1;
     }
 
-    const unsigned long Type = Instance->Relative[0];
+    const uint32_t Type = Instance->Relative[0];
     if (Type == G_JointTypePris || Type == G_JointTypeRev)
     {
         CopyJointFloats(Out, Instance->JointState, 1);
@@ -6689,7 +6692,7 @@ static FEngineInstance* DACOM_API EngineGetInstanceParent(FEngineObject* This,
 // LAB_066224d0 / IEngine+0xD8 RET 0x10: first child / next sibling / parent-walk.
 static FEngineInstance* DACOM_API EngineGetRelatedInstance(FEngineObject* This,
                                                           FEngineInstance* From,
-                                                          unsigned long Flags,
+                                                          uint32_t Flags,
                                                           FEngineInstance* Cursor)
 {
     (void)This;
@@ -6747,7 +6750,7 @@ static FArchetypeChild* DACOM_API EngineFindArchetypeChild(FEngineObject* This,
 
 // LAB_06612df0 / IEngine+0xE4 RET 0xC: always −1. Not get/set.
 // formerly EngineSlot57ReturnNeg1
-static unsigned long DACOM_API RejectEngineOperation(FEngineObject* This, void* A, void* B)
+static uint32_t DACOM_API RejectEngineOperation(FEngineObject* This, void* A, void* B)
 {
     (void)This;
     (void)A;
@@ -6766,7 +6769,7 @@ static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
         return (FEngineInstance*)(
             (intptr_t)(This->Instances.begin()->first));
     }
-    const long Key = EngineInstanceKey(Instance);
+    const int32_t Key = EngineInstanceKey(Instance);
     This->InstanceLookupCount += 1;
     FEngineInstanceMap::iterator It;
     if (This->bInstanceCacheValid != 0 && This->CachedInstance->first == Key)
@@ -6788,7 +6791,7 @@ static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
     ++It;
     if (It == This->Instances.end())
         return G_InvalidInstance;
-    return (FEngineInstance*)((intptr_t)(It->first));
+    return (FEngineInstance*)fl::HandleToPtr((uint32_t)((It->first)));
 }
 
 static I3DMathEngine* G_MathEngine = nullptr;
@@ -6866,15 +6869,15 @@ static GENRESULT DACOM_API EngineQueryEngineComponent(FEngineObject* This, int I
 }
 
 // The map key: retail stores the archetype handle as a signed int (FUN_06612e70, JGE).
-static long HardpointKeyOf(FArchetypeHandle* Handle)
+static int32_t HardpointKeyOf(FArchetypeHandle* Handle)
 {
-    return (long)((intptr_t)Handle);
+    return (int32_t)fl::PtrToHandle(Handle);
 }
 
 // The lookup every IHardpoint / IEngineComponent method of this object opens with (inline in
 static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetypeHandle* Handle)
 {
-    const long Key = HardpointKeyOf(Handle);
+    const int32_t Key = HardpointKeyOf(Handle);
     This->LookupCount += 1;
     if (This->bCacheValid != 0 && This->CachedNode->first == Key)
     {
@@ -6891,7 +6894,7 @@ static FHardpointMap::iterator HardpointLookup(FHardpointObject* This, FArchetyp
 }
 
 // FUN_06626350 / IHardpoint+0x0C (stdcall RET 0x10). No argument checks.
-static unsigned long DACOM_API HardpointGetHardpoint(FHardpointObject* This,
+static uint32_t DACOM_API HardpointGetHardpoint(FHardpointObject* This,
                                                     FArchetypeHandle* Handle,
                                                     FHardpointKey const* Key, void* Out)
 {
@@ -6911,7 +6914,7 @@ static unsigned long DACOM_API HardpointGetHardpoint(FHardpointObject* This,
 }
 
 // LAB_066263e0 / IHardpoint+0x10 (stdcall RET 0x10). No argument checks.
-static unsigned long DACOM_API HardpointAddHardpoint(FHardpointObject* This,
+static uint32_t DACOM_API HardpointAddHardpoint(FHardpointObject* This,
                                                     FArchetypeHandle* Handle,
                                                     FHardpointKey const* Key, const void* Data)
 {
@@ -6961,7 +6964,7 @@ static GENRESULT DACOM_API HardpointEnumerateHardpoints(FHardpointObject* This,
 // FUN_066269b0 / IHardpoint+0x1C (stdcall RET 0xC). No argument checks.
 static char const* DACOM_API HardpointFindHardpoint(FHardpointObject* This,
                                                    FArchetypeHandle* Handle,
-                                                   unsigned long const* Crc)
+                                                   uint32_t const* Crc)
 {
     FHardpointMap::iterator Entry = HardpointLookup(This, Handle);
     if (Entry == This->Archetypes.end())
@@ -6976,13 +6979,13 @@ static char const* DACOM_API HardpointFindHardpoint(FHardpointObject* This,
 }
 
 // LAB_06626690 / IHardpoint+0x18 (stdcall RET 0x14): connect InstA's hardpoint KeyA to InstB's
-static unsigned long DACOM_API HardpointConnect(FHardpointObject* This, FEngineInstance* InstA,
+static uint32_t DACOM_API HardpointConnect(FHardpointObject* This, FEngineInstance* InstA,
                                                FHardpointKey const* NameA, FEngineInstance* InstB,
                                                FHardpointKey const* NameB)
 {
     IEngine* Engine = This->Engine;
     void* HandleB = G_InvalidArchetype;
-    unsigned long Status = 1;
+    uint32_t Status = 1;
     unsigned char DataA[0x48];
     unsigned char DataB[0x48];
 
@@ -6993,10 +6996,10 @@ static unsigned long DACOM_API HardpointConnect(FHardpointObject* This, FEngineI
         HandleB = Engine->GetInstanceArchetype(InstB);
         if (HandleB != G_InvalidArchetype && This->GetHardpoint(HandleB, NameB, DataB) != 0)
         {
-            unsigned long Payload[G_EngineJointPayloadDwords];
+            uint32_t Payload[G_EngineJointPayloadDwords];
             std::memset(Payload, 0, sizeof(Payload));
             Status = 3;
-            const unsigned long TypeB = *(unsigned long*)DataB;
+            const uint32_t TypeB = *(uint32_t*)DataB;
             Payload[0] = TypeB;
             float* PayloadF = (float*)Payload;
             const float* PosA = (const float*)(DataA + 4);
@@ -7043,8 +7046,8 @@ static unsigned long DACOM_API HardpointConnect(FHardpointObject* This, FEngineI
 }
 
 // LAB_06621f90 / IEngine+0xBC (stdcall RET 0x10), listing 34640-34796:
-static unsigned long DACOM_API EngineCreateJoint(FEngineObject* This, FEngineInstance* Parent,
-                                                FEngineInstance* Child, const unsigned long* Payload)
+static uint32_t DACOM_API EngineCreateJoint(FEngineObject* This, FEngineInstance* Parent,
+                                                FEngineInstance* Child, const uint32_t* Payload)
 {
     if (Parent == G_InvalidInstance || Parent == nullptr)
         return 0;
@@ -7068,7 +7071,7 @@ static unsigned long DACOM_API EngineCreateJoint(FEngineObject* This, FEngineIns
                                         Parent, Child));
         return 0;
     }
-    if ((long)(Child->ChildCount) > 0)
+    if ((int32_t)(Child->ChildCount) > 0)
         EraseRootInstance(This, Child);
     ConnectInstanceChild(Parent, Child, Payload);
     if (Parent->ChildCount == 1 && Parent->Parent == nullptr)
@@ -7078,7 +7081,7 @@ static unsigned long DACOM_API EngineCreateJoint(FEngineObject* This, FEngineIns
 }
 
 // LAB_06622140 / IEngine+0xC0 (stdcall RET 0xC), listing 34798-34922. The instance acted on is
-static unsigned long DACOM_API EngineDestroyJoint(FEngineObject* This, FEngineInstance* Parent,
+static uint32_t DACOM_API EngineDestroyJoint(FEngineObject* This, FEngineInstance* Parent,
                                                  FEngineInstance* Child)
 {
     if (Child == G_InvalidInstance || Child == nullptr)
@@ -7105,7 +7108,7 @@ static unsigned long DACOM_API EngineDestroyJoint(FEngineObject* This, FEngineIn
     UnlinkInstanceChild(OldParent, Child);
     if (OldParent->ChildCount == 0 && OldParent->Parent == nullptr)
         EraseRootInstance(This, OldParent);
-    if ((long)(Child->ChildCount) > 0)
+    if ((int32_t)(Child->ChildCount) > 0)
         InsertRootInstance(This, Child);
     return 1;
 }
@@ -7127,7 +7130,7 @@ static GENRESULT DACOM_API HardpointEngineComponentInitialize(void* Nested)
 // FUN_06626d00 (thiscall, ECX unused, RET 4). Case-sensitive compares, in this order:
 // "Fixed" -> 0, "Revolute" -> 2, "Prismatic" -> 1; anything else FDUMPs 0x100002
 // HardPoint.cpp 0x25F and returns 0 (JT_FIXED, as the message says). No null check.
-static long ParseHardpointJointType(const char* Name)
+static int32_t ParseHardpointJointType(const char* Name)
 {
     if (std::strcmp(Name, G_NameFixed) == 0)
         return 0;
@@ -7141,7 +7144,7 @@ static long ParseHardpointJointType(const char* Name)
 }
 
 // The fixed-size field read LAB_06625e60 inlines four times (Axis 066260b8..1e, Min
-static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, unsigned long Size)
+static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, uint32_t Size)
 {
     FEngBaseFileSystemDesc Desc;
     FillFileSystemDesc(&Desc, Name, nullptr);
@@ -7149,11 +7152,11 @@ static void ReadHardpointField(IFileSystem* Fs, const char* Name, void* Dest, un
     if (FileHandle == -1)
         return;
     unsigned char Temp[0xC];
-    unsigned long BytesRead = 0;
-    if (Fs->Read((unsigned long)FileHandle, Temp, Size, &BytesRead, 0) != 0 && // +0x14
+    uint32_t BytesRead = 0;
+    if (Fs->Read((uint32_t)FileHandle, Temp, Size, &BytesRead, 0) != 0 && // +0x14
         BytesRead == Size)
         std::memcpy(Dest, Temp, Size);
-    Fs->CloseFile((unsigned long)FileHandle); // +0x10
+    Fs->CloseFile((uint32_t)FileHandle); // +0x10
 }
 
 // FUN_06627b30 (cdecl, FS, Name, Out): the same open as ReadHardpointField, a 0x24-byte Read
@@ -7166,15 +7169,15 @@ static GENRESULT ReadHardpointOrientation(IFileSystem* Fs, const char* Name, flo
     if (FileHandle != -1)
     {
         float Temp[9];
-        unsigned long BytesRead = 0;
-        if (Fs->Read((unsigned long)FileHandle, Temp, sizeof(Temp), &BytesRead, 0) !=
+        uint32_t BytesRead = 0;
+        if (Fs->Read((uint32_t)FileHandle, Temp, sizeof(Temp), &BytesRead, 0) !=
                 0 &&
             BytesRead == sizeof(Temp))
         {
             bRead = true;
             std::memcpy(Out, Temp, sizeof(Temp));
         }
-        Fs->CloseFile((unsigned long)FileHandle); // +0x10
+        Fs->CloseFile((uint32_t)FileHandle); // +0x10
     }
     return bRead ? GR_OK : GR_E_FAIL;
 }
@@ -7235,7 +7238,7 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                     Entry->second.push_back(Temp);
                 }
                 unsigned char* Data = Entry->second.back().Data;
-                const long Type = ParseHardpointJointType(Outer.cFileName);
+                const int32_t Type = ParseHardpointJointType(Outer.cFileName);
                 std::memcpy(Data, &Type, sizeof(Type));
                 // 066260a3 JZ (0 -> Position), 066260a9 JLE (< 0 -> FDUMP), 066260b2 JG (> 2 ->
                 // FDUMP): signed compares against 0 and 2.
@@ -7257,14 +7260,14 @@ static GENRESULT DACOM_API HardpointCreateArchetype(void* Nested, FArchetypeHand
                                              (float*)(Data + 0x10));
                 }
                 Fs->OpenNode(G_NameParentDot); // +0x60
-            } while (Fs->FindNext((unsigned long)InnerFind, // +0x4C
+            } while (Fs->FindNext((uint32_t)InnerFind, // +0x4C
                                 &Inner) != 0);
-            Fs->FindClose((unsigned long)InnerFind); // +0x50
+            Fs->FindClose((uint32_t)InnerFind); // +0x50
         }
         Fs->OpenNode(G_NameParentDot); // +0x60
-    } while (Fs->FindNext((unsigned long)OuterFind, // +0x4C
+    } while (Fs->FindNext((uint32_t)OuterFind, // +0x4C
                         &Outer) != 0);
-    Fs->FindClose((unsigned long)OuterFind); // +0x50
+    Fs->FindClose((uint32_t)OuterFind); // +0x50
     Fs->OpenNode(G_NameParentDot);                     // +0x60
     return Entry != Object->Archetypes.end() ? 1 : 0;
 }
@@ -7296,7 +7299,7 @@ static GENRESULT DACOM_API HardpointDestroyArchetype(void* Nested, FArchetypeHan
     FHardpointObject* Object = HardpointFromNested(Nested, 4);
     if (HardpointLookup(Object, Handle) == Object->Archetypes.end())
         return GR_OK;
-    const long Key = HardpointKeyOf(Handle);
+    const int32_t Key = HardpointKeyOf(Handle);
     if (Object->bCacheValid != 0 && Object->CachedNode->first == Key)
         Object->bCacheValid = 0;
     Object->Archetypes.erase(Key);
@@ -7304,69 +7307,69 @@ static GENRESULT DACOM_API HardpointDestroyArchetype(void* Nested, FArchetypeHan
 }
 
 // Facet wrappers retain their specific interface receiver.
-unsigned long DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, unsigned long Type,
+uint32_t DACOM_API FAnimationChannelFacet::CreateTyped(void* Owner, uint32_t Type,
                                                             void* BindA, void* BindB)
 {
     return ChannelCreateTyped(this, Owner, Type, BindA, BindB);              // LAB_06615950
 }
-unsigned long DACOM_API FAnimationChannelFacet::CreateFromObject(void* Object, void* BindA,
+uint32_t DACOM_API FAnimationChannelFacet::CreateFromObject(void* Object, void* BindA,
                                                                  void* BindB)
 {
     return ChannelCreateFromObject(this, Object, BindA, BindB);              // LAB_06615b00
 }
-unsigned long DACOM_API FAnimationChannelFacet::Destroy(unsigned long Key)
+uint32_t DACOM_API FAnimationChannelFacet::Destroy(uint32_t Key)
 {
     return ChannelDestroy(this, Key);                                        // FUN_06615e10
 }
-unsigned long DACOM_API FAnimationChannelFacet::GetObject(unsigned long Key, void** Out)
+uint32_t DACOM_API FAnimationChannelFacet::GetObject(uint32_t Key, void** Out)
 {
     return ChannelGetObject(this, Key, Out);                                 // LAB_06615d80
 }
-unsigned long DACOM_API FAnimationChannelFacet::Play(unsigned long Key, float* Time)
+uint32_t DACOM_API FAnimationChannelFacet::Play(uint32_t Key, float* Time)
 {
     return ChannelPlay(this, Key, Time);
 }
-unsigned long DACOM_API FAnimationChannelFacet::StopGraph(unsigned long Key)
+uint32_t DACOM_API FAnimationChannelFacet::StopGraph(uint32_t Key)
 {
     return ChannelStopGraph(this, Key);
 }
-float DACOM_API FAnimationChannelFacet::GetDuration(unsigned long Key)
+float DACOM_API FAnimationChannelFacet::GetDuration(uint32_t Key)
 {
     return ChannelGetDuration(this, Key);
 }
-unsigned long DACOM_API FAnimationChannelFacet::Blend(unsigned long Key, float Duration)
+uint32_t DACOM_API FAnimationChannelFacet::Blend(uint32_t Key, float Duration)
 {
     return ChannelBlend(this, Key, Duration);
 }
-GENRESULT DACOM_API FAnimationChannelFacet::SetUser(unsigned long Key, unsigned long User)
+GENRESULT DACOM_API FAnimationChannelFacet::SetUser(uint32_t Key, uint32_t User)
 {
     return ChannelSetUser(this, Key, User);
 }
-float DACOM_API FAnimationChannelFacet::GetUser(unsigned long Key)
+float DACOM_API FAnimationChannelFacet::GetUser(uint32_t Key)
 {
     return ChannelGetUser(this, Key);
 }
-GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayPos(unsigned long Key, float* Pos)
+GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayPos(uint32_t Key, float* Pos)
 {
     return ChannelSetOverlayPos(this, Key, Pos);
 }
-GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayExtra(unsigned long Key, float* Extra)
+GENRESULT DACOM_API FAnimationChannelFacet::SetOverlayExtra(uint32_t Key, float* Extra)
 {
     return ChannelSetOverlayExtra(this, Key, Extra);
 }
-unsigned long DACOM_API FAnimationChannelFacet::InMixer(unsigned long Key)
+uint32_t DACOM_API FAnimationChannelFacet::InMixer(uint32_t Key)
 {
     return ChannelInMixer(this, Key);
 }
-unsigned long* DACOM_API FAnimationChannelFacet::GetHeader(unsigned long* Out, unsigned long Key)
+uint32_t* DACOM_API FAnimationChannelFacet::GetHeader(uint32_t* Out, uint32_t Key)
 {
     return ChannelGetHeader(this, Out, Key);
 }
-GENRESULT DACOM_API FAnimationChannelFacet::AddOverlayPos(unsigned long Key, float* Delta)
+GENRESULT DACOM_API FAnimationChannelFacet::AddOverlayPos(uint32_t Key, float* Delta)
 {
     return ChannelAddOverlayPos(this, Key, Delta);
 }
-GENRESULT DACOM_API FAnimationChannelFacet::GetMapped(unsigned long Key, unsigned char* Out)
+GENRESULT DACOM_API FAnimationChannelFacet::GetMapped(uint32_t Key, unsigned char* Out)
 {
     return ChannelGetMapped(this, Key, Out);
 }
@@ -7376,8 +7379,8 @@ GENRESULT DACOM_API FAnimationObject::Initialize()
     return AggregateInitialize((IAggregateComponent*)this);     // LAB_06616d40
 }
 
-unsigned char DACOM_API FAnimationObject::Eval(unsigned long PlaybackId, void* TouchArg,
-                                               unsigned long Flags, float Time, float Scale,
+unsigned char DACOM_API FAnimationObject::Eval(uint32_t PlaybackId, void* TouchArg,
+                                               uint32_t Flags, float Time, float Scale,
                                                void* Arg6, void* Arg7, float Arg8)
 {
     return RootDataEval((IRootData*)this, PlaybackId, TouchArg, Flags, Time, Scale,
@@ -7543,7 +7546,7 @@ GENRESULT DACOM_API ChannelArchetypeFactoryCreateInstance(FDacomFactory* This, A
 }
 
 
-static void* NestedThis(void* Object, unsigned long Offset)
+static void* NestedThis(void* Object, uint32_t Offset)
 {
     return (unsigned char*)Object + Offset;
 }
@@ -7552,11 +7555,11 @@ GENRESULT DACOM_API FEngineObject::QueryInterface(const char* Iid, void** Out)
 {
     return EngineQueryInterface(this, Iid, Out);
 }
-unsigned long DACOM_API FEngineObject::AddRef()
+uint32_t DACOM_API FEngineObject::AddRef()
 {
     return EngineAddRef(this);
 }
-unsigned long DACOM_API FEngineObject::Release()
+uint32_t DACOM_API FEngineObject::Release()
 {
     return EngineRelease(this);
 }
@@ -7564,7 +7567,7 @@ GENRESULT DACOM_API FEngineObject::LoadEngineComponents(IDAComponent* SystemCont
 {
     return EngineLoadEngineComponents(this, SystemContainer);
 }
-unsigned long DACOM_API FEngineObject::EnumerateEngineComponents(
+uint32_t DACOM_API FEngineObject::EnumerateEngineComponents(
     int(__cdecl* Callback)(const char*, void*))
 {
     return EngineEnumerateEngineComponents(this, Callback);
@@ -7577,7 +7580,7 @@ GENRESULT DACOM_API FEngineObject::SetSearchPath(const char* Path)
 {
     return EngineSetSearchPath(this, Path);
 }
-GENRESULT DACOM_API FEngineObject::QuerySearchPath(char* Dest, unsigned long MaxChars)
+GENRESULT DACOM_API FEngineObject::QuerySearchPath(char* Dest, uint32_t MaxChars)
 {
     return EngineQuerySearchPath(this, Dest, MaxChars);
 }
@@ -7605,11 +7608,11 @@ void* DACOM_API FEngineObject::DuplicateArchetype(void* ArchIn, FEngineName* Nam
 {
     return EngineDuplicateArchetype(this, (FArchetypeHandle*)ArchIn, Name);
 }
-unsigned long DACOM_API FEngineObject::AddRefHandle(void* Handle)
+uint32_t DACOM_API FEngineObject::AddRefHandle(void* Handle)
 {
     return EngineAddRefHandle(this, (FArchetypeHandle*)Handle);
 }
-unsigned long DACOM_API FEngineObject::ReleaseHandle(void* Handle)
+uint32_t DACOM_API FEngineObject::ReleaseHandle(void* Handle)
 {
     return EngineReleaseHandle(this, (FArchetypeHandle*)Handle);
 }
@@ -7625,7 +7628,7 @@ GENRESULT DACOM_API FEngineObject::QueryEngineComponent(int Id, void* Name, void
 {
     return EngineQueryEngineComponent(this, Id, Name, Out);
 }
-unsigned long DACOM_API FEngineObject::IsCompoundArchetype(void* Handle)
+uint32_t DACOM_API FEngineObject::IsCompoundArchetype(void* Handle)
 {
     return EngineIsCompoundArchetype(this, (FArchetypeHandle*)Handle);
 }
@@ -7662,7 +7665,7 @@ FEngineName* DACOM_API FEngineObject::GetInstanceName(FEngineName* Out, void* In
 {
     return EngineGetInstanceName(this, Out, (FEngineInstance*)Instance);
 }
-GENRESULT DACOM_API FEngineObject::UpdateInstance(void* Instance, unsigned long Flags, void* Arg)
+GENRESULT DACOM_API FEngineObject::UpdateInstance(void* Instance, uint32_t Flags, void* Arg)
 {
     return EngineUpdateInstance(this, (FEngineInstance*)Instance, Flags, Arg);
 }
@@ -7688,12 +7691,12 @@ void* DACOM_API FEngineObject::GetInstanceUserData(void* Instance)
 {
     return EngineGetInstanceUserData(this, (FEngineInstance*)Instance);
 }
-GENRESULT DACOM_API FEngineObject::SetInstanceExtent(void* Instance, unsigned long Flags, float Extent,
+GENRESULT DACOM_API FEngineObject::SetInstanceExtent(void* Instance, uint32_t Flags, float Extent,
                                                       const float* Vec)
 {
     return EngineSetInstanceExtent(this, (FEngineInstance*)Instance, Flags, Extent, Vec);
 }
-GENRESULT DACOM_API FEngineObject::GetInstanceExtent(void* Instance, unsigned long Flags,
+GENRESULT DACOM_API FEngineObject::GetInstanceExtent(void* Instance, uint32_t Flags,
                                                       float* OutExtent, float* OutVec)
 {
     return EngineGetInstanceExtent(this, (FEngineInstance*)Instance, Flags, OutExtent,
@@ -7741,36 +7744,36 @@ float* DACOM_API FEngineObject::GetIdentityMatrix2(void* Unused)
 {
     return EngineGetIdentityMatrix(this, Unused);
 }
-GENRESULT DACOM_API FEngineObject::SetTransformUser(void* Instance, unsigned long User)
+GENRESULT DACOM_API FEngineObject::SetTransformUser(void* Instance, uint32_t User)
 {
     return EngineSetTransformUser(this, (FEngineInstance*)Instance,
-                                   (void*)User);
+                                   (void*)fl::HandleToPtr(User));
 }
-unsigned long DACOM_API FEngineObject::GetTransformUser(void* Instance)
+uint32_t DACOM_API FEngineObject::GetTransformUser(void* Instance)
 {
     return EngineGetTransformUser(this, (FEngineInstance*)Instance);
 }
-unsigned long DACOM_API FEngineObject::CreateJoint(void* Parent, void* Child,
-                                                     const unsigned long* Payload)
+uint32_t DACOM_API FEngineObject::CreateJoint(void* Parent, void* Child,
+                                                     const uint32_t* Payload)
 {
     return EngineCreateJoint(this, (FEngineInstance*)Parent,
                               (FEngineInstance*)Child, Payload);
 }
-unsigned long DACOM_API FEngineObject::DestroyJoint(void* Parent, void* Child)
+uint32_t DACOM_API FEngineObject::DestroyJoint(void* Parent, void* Child)
 {
     return EngineDestroyJoint(this, (FEngineInstance*)Parent,
                               (FEngineInstance*)Child);
 }
-unsigned long* DACOM_API FEngineObject::GetInstanceRelative(void* Instance)
+uint32_t* DACOM_API FEngineObject::GetInstanceRelative(void* Instance)
 {
     return EngineGetInstanceRelative(this, (FEngineInstance*)Instance);
 }
-unsigned long DACOM_API FEngineObject::SetJointParams(void* Instance, unsigned long Index,
+uint32_t DACOM_API FEngineObject::SetJointParams(void* Instance, uint32_t Index,
                                                       const float* Values)
 {
     return EngineSetJointParams(this, (FEngineInstance*)Instance, Index, Values);
 }
-unsigned long DACOM_API FEngineObject::GetJointParams(void* Instance, unsigned long Index, float* Out)
+uint32_t DACOM_API FEngineObject::GetJointParams(void* Instance, uint32_t Index, float* Out)
 {
     return EngineGetJointParams(this, (FEngineInstance*)Instance, Index, Out);
 }
@@ -7782,7 +7785,7 @@ void* DACOM_API FEngineObject::GetInstanceParent(void* Instance)
 {
     return EngineGetInstanceParent(this, (FEngineInstance*)Instance);
 }
-void* DACOM_API FEngineObject::GetRelatedInstance(void* From, unsigned long Flags, void* Cursor)
+void* DACOM_API FEngineObject::GetRelatedInstance(void* From, uint32_t Flags, void* Cursor)
 {
     return EngineGetRelatedInstance(this, (FEngineInstance*)From, Flags,
                                     (FEngineInstance*)Cursor);
@@ -7797,7 +7800,7 @@ void* DACOM_API FEngineObject::FindArchetypeChild(void* Handle, void* ChildHandl
                                     (FArchetypeHandle*)ChildHandle);
 }
 // formerly UnusedSlot57
-unsigned long DACOM_API FEngineObject::RejectOperation(void* A, void* B)
+uint32_t DACOM_API FEngineObject::RejectOperation(void* A, void* B)
 {
     return RejectEngineOperation(this, A, B);
 }
@@ -7806,11 +7809,11 @@ GENRESULT DACOM_API FAnimationObject::QueryInterface(const char* Iid, void** Out
 {
     return AnimationQueryInterface(this, Iid, Out);
 }
-unsigned long DACOM_API FAnimationObject::AddRef()
+uint32_t DACOM_API FAnimationObject::AddRef()
 {
     return AnimationAddRef(this);
 }
-unsigned long DACOM_API FAnimationObject::Release()
+uint32_t DACOM_API FAnimationObject::Release()
 {
     return AnimationRelease(this);
 }
@@ -7827,7 +7830,7 @@ GENRESULT DACOM_API FAnimationObject::CloseScript(void* Script)
 // header still carries the dword as void*.
 float DACOM_API FAnimationObject::GetScriptDuration(void* Script)
 {
-    return AnimationGetScriptDuration(this, (unsigned long)((size_t)Script));
+    return AnimationGetScriptDuration(this, (uint32_t)((size_t)Script));
 }
 float DACOM_API FAnimationObject::GetNamedDuration(void* Script, const char* Name)
 {
@@ -7842,7 +7845,7 @@ GENRESULT DACOM_API FAnimationObject::FindScriptName(void* Callback, void* Scrip
 {
     return AnimationFindScriptName(this, Callback, (FAnimScript*)Script, Name, Context);
 }
-unsigned long DACOM_API FAnimationObject::PlayScript(void* Script, void* Root, const char* Name,
+uint32_t DACOM_API FAnimationObject::PlayScript(void* Script, void* Root, const char* Name,
                                                       void* ArgD, void* ArgE)
 {
     return AnimationPlayScript(this, (FAnimScript*)Script,
@@ -7850,80 +7853,80 @@ unsigned long DACOM_API FAnimationObject::PlayScript(void* Script, void* Root, c
 }
 GENRESULT DACOM_API FAnimationObject::DestroyScript(void* Script)
 {
-    return AnimationDestroyScript(this, (unsigned long)((size_t)Script));
+    return AnimationDestroyScript(this, (uint32_t)((size_t)Script));
 }
-unsigned long DACOM_API FAnimationObject::EvalPlayback(unsigned long PlaybackId, unsigned long Flags,
+uint32_t DACOM_API FAnimationObject::EvalPlayback(uint32_t PlaybackId, uint32_t Flags,
                                                      float Time, float Scale, void* A, void* B,
                                                      void* C, void* D)
 {
     return AnimationEvalPlayback(this, PlaybackId, Flags, Time, Scale, A, B, C, D);
 }
-unsigned long DACOM_API FAnimationObject::EvalStored(unsigned long PlaybackId)
+uint32_t DACOM_API FAnimationObject::EvalStored(uint32_t PlaybackId)
 {
     return AnimationEvalStored(this, PlaybackId);
 }
-unsigned long DACOM_API FAnimationObject::ApplyChannels(unsigned long PlaybackId)
+uint32_t DACOM_API FAnimationObject::ApplyChannels(uint32_t PlaybackId)
 {
     return AnimationApplyChannels(this, PlaybackId);
 }
-unsigned long DACOM_API FAnimationObject::StopPlayback(unsigned long PlaybackId)
+uint32_t DACOM_API FAnimationObject::StopPlayback(uint32_t PlaybackId)
 {
     return AnimationStopPlayback(this, PlaybackId);
 }
-unsigned long DACOM_API FAnimationObject::StopChannels(unsigned long PlaybackId, void* Unused)
+uint32_t DACOM_API FAnimationObject::StopChannels(uint32_t PlaybackId, void* Unused)
 {
     return AnimationStopChannels(this, PlaybackId, Unused);
 }
-float DACOM_API FAnimationObject::GetStoredDuration(unsigned long PlaybackId)
+float DACOM_API FAnimationObject::GetStoredDuration(uint32_t PlaybackId)
 {
     return AnimationGetStoredDuration(this, PlaybackId);
 }
-unsigned long DACOM_API FAnimationObject::FilterObjects(void* Filter)
+uint32_t DACOM_API FAnimationObject::FilterObjects(void* Filter)
 {
-    return AnimationFilterObjects(this, (unsigned long)((size_t)Filter));
+    return AnimationFilterObjects(this, (uint32_t)((size_t)Filter));
 }
-unsigned long DACOM_API FAnimation2Facet::SetOverlayPos(unsigned long PlaybackId, float* Pos)
+uint32_t DACOM_API FAnimation2Facet::SetOverlayPos(uint32_t PlaybackId, float* Pos)
 {
     return AnimationSetOverlayPos((FAnimationObject*)this, PlaybackId, Pos);
 }
-unsigned long DACOM_API FAnimation2Facet::SetOverlayExtra(unsigned long PlaybackId, float* Extra)
+uint32_t DACOM_API FAnimation2Facet::SetOverlayExtra(uint32_t PlaybackId, float* Extra)
 {
     return AnimationSetOverlayExtra((FAnimationObject*)this, PlaybackId, Extra);
 }
-unsigned long DACOM_API FAnimationObject::HasObject(unsigned long PlaybackId, void* Object)
+uint32_t DACOM_API FAnimationObject::HasObject(uint32_t PlaybackId, void* Object)
 {
     return AnimationHasObject(this, PlaybackId, Object);
 }
-unsigned long DACOM_API FAnimationObject::TouchMapped(unsigned long PlaybackId, float* Pos, float* Extra)
+uint32_t DACOM_API FAnimationObject::TouchMapped(uint32_t PlaybackId, float* Pos, float* Extra)
 {
     return AnimationTouchMapped(this, PlaybackId, Pos, Extra);
 }
-unsigned long DACOM_API FAnimation2Facet::AddOverlayPos(unsigned long PlaybackId, float* Delta)
+uint32_t DACOM_API FAnimation2Facet::AddOverlayPos(uint32_t PlaybackId, float* Delta)
 {
     return AnimationAddOverlayPos((FAnimationObject*)this, PlaybackId, Delta);
 }
-unsigned long DACOM_API FAnimationObject::GetFirstInstanceField(unsigned long PlaybackId,
-                                                               unsigned long* Out)
+uint32_t DACOM_API FAnimationObject::GetFirstInstanceField(uint32_t PlaybackId,
+                                                               uint32_t* Out)
 {
     return AnimationGetFirstInstanceField(this, PlaybackId, Out);
 }
-unsigned long DACOM_API FAnimationObject::GetDurationIfNamed(unsigned long PlaybackId, float* Out)
+uint32_t DACOM_API FAnimationObject::GetDurationIfNamed(uint32_t PlaybackId, float* Out)
 {
     return AnimationGetDurationIfNamed(this, PlaybackId, Out);
 }
-unsigned long DACOM_API FAnimationObject::GetNamedDurationOut(void* Script, const char* Name, float* Out)
+uint32_t DACOM_API FAnimationObject::GetNamedDurationOut(void* Script, const char* Name, float* Out)
 {
     return AnimationGetNamedDurationOut(this, (FAnimScript*)Script, Name, Out);
 }
-unsigned long DACOM_API FAnimationObject::FindObject(unsigned long PlaybackId, void* Query)
+uint32_t DACOM_API FAnimationObject::FindObject(uint32_t PlaybackId, void* Query)
 {
     return AnimationFindObject(this, PlaybackId, Query);
 }
-unsigned long DACOM_API FAnimationObject::MixerWalk(unsigned long PlaybackId, float Time)
+uint32_t DACOM_API FAnimationObject::MixerWalk(uint32_t PlaybackId, float Time)
 {
     return AnimationMixerWalk(this, PlaybackId, Time);
 }
-unsigned long DACOM_API FAnimationObject::MixerWalkAll(float Time)
+uint32_t DACOM_API FAnimationObject::MixerWalkAll(float Time)
 {
     return AnimationMixerWalkAll(this, Time);
 }
@@ -7931,41 +7934,41 @@ void* DACOM_API FAnimationObject::CreateEmptyScript()
 {
     return AnimationCreateEmptyScript(this);
 }
-unsigned long DACOM_API FAnimationObject::AddScriptNames(void* Script, void* FileSystem,
+uint32_t DACOM_API FAnimationObject::AddScriptNames(void* Script, void* FileSystem,
                                                        const char** Names, int Count)
 {
     return AnimationAddScriptNames(this, (FAnimScript*)Script, FileSystem, Names, Count);
 }
-unsigned long DACOM_API FAnimationObject::RemoveScriptNames(void* Script, const char** Names, int Count)
+uint32_t DACOM_API FAnimationObject::RemoveScriptNames(void* Script, const char** Names, int Count)
 {
     return AnimationRemoveScriptNames(this, (FAnimScript*)Script, Names, Count);
 }
-unsigned long DACOM_API FAnimationObject::EnumFsScripts(void* Callback, void* FileSystem, void* Context)
+uint32_t DACOM_API FAnimationObject::EnumFsScripts(void* Callback, void* FileSystem, void* Context)
 {
     return AnimationEnumFsScripts(this, Callback, FileSystem, Context);
 }
-unsigned long DACOM_API FAnimationObject::HasScriptName(void* Script, const char* Name)
+uint32_t DACOM_API FAnimationObject::HasScriptName(void* Script, const char* Name)
 {
     return AnimationHasScriptName(this, (FAnimScript*)Script, Name);
 }
-unsigned long DACOM_API FAnimationObject::GetScriptNameCount(void* Script, unsigned long* Out)
+uint32_t DACOM_API FAnimationObject::GetScriptNameCount(void* Script, uint32_t* Out)
 {
     return AnimationGetScriptNameCount(this, (FAnimScript*)Script, Out);
 }
-unsigned long DACOM_API FAnimationObject::EnumObjects(void* Callback, unsigned long PlaybackId,
+uint32_t DACOM_API FAnimationObject::EnumObjects(void* Callback, uint32_t PlaybackId,
                                                        void* Context)
 {
     return AnimationEnumObjects(this, Callback, PlaybackId, Context);
 }
-unsigned long DACOM_API FAnimationObject::RegisterHandle(unsigned long Key)
+uint32_t DACOM_API FAnimationObject::RegisterHandle(uint32_t Key)
 {
     return AnimationRegisterHandle(this, Key);
 }
-unsigned long DACOM_API FAnimationObject::HasHandle(unsigned long Key, unsigned char* Out)
+uint32_t DACOM_API FAnimationObject::HasHandle(uint32_t Key, unsigned char* Out)
 {
     return AnimationHasHandle(this, Key, Out);
 }
-unsigned long DACOM_API FAnimationObject::HasAnyHandle(unsigned long Key)
+uint32_t DACOM_API FAnimationObject::HasAnyHandle(uint32_t Key)
 {
     return AnimationHasAnyHandle(this, Key);
 }
@@ -7974,20 +7977,20 @@ GENRESULT DACOM_API FHardpointObject::QueryInterface(const char* Iid, void** Out
 {
     return HardpointQueryInterface(this, Iid, Out);
 }
-unsigned long DACOM_API FHardpointObject::AddRef()
+uint32_t DACOM_API FHardpointObject::AddRef()
 {
     return HardpointAddRef(this);
 }
-unsigned long DACOM_API FHardpointObject::Release()
+uint32_t DACOM_API FHardpointObject::Release()
 {
     return HardpointRelease(this);
 }
-unsigned long DACOM_API FHardpointObject::GetHardpoint(void* Handle, FHardpointKey const* Key,
+uint32_t DACOM_API FHardpointObject::GetHardpoint(void* Handle, FHardpointKey const* Key,
                                                        void* Out)
 {
     return HardpointGetHardpoint(this, (FArchetypeHandle*)Handle, Key, Out);
 }
-unsigned long DACOM_API FHardpointObject::AddHardpoint(void* Handle, FHardpointKey const* Key,
+uint32_t DACOM_API FHardpointObject::AddHardpoint(void* Handle, FHardpointKey const* Key,
                                                        const void* Data)
 {
     return HardpointAddHardpoint(this, (FArchetypeHandle*)Handle, Key, Data);
@@ -7998,70 +8001,70 @@ GENRESULT DACOM_API FHardpointObject::EnumerateHardpoints(FHardpointEnumProc Cal
     return HardpointEnumerateHardpoints(this, Callback, (FArchetypeHandle*)Handle,
                                          Context);
 }
-unsigned long DACOM_API FHardpointObject::ConnectHardpoints(void* InstA, FHardpointKey const* KeyA,
+uint32_t DACOM_API FHardpointObject::ConnectHardpoints(void* InstA, FHardpointKey const* KeyA,
                                                             void* InstB, FHardpointKey const* KeyB)
 {
     return HardpointConnect(this, (FEngineInstance*)InstA, KeyA,
                                   (FEngineInstance*)InstB, KeyB);
 }
-char const* DACOM_API FHardpointObject::FindHardpoint(void* Handle, unsigned long const* Crc)
+char const* DACOM_API FHardpointObject::FindHardpoint(void* Handle, uint32_t const* Crc)
 {
     return HardpointFindHardpoint(this, (FArchetypeHandle*)Handle, Crc);
 }
 int DACOM_API FHardpointObject::Initialize()
 {
-    return (int)(HardpointEngineComponentInitialize(NestedThis(this, 4)));
+    return (int)(HardpointEngineComponentInitialize(static_cast<void*>(static_cast<IEngineComponent*>(this))));
 }
 int DACOM_API FHardpointObject::CreateArchetype(void* Arg1, void* Arg2)
 {
     return (int)(
-        HardpointCreateArchetype(NestedThis(this, 4), (FArchetypeHandle*)Arg1, Arg2));
+        HardpointCreateArchetype(static_cast<void*>(static_cast<IEngineComponent*>(this)), (FArchetypeHandle*)Arg1, Arg2));
 }
 int DACOM_API FHardpointObject::DuplicateArchetype(void* Arg1, void* Arg2)
 {
     return (int)(
-        HardpointDuplicateArchetype(NestedThis(this, 4), (FArchetypeHandle*)Arg1,
+        HardpointDuplicateArchetype(static_cast<void*>(static_cast<IEngineComponent*>(this)), (FArchetypeHandle*)Arg1,
                                         (FArchetypeHandle*)Arg2));
 }
 int DACOM_API FHardpointObject::DestroyArchetype(void* Arg1)
 {
-    return (int)(HardpointDestroyArchetype(NestedThis(this, 4),
+    return (int)(HardpointDestroyArchetype(static_cast<void*>(static_cast<IEngineComponent*>(this)),
                                                        (FArchetypeHandle*)Arg1));
 }
 int DACOM_API FHardpointObject::QueryArchetype(void* Arg1, const char* Iid, void** Out)
 {
-    return (int)(RejectHardpointQuery(NestedThis(this, 4), Arg1, Iid, Out));
+    return (int)(RejectHardpointQuery(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1, Iid, Out));
 }
 int DACOM_API FHardpointObject::CreateInstance(void* Arg1, void* Arg2)
 {
-    return (int)(NoOpHardpointInstance(NestedThis(this, 4), Arg1, Arg2));
+    return (int)(NoOpHardpointInstance(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1, Arg2));
 }
 int DACOM_API FHardpointObject::DestroyInstance(void* Arg1)
 {
-    return (int)(StubRet8(NestedThis(this, 4), Arg1));
+    return (int)(StubRet8(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1));
 }
 int DACOM_API FHardpointObject::UpdateInstance(void* Arg1, void* Arg2)
 {
-    return (int)(StubRetC(NestedThis(this, 4), Arg1, Arg2));
+    return (int)(StubRetC(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1, Arg2));
 }
 int DACOM_API FHardpointObject::QueryInstance(void* Arg1, const char* Iid, void** Out)
 {
-    return (int)(RejectHardpointQuery(NestedThis(this, 4), Arg1, Iid, Out));
+    return (int)(RejectHardpointQuery(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1, Iid, Out));
 }
 int DACOM_API FHardpointObject::Notify(void* Arg1)
 {
-    return (int)(StubRet8(NestedThis(this, 4), Arg1));
+    return (int)(StubRet8(static_cast<void*>(static_cast<IEngineComponent*>(this)), Arg1));
 }
 
 GENRESULT DACOM_API FChannelArchetypeObject::QueryInterface(const char* Iid, void** Out)
 {
     return ChannelArchetypeQueryInterface(this, Iid, Out);
 }
-unsigned long DACOM_API FChannelArchetypeObject::AddRef()
+uint32_t DACOM_API FChannelArchetypeObject::AddRef()
 {
     return ChannelArchetypeAddRef(this);
 }
-unsigned long DACOM_API FChannelArchetypeObject::Release()
+uint32_t DACOM_API FChannelArchetypeObject::Release()
 {
     return ChannelArchetypeRelease(this);
 }
@@ -8073,7 +8076,7 @@ GENRESULT DACOM_API FChannelArchetypeObject::GetDuration(float* Out)
 {
     return ChannelArchetypeGetDuration(this, Out);
 }
-GENRESULT DACOM_API FChannelArchetypeObject::GetFlags(unsigned long* Out)
+GENRESULT DACOM_API FChannelArchetypeObject::GetFlags(uint32_t* Out)
 {
     return ChannelArchetypeGetFlags(this, Out);
 }
@@ -8093,12 +8096,12 @@ GENRESULT DACOM_API FChannelArchetypeObject::GetFrame(unsigned char bLast, const
     return ChannelArchetypeGetFrame(this, bLast, Out);
 }
 GENRESULT DACOM_API FChannelArchetypeObject::CollectRange(float Time0, float Time1, float* OutKeys,
-                                                          unsigned long Capacity, unsigned long* Count)
+                                                          uint32_t Capacity, uint32_t* Count)
 {
     return ChannelArchetypeCollectRange(this, Time0, Time1, OutKeys, Capacity, Count);
 }
 GENRESULT DACOM_API FChannelArchetypeObject::CollectAt(float Time, float* OutKeys,
-                                                        unsigned long Capacity, unsigned long* Count)
+                                                        uint32_t Capacity, uint32_t* Count)
 {
     return ChannelArchetypeCollectAt(this, Time, OutKeys, Capacity, Count);
 }
@@ -8138,7 +8141,7 @@ GENRESULT DACOM_API FChannelArchetypeFactory::CreateInstance(AGGDESC* Desc, void
 }
 
 
-static void RegisterFactory(FDacomFactory* Factory, const char* Name, unsigned long Priority)
+static void RegisterFactory(FDacomFactory* Factory, const char* Name, uint32_t Priority)
 {
     if (Factory == nullptr)
         return;
@@ -8148,7 +8151,7 @@ static void RegisterFactory(FDacomFactory* Factory, const char* Name, unsigned l
     if (Dacom != nullptr)
     {
         Dacom->RegisterComponent((IDAComponent*)Factory, Name,
-                                 (void*)Priority);
+                                 (void*)fl::HandleToPtr(Priority));
         Factory->Release();
     }
     else

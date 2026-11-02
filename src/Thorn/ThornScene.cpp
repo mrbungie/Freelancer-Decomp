@@ -25,6 +25,39 @@
 
 // Playback: slots 19/22/23/26 + Start types 1РІР‚вЂњ19. docs/re/thorn.md.
 
+#if !defined(_MSC_VER) || defined(FREELANCER_PORTABLE)
+// Portable replacements for the x87 sequences below. Extended precision is
+// modelled with double; no intermediate contraction (FMA) is allowed.
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+namespace
+{
+    // x87 FISTP with round-toward-zero; NaN/out-of-range gives integer indefinite.
+    inline long long PortableChopToInt64(double Value)
+    {
+        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
+            return static_cast<long long>(0x8000000000000000ULL);
+        return static_cast<long long>(Value);
+    }
+
+    // FLD dword / FSTP dword round trip quiets a signalling NaN.
+    inline float PortableQuietF32(float Value)
+    {
+        unsigned int Bits;
+        std::memcpy(&Bits, &Value, sizeof(Bits));
+        if ((Bits & 0x7f800000u) == 0x7f800000u && (Bits & 0x007fffffu) != 0u)
+            Bits |= 0x00400000u;
+        std::memcpy(&Value, &Bits, sizeof(Value));
+        return Value;
+    }
+
+    // Stand-in for the x87 stack slot the audio tick keeps live across calls.
+    double G_PortableX87Progress = 0.0;
+
+}
+#endif
+
 namespace
 {
     unsigned int G_NextEventId = 0; // DAT_06f61e24: module lifetime, wrapping counter.
@@ -384,6 +417,7 @@ namespace
     // FUN_06f2ecc0: keep Z/Y/X differences on x87 until every input is read.
     void Cross3(float* Result, const float* A, const float* B)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, A
@@ -408,12 +442,21 @@ namespace
             fstp dword ptr [eax+4]
             fstp dword ptr [eax+8]
         }
+#else
+        const double S0 = static_cast<double>(A[0]) * B[1] - static_cast<double>(A[1]) * B[0];
+        const double S1 = static_cast<double>(A[2]) * B[0] - static_cast<double>(B[2]) * A[0];
+        const double S2 = static_cast<double>(A[1]) * B[2] - static_cast<double>(A[2]) * B[1];
+        Result[0] = static_cast<float>(S2);
+        Result[1] = static_cast<float>(S1);
+        Result[2] = static_cast<float>(S0);
+#endif
     }
 
     // FUN_06f2ec80: (X*X + Y*Y) + Z*Z, then extended reciprocal.
     void Normalize3(float* V)
     {
         const float One = 1.0f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, V
@@ -443,11 +486,20 @@ namespace
             fmul dword ptr [eax+8]
             fstp dword ptr [eax+8]
         }
+#else
+        const double SumSq = (static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1]) +
+                             static_cast<double>(V[2]) * V[2];
+        const double Reciprocal = 1.0 / std::sqrt(SumSq);
+        V[0] = static_cast<float>(Reciprocal * V[0]);
+        V[1] = static_cast<float>(Reciprocal * V[1]);
+        V[2] = static_cast<float>(Reciprocal * V[2]);
+#endif
     }
 
     // FUN_06f23090: separate input/output, all FLD/FCHS before stores.
     void NegateVector3(float* Result, const float* Source)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Source
@@ -462,6 +514,14 @@ namespace
             fstp dword ptr [eax+4]
             fstp dword ptr [eax+8]
         }
+#else
+        const float N2 = -PortableQuietF32(Source[2]);
+        const float N1 = -PortableQuietF32(Source[1]);
+        const float N0 = -PortableQuietF32(Source[0]);
+        Result[0] = N0;
+        Result[1] = N1;
+        Result[2] = N2;
+#endif
     }
 
     char* DupHeapString(const char* Src)
@@ -513,6 +573,7 @@ namespace
     void ReadColumn(const float* M9, int Col, float* V)
     {
         const float* Source = M9 + Col;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Source
@@ -524,6 +585,14 @@ namespace
             fstp dword ptr [eax+4]
             fstp dword ptr [eax+8]
         }
+#else
+        const float C6 = PortableQuietF32(Source[6]);
+        const float C3 = PortableQuietF32(Source[3]);
+        const float C0 = PortableQuietF32(Source[0]);
+        V[0] = C0;
+        V[1] = C3;
+        V[2] = C6;
+#endif
     }
 
     // FUN_06f3b670: load all eight FP words before output; word3 is raw.
@@ -531,6 +600,7 @@ namespace
     void Transpose9(float* Out9, const float* In9)
     {
         unsigned int RawWord;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, In9
@@ -556,6 +626,23 @@ namespace
             fstp dword ptr [eax+1ch]
             fstp dword ptr [eax+20h]
         }
+#else
+        unsigned int Raw3;
+        std::memcpy(&Raw3, In9 + 3, sizeof(Raw3));
+        float W[9];
+        for (int Index = 0; Index < 9; ++Index)
+            W[Index] = PortableQuietF32(In9[Index]);
+        RawWord = Raw3;
+        Out9[0] = W[0];
+        std::memcpy(Out9 + 1, &RawWord, sizeof(RawWord));
+        Out9[2] = W[6];
+        Out9[3] = W[1];
+        Out9[4] = W[4];
+        Out9[5] = W[7];
+        Out9[6] = W[2];
+        Out9[7] = W[5];
+        Out9[8] = W[8];
+#endif
     }
 
     // FUN_06f3b9a0: math +0x38 transpose_transform(out, csys.orient, csys.pos).
@@ -792,6 +879,7 @@ namespace
     void NormalizeAxis3(float* V)
     {
         const float One = 1.0f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, V
@@ -823,6 +911,14 @@ namespace
             fstp dword ptr [eax+8]
             fstp st(0)
         }
+#else
+        const double SumSq = (static_cast<double>(V[0]) * V[0] + static_cast<double>(V[1]) * V[1]) +
+                             static_cast<double>(V[2]) * V[2];
+        const double Reciprocal = 1.0 / std::sqrt(SumSq);
+        V[0] = static_cast<float>(Reciprocal * V[0]);
+        V[1] = static_cast<float>(Reciprocal * V[1]);
+        V[2] = static_cast<float>(Reciprocal * V[2]);
+#endif
     }
 
     // Inlined 2e53d/2e7c7/2e737: Up cross Front, Z/Y/X float stores.
@@ -831,6 +927,7 @@ namespace
     {
         const float* LastLeft = bInitial ? Front + 1 : Up + 2;
         const float* LastRight = bInitial ? Up + 2 : Front + 1;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Up
@@ -857,11 +954,18 @@ namespace
             fsubp st(1), st(0)
             fstp dword ptr [eax]
         }
+#else
+        Result[2] = static_cast<float>(static_cast<double>(Front[1]) * Up[0] - static_cast<double>(Up[1]) * Front[0]);
+        Result[1] = static_cast<float>(static_cast<double>(Up[2]) * Front[0] - static_cast<double>(Front[2]) * Up[0]);
+        Result[0] = static_cast<float>(static_cast<double>(Front[2]) * Up[1] -
+                                       static_cast<double>(*LastLeft) * *LastRight);
+#endif
     }
 
     // Inlined 2e687/2e85f: Dir cross Side, Z/Y/X float stores.
     void CrossAxisUp3(float* Result, const float* Dir, const float* Side)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Dir
@@ -886,6 +990,11 @@ namespace
             fsubp st(1), st(0)
             fstp dword ptr [eax]
         }
+#else
+        Result[2] = static_cast<float>(static_cast<double>(Side[1]) * Dir[0] - static_cast<double>(Dir[1]) * Side[0]);
+        Result[1] = static_cast<float>(static_cast<double>(Dir[2]) * Side[0] - static_cast<double>(Side[2]) * Dir[0]);
+        Result[0] = static_cast<float>(static_cast<double>(Side[2]) * Dir[1] - static_cast<double>(Side[1]) * Dir[2]);
+#endif
     }
 
     bool AxisDotNotGreater(const float* Up, const float* Dir)
@@ -893,6 +1002,7 @@ namespace
         // Raw DAT_06f5a248 = 3fefae147ae147ae (double 0.99).
         const double Threshold = 0.99;
         unsigned char bNotGreater;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Up
@@ -911,6 +1021,12 @@ namespace
             test ah, 41h
             setnz bNotGreater
         }
+#else
+        const double Dot = (static_cast<double>(Up[2]) * Dir[2] + static_cast<double>(Up[1]) * Dir[1]) +
+                           static_cast<double>(Up[0]) * Dir[0];
+        // FCOMP ST(0)=|dot| vs threshold; TEST AH,41h is nonzero for less/equal/unordered.
+        bNotGreater = !(std::fabs(Dot) > Threshold) ? 1 : 0;
+#endif
         // TEST AH41/JNZ selects not-greater, including unordered; greater
         // falls through to the near-parallel fallback in the retail listing.
         return bNotGreater != 0;
@@ -1066,6 +1182,7 @@ namespace
     // capture/result. Ordinary C++ changed FADDP/store and final-pop stages.
     void AudioLerpFloat(const float* From, const float* To, float* Output)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, From
@@ -1079,6 +1196,11 @@ namespace
             fstp dword ptr [eax]
             fstp st(0)
         }
+#else
+        const double Progress = G_PortableX87Progress;
+        const double Delta = static_cast<double>(*To) - static_cast<double>(*From);
+        *Output = static_cast<float>(Delta * Progress + static_cast<double>(*From));
+#endif
     }
 
     // 47500/47534: wrapped32 SUB zero-extends into FILD qword;
@@ -1090,12 +1212,16 @@ namespace
         const unsigned int DifferenceBits = static_cast<unsigned int>(To) -
                                             static_cast<unsigned int>(From);
         const unsigned long long Difference = DifferenceBits;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fild qword ptr Difference
             fmul st(0), st(1)
             fiadd dword ptr From
         }
+#else
+        return static_cast<double>(Difference) * G_PortableX87Progress + static_cast<double>(From);
+#endif
     }
 #pragma warning(pop)
 
@@ -1109,6 +1235,7 @@ namespace
         const unsigned int DifferenceBits = static_cast<unsigned int>(To) -
                                             static_cast<unsigned int>(From);
         const int Difference = static_cast<int>(DifferenceBits);
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fild dword ptr Difference
@@ -1116,6 +1243,9 @@ namespace
             fmul dword ptr [eax]
             fiadd dword ptr From
         }
+#else
+        return static_cast<double>(Difference) * static_cast<double>(*U) + static_cast<double>(From);
+#endif
     }
 #pragma warning(pop)
 
@@ -1125,6 +1255,7 @@ namespace
     // ordering. Keep this existing arithmetic-only kernel; it has no calls.
     void FogLerpFloat(const float* From, const float* To, const float* U, float* ResultValue)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, From
@@ -1139,6 +1270,11 @@ namespace
             fstp dword ptr [eax]
             fstp st(0)
         }
+#else
+        const double FromValue = *From;
+        const double Difference = static_cast<double>(*To) - FromValue;
+        *ResultValue = static_cast<float>(Difference * static_cast<double>(*U) + FromValue);
+#endif
     }
 
     // FOG 48f17..48f98 wraps SUB as an int32, FILDs that value, then
@@ -1149,6 +1285,7 @@ namespace
         long long Result;
         unsigned short OldControl;
         unsigned short ChopControl;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, To
@@ -1166,6 +1303,12 @@ namespace
             fistp qword ptr Result
             fldcw OldControl
         }
+#else
+        Difference = static_cast<int>(static_cast<unsigned int>(To) - static_cast<unsigned int>(From));
+        Result = PortableChopToInt64(static_cast<double>(Difference) * static_cast<double>(*U) +
+                                     static_cast<double>(From));
+        static_cast<void>(OldControl); static_cast<void>(ChopControl);
+#endif
         return static_cast<int>(static_cast<unsigned int>(Result));
     }
 
@@ -1226,6 +1369,7 @@ namespace
         const unsigned int Constant_6f5a250 = 0x3e800000u;
         const unsigned int Constant_6f5a1b8 = 0x3f800000u;
         float Scratch[4];
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov edx, Source
@@ -1329,6 +1473,74 @@ namespace
             jmp CompactDone
         CompactDone:
         }
+#else
+        auto LoadF = [Source](unsigned int Offset) { float Value; std::memcpy(&Value, Source + Offset, sizeof(Value)); return Value; };
+        auto LoadI = [Source](unsigned int Offset) { int Value; std::memcpy(&Value, Source + Offset, sizeof(Value)); return Value; };
+        auto StoreW = [Target](unsigned int Offset, unsigned int Word) { std::memcpy(Target + Offset, &Word, sizeof(Word)); };
+        auto StoreF = [Target](unsigned int Offset, float Value) { std::memcpy(Target + Offset, &Value, sizeof(Value)); };
+        auto BitsF = [](unsigned int Bits) { float Value; std::memcpy(&Value, &Bits, sizeof(Value)); return Value; };
+        auto BitsD = [](unsigned long long Bits) { double Value; std::memcpy(&Value, &Bits, sizeof(Value)); return Value; };
+        static_cast<void>(Scratch);
+        if (LoadI(0x24) != 0)
+        {
+            StoreW(0x00, 3);
+        }
+        else if (LoadF(0x1c) < BitsF(Constant_6f5a1d4))
+        {
+            StoreW(0x00, 1);
+            StoreW(0x60, 0x40490fdbu);
+            StoreW(0x64, 0x40490fdbu);
+        }
+        else
+        {
+            StoreW(0x00, 2);
+            double Value = static_cast<double>(LoadF(0x1c)) * BitsF(Constant_6f5a230);
+            const double Limit = BitsD(Constant_6f5a270);
+            // FCOM/TEST AH,5/JNP keeps the value only when strictly less.
+            if (!(Value < Limit))
+                Value = Limit;
+            StoreF(0x60, static_cast<float>(Value));
+            Value *= BitsF(Constant_6f5a26c);
+            const double PiLimit = BitsF(Constant_6f5a268);
+            if (!(Value < PiLimit))
+                Value = PiLimit;
+            StoreF(0x64, static_cast<float>(Value));
+        }
+        // Compact_6f2eba2
+        {
+            const float Scale = BitsF(Constant_6f5a1e8);
+            const float S0 = static_cast<float>(static_cast<double>(LoadI(0x00)) * Scale);
+            const float S1 = static_cast<float>(static_cast<double>(LoadI(0x04)) * Scale);
+            const double I2 = LoadI(0x08);
+            StoreF(0x04, S0);
+            StoreF(0x08, S1);
+            const float S2 = static_cast<float>(I2 * Scale);
+            StoreF(0x0c, S2);
+            StoreW(0x10, 0x3f800000u);
+            for (unsigned int Offset = 0x14; Offset < 0x24; Offset += 4)
+                StoreW(Offset, 0u);
+            for (unsigned int Offset = 0x24; Offset < 0x34; Offset += 4)
+                StoreW(Offset, 0u);
+            StoreW(0x50, 0x3f800000u);
+            if (LoadF(0x18) < BitsD(Constant_6f5a260))
+            {
+                StoreW(0x58, 0x38d1b717u);
+                StoreW(0x54, 0u);
+                StoreW(0x5c, 0u);
+                StoreF(0x4c, static_cast<float>(std::sqrt(BitsD(Constant_6f5a258))));
+            }
+            else
+            {
+                StoreW(0x54, 0x3f800000u);
+                StoreW(0x58, 0u);
+                const double A = LoadF(0x18);
+                const double Quarter = (A * A) * BitsF(Constant_6f5a250);
+                StoreF(0x5c, static_cast<float>(static_cast<double>(BitsF(Constant_6f5a1b8)) / Quarter));
+                const double B = LoadF(0x18);
+                StoreF(0x4c, static_cast<float>(B + B));
+            }
+        }
+#endif
     }
 
     void ConvertCompactLight(FThornLightProps* Blob)
@@ -1425,6 +1637,7 @@ namespace
     {
         static const float One = 1.0f;
         unsigned short Status;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, U
@@ -1432,6 +1645,9 @@ namespace
             fcomp dword ptr One
             fnstsw Status
         }
+#else
+        Status = (*U >= One) ? 0x0000u : 0x0100u;
+#endif
         // TEST AH,01 + JNZ skips for less/unordered; equal/greater continue.
         return (Status & 0x0100u) == 0;
     }
@@ -1445,6 +1661,7 @@ namespace
         float DifferenceZ;
         float DeltaX;
         float Result[3];
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, To
@@ -1485,6 +1702,24 @@ namespace
             mov eax, dword ptr Result[8]
             mov dword ptr [ecx + 8], eax
         }
+#else
+        unsigned int FromWords[3];
+        std::memcpy(FromWords, From, sizeof(FromWords));
+        std::memcpy(Capture, FromWords, sizeof(Capture));
+        const double D0 = static_cast<double>(To[0]) - Capture[0];
+        const double D1 = static_cast<double>(To[1]) - Capture[1];
+        const double D2 = static_cast<double>(To[2]) - Capture[2];
+        DifferenceZ = static_cast<float>(D2);
+        DeltaX = static_cast<float>(D0 * U[0]);
+        const double P1 = D1 * U[0];
+        const double DZU = static_cast<double>(DifferenceZ) * U[0];
+        Result[0] = static_cast<float>(static_cast<double>(DeltaX) + Capture[0]);
+        Result[1] = static_cast<float>(P1 + Capture[1]);
+        Out[0] = Result[0];
+        Result[2] = static_cast<float>(DZU + Capture[2]);
+        Out[1] = Result[1];
+        Out[2] = Result[2];
+#endif
     }
 
     // LAB_06f45890 FPU mask loop. Out starts as live primary; To is target (or secondary live).
@@ -1621,6 +1856,7 @@ namespace
     // final float store; the inputs are current event-owned positions.
     void LerpSpatialPosition(float* ResultPosition, const float* From, const float* To, const float* Scale)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, ResultPosition
@@ -1643,12 +1879,21 @@ namespace
             fadd dword ptr [ecx+8]
             fstp dword ptr [eax+8]
         }
+#else
+        for (int Index = 0; Index < 3; ++Index)
+        {
+            const double FromValue = From[Index];
+            ResultPosition[Index] = static_cast<float>((static_cast<double>(To[Index]) - FromValue) *
+                                                        static_cast<double>(*Scale) + FromValue);
+        }
+#endif
     }
 
     // 46e6d..46ed8 stores the delta as float, but adds old Applied to the
     // still-extended delta before storing the new accumulator.
     void AccumulateAxisDelta(const float* AnimT, const float* Angle, float* Applied, float* Delta)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, Applied
@@ -1662,6 +1907,11 @@ namespace
             fadd dword ptr [eax]
             fstp dword ptr [eax]
         }
+#else
+        const double Product = static_cast<double>(*AnimT) * static_cast<double>(*Angle) - static_cast<double>(*Applied);
+        *Delta = static_cast<float>(Product);
+        *Applied = static_cast<float>(Product + static_cast<double>(*Applied));
+#endif
     }
 
     // 46eef..46fd7: FCOS is stored to float, FSIN remains on x87 through
@@ -1678,6 +1928,7 @@ namespace
         if (Kind <= 5u)
         {
             float CosValue;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov eax, DeltaDeg
@@ -1762,6 +2013,38 @@ namespace
             AxisColumnsDone:
                 fstp st(0)
             }
+#else
+            float PiOver180;
+            std::memcpy(&PiOver180, &PiOver180Bits, sizeof(PiOver180));
+            const double Radians = static_cast<double>(*DeltaDeg) * static_cast<double>(PiOver180);
+            CosValue = static_cast<float>(std::cos(Radians));
+            const double SinValue = std::sin(Radians);
+            const double CosD = CosValue;
+            if (Kind == 0u || Kind == 3u || Kind == 2u || Kind == 5u)
+            {
+                // X uses columns (3,6); Z uses columns (0,3).
+                float* Base = (Kind == 0u || Kind == 3u) ? Rot + 6 : Rot + 3;
+                for (int Column = 0; Column < 3; ++Column)
+                {
+                    float* P = Base + Column;
+                    const double A = P[-3];
+                    const double B = P[0];
+                    P[-3] = static_cast<float>(CosD * A - SinValue * B);
+                    P[0] = static_cast<float>(A * SinValue + CosD * B);
+                }
+            }
+            else
+            {
+                for (int Column = 0; Column < 3; ++Column)
+                {
+                    float* P = Rot + 6 + Column;
+                    const double A = P[-6];
+                    const double B = P[0];
+                    P[-6] = static_cast<float>(SinValue * B + CosD * A);
+                    P[0] = static_cast<float>(CosD * B - A * SinValue);
+                }
+            }
+#endif
         }
 
         I3DMathEngine* Math = AcquireSceneEventMathEngine();
@@ -2156,6 +2439,7 @@ namespace
     {
         unsigned char bUseDirection;
         const float Zero = 0.0f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Target
@@ -2186,6 +2470,17 @@ namespace
             fstp st(0)
             setp bUseDirection
         }
+#else
+        const double DZ = static_cast<double>(Target[2]) - Origin[2];
+        const double DY = static_cast<double>(Target[1]) - Origin[1];
+        const double DX = static_cast<double>(Target[0]) - Origin[0];
+        DirectionOut[0] = static_cast<float>(DX);
+        DirectionOut[1] = static_cast<float>(DY);
+        DirectionOut[2] = static_cast<float>(DZ);
+        const double Sum = (static_cast<double>(DirectionOut[0]) * DirectionOut[0] + DY * DY) + DZ * DZ;
+        // TEST AH,44h + SETP: true for greater/less/unordered, false only for ordered equal.
+        bUseDirection = (Sum == static_cast<double>(Zero)) ? 0 : 1;
+#endif
         return bUseDirection != 0;
     }
 
@@ -2359,6 +2654,7 @@ namespace
     {
         float Argument;
         float* Runtime = &Entity->PsysRuntimeSparam;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov eax, Value
             fld dword ptr [eax]
@@ -2366,6 +2662,10 @@ namespace
             mov edx, Runtime
             fstp dword ptr [edx]
         }
+#else
+        Argument = PortableQuietF32(*Value);
+        *Runtime = Argument;
+#endif
         // The pointer is read only after the runtime float has been published.
         IPSysControl* Control = Entity->PsysControl;
         if (Control != nullptr)
@@ -2385,6 +2685,7 @@ namespace
         float T;
         float Delta;
         float Scale;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Last
@@ -2434,6 +2735,34 @@ namespace
             mov Scale, 0
         SpatialScaleDone:
         }
+#else
+        const double TExt = Progress->Get();
+        T = static_cast<float>(TExt);
+        const double DeltaExt = TExt - static_cast<double>(*Last);
+        Delta = static_cast<float>(DeltaExt);
+        if (DeltaExt == static_cast<double>(Zero))
+        {
+            Scale = 0.0f;
+        }
+        else if (!(static_cast<double>(T) < OneDouble))
+        {
+            Scale = One;
+        }
+        else
+        {
+            const double Remain = static_cast<double>(One) - static_cast<double>(*Last);
+            if (Remain == static_cast<double>(Zero))
+            {
+                Scale = One;
+                *Last = T;
+            }
+            else
+            {
+                Scale = static_cast<float>(static_cast<double>(Delta) / Remain);
+                *Last = T;
+            }
+        }
+#endif
         // Retail retains exactly the initial FST dword for the later axis pass.
         std::memcpy(RoundedProgress, &T, sizeof(T));
         std::memcpy(ResultScale, &Scale, sizeof(Scale));
@@ -2449,6 +2778,7 @@ namespace
         const double OneDouble = 1.0;
         float Delta;
         float Scale;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Last
@@ -2494,6 +2824,28 @@ namespace
             fstp st(0)
         FloorScaleDone:
         }
+#else
+        const double TExt = Progress->Get();
+        const double DeltaExt = TExt - static_cast<double>(*Last);
+        Delta = static_cast<float>(DeltaExt);
+        if (DeltaExt == static_cast<double>(Zero))
+        {
+            Scale = 0.0f;
+        }
+        else if (!(TExt < OneDouble))
+        {
+            Scale = One;
+        }
+        else
+        {
+            const double Remain = static_cast<double>(One) - static_cast<double>(*Last);
+            if (Remain == static_cast<double>(Zero))
+                Scale = One;
+            else
+                Scale = static_cast<float>(static_cast<double>(Delta) / Remain);
+            *Last = static_cast<float>(TExt);
+        }
+#endif
         // Transport the stored DWORD without an early x87 denormal load.
         std::memcpy(ScaleOutput, &Scale, sizeof(Scale));
     }
@@ -2502,6 +2854,7 @@ namespace
     {
         // 49b31..49b4a: Capture remains below the unrounded difference/product.
         float Height;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Capture
@@ -2515,6 +2868,11 @@ namespace
             fstp Height
             fstp st(0)
         }
+#else
+        const double CaptureValue = *Capture;
+        Height = static_cast<float>((static_cast<double>(*Target) - CaptureValue) *
+                                    static_cast<double>(*ScaleSource) + CaptureValue);
+#endif
         std::memcpy(HeightOutput, &Height, sizeof(Height));
     }
 
@@ -2537,6 +2895,7 @@ namespace
     // Write the final float directly; returning it would add a reload/store.
     void StoreAnimTValue(const FThornExtendedProgress* Progress, float* Output)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Progress
@@ -2544,6 +2903,9 @@ namespace
             mov ecx, Output
             fstp dword ptr [ecx]
         }
+#else
+        *Output = static_cast<float>(Progress->Get());
+#endif
     }
 
     float StoreAnimT(const FThornExtendedProgress* Progress)
@@ -2590,6 +2952,7 @@ namespace
     {
         // 46318..46374: preserve one extended curve result under each pair
         // of loads. Only the final interpolated field receives a float store.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Progress
@@ -2640,6 +3003,19 @@ namespace
         CameraInterpolationDone:
             fstp st(0)
         }
+#else
+        const double ProgressValue = Progress->Get();
+        static const int Fields[4][2] = {{1, 0}, {8, 3}, {2, 1}, {4, 2}};
+        for (int Step = 0; Step < 4; ++Step)
+        {
+            if ((Mask & Fields[Step][0]) == 0)
+                continue;
+            const int Field = Fields[Step][1];
+            const double CaptureValue = CapturedValues[Field];
+            ResultValues[Field] = static_cast<float>((static_cast<double>(TargetValues[Field]) - CaptureValue) *
+                                                      ProgressValue + CaptureValue);
+        }
+#endif
     }
 
     void CaptureCameraProps(FThornEntity* Entity, float* Out4)
@@ -3055,7 +3431,7 @@ void FThornEvent::ApplyFloorHeightDesc(const void* DescIn)
     if (ReadEventWord(DescIn, 0) == kThornTypeFloorHeightAnim)
     {
         std::memcpy(&FloorTarget, static_cast<const unsigned char*>(DescIn) + 44, sizeof(FloorTarget));
-        SetFloorTargetPart(reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12))));
+        SetFloorTargetPart(fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 12))));
         TargetType = ReadEventWord(DescIn, 13);
     }
     // 49677..49696 mirrors common timing/endpoints after the payload work.
@@ -3577,12 +3953,12 @@ void FThornEvent::ApplyConnectDesc(const void* DescIn)
     if (bMatchingType)
     {
         const char* HardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 11)));
+            fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 11)));
         if (HardpointName != nullptr)
             SetConnectHardpoint(HardpointName);
         // 48237 reads the second argument after the first string operation.
         const char* ParentHardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12)));
+            fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 12)));
         if (ParentHardpointName != nullptr)
             SetConnectParentHardpoint(ParentHardpointName);
     }
@@ -3601,7 +3977,7 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
         TargetType = ReadEventWord(DescIn, 14);
         LookAtUpAxis = ReadEventWord(DescIn, 15);
         LookAtFrontAxis = ReadEventWord(DescIn, 16);
-        const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 17)));
+        const char* TargetPartName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 17)));
         if (TargetPartName != nullptr)
         {
             AttachTargetPartStorage.Assign(TargetPartName);
@@ -3698,13 +4074,13 @@ void FThornEvent::ApplyMotionDesc(const void* DescIn)
         std::memcpy(&TransTime, static_cast<const unsigned char*>(DescIn) + 48, sizeof(TransTime));
         std::memcpy(&TransScale, static_cast<const unsigned char*>(DescIn) + 76, sizeof(TransScale));
         std::memcpy(&Weight, static_cast<const unsigned char*>(DescIn) + 56, sizeof(Weight));
-        const char* AnimationName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 15)));
+        const char* AnimationName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 15)));
         if (AnimationName != nullptr)
         {
             MotionAnimationStorage.Assign(AnimationName);
             Animation = MotionAnimationStorage.GetPublishedData();
         }
-        const char* BoneName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 18)));
+        const char* BoneName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 18)));
         if (BoneName != nullptr)
         {
             MotionLockedBoneStorage.Assign(BoneName);
@@ -3778,7 +4154,7 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
         SpatialMatrixToQuaternion(G_SceneEventMathEngine, TargetQuat,
             static_cast<const unsigned char*>(DescIn) + 48);
     }
-    const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 30)));
+    const char* TargetPartName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 30)));
     // 46636 already cleared exposure before the math callback. Null input
     // skips assignment entirely; do not clear a callback's later publication.
     if (TargetPartName != nullptr)
@@ -4103,7 +4479,9 @@ void FThornEvent::ReleaseMotionOwnedState()
 
 #pragma warning(push)
 #pragma warning(disable: 4716) // Preserve the retail extended ST(0) return.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 #pragma float_control(precise, off, push) // Keep the complete curve FMUL/FADD result in ST(0).
+#endif
 float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
 {
     // Full454f0..4556f: TEST AH,44h / JNP takes only ordered equality.
@@ -4111,6 +4489,7 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
     const float Zero = 0.0f;
     const float One = 1.0f;
     bool bScaleZero;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm
     {
         fld Scale
@@ -4120,9 +4499,16 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
         setnp al
         mov bScaleZero, al
     }
+#else
+    bScaleZero = (Scale == Zero);
+#endif
     if (bScaleZero)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm { fld One }
+#else
+        return One;
+#endif
     }
     else
     {
@@ -4134,16 +4520,25 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
         float Ratio;
         // 4551b..45527 always computes/stores the ratio, even before Slot12.
         // FST does not pop: the unbound arithmetic consumes extended ST(0).
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fild qword ptr ExtendedElapsed
             fidiv Duration
             fst Ratio
         }
+#else
+        const double RatioExtended = static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration);
+        Ratio = static_cast<float>(RatioExtended);
+#endif
         if (Curve != nullptr)
         {
             const int Period = PcurvePeriod;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm { fstp st(0) }
+#else
+            static_cast<void>(0);
+#endif
             // Ordinary typed expression: retain the curve return through both
             // operations, and read StartPercent only after the callback.
             if (Period > 0)
@@ -4153,15 +4548,21 @@ float FThornEvent::EvaluateControlBackedCurve(float Scale, int TimeMs)
         // Scale is the incoming argument; StartPercent is read AFTER curve
         // callbacks. The unbound quotient stays extended through both operations.
         const float* StartPercentValue = &StartPercent;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fmul Scale
             mov edx, StartPercentValue
             fadd dword ptr [edx]
         }
+#else
+        return static_cast<float>(RatioExtended * static_cast<double>(Scale) + static_cast<double>(*StartPercentValue));
+#endif
     }
 }
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 #pragma float_control(pop)
+#endif
 #pragma warning(pop)
 
 namespace
@@ -4419,7 +4820,11 @@ float FThornEvent::EvaluateProgress(int TimeMs) const
     const float One = 1.0f;
     if (Duration == 0)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm { fld One }
+#else
+        return One;
+#endif
     }
     else
     {
@@ -4437,21 +4842,29 @@ float FThornEvent::EvaluateProgress(int TimeMs) const
             else
             {
                 float Ratio;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 __asm {
                     fild qword ptr ExtendedElapsed
                     fidiv Duration
                     fstp Ratio
                 }
+#else
+                Ratio = static_cast<float>(static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration));
+#endif
                 return Curve->Evaluate(Ratio);
             }
         }
         else
         {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 fild qword ptr ExtendedElapsed
                 fidiv Duration
             }
+#else
+            return static_cast<float>(static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration));
+#endif
         }
     }
 }
@@ -4467,7 +4880,11 @@ float FThornEvent::EvaluateProgressNoPeriodWrap(int TimeMs) const
     const float One = 1.0f;
     if (Duration == 0)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm { fld One }
+#else
+        return One;
+#endif
     }
     else
     {
@@ -4476,19 +4893,27 @@ float FThornEvent::EvaluateProgressNoPeriodWrap(int TimeMs) const
         const long long ExtendedElapsed = ElapsedBits;
         IParamCurve* Curve = ParamCurve;
         float Ratio;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fild qword ptr ExtendedElapsed
             fidiv Duration
             fstp Ratio
         }
+#else
+        Ratio = static_cast<float>(static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration));
+#endif
         if (Curve != nullptr)
         {
             return Curve->Evaluate(Ratio);
         }
         else
         {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm { fld Ratio }
+#else
+            return Ratio;
+#endif
         }
     }
 }
@@ -4501,12 +4926,16 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
     if (Duration == 0)
     {
         const float One = 1.0f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld One
             mov edx, Result
             fstp tbyte ptr [edx]
         }
+#else
+        Result->Set(static_cast<double>(One));
+#endif
         return;
     }
     IParamCurve* Curve = ParamCurve;
@@ -4525,6 +4954,7 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
     }
     if (!bNoPeriodWrap && Curve == nullptr)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fild qword ptr ExtendedElapsed
@@ -4532,17 +4962,24 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
             mov edx, Result
             fstp tbyte ptr [edx]
         }
+#else
+        Result->Set(static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration));
+#endif
         return;
     }
     // Both ordinary Evaluate branches require one float argument store.
     // NoPeriodWrap also requires that store in the unbound path (493e0).
     float Ratio;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm
     {
         fild qword ptr ExtendedElapsed
         fidiv Duration
         fstp Ratio
     }
+#else
+    Ratio = static_cast<float>(static_cast<double>(ExtendedElapsed) / static_cast<double>(Duration));
+#endif
     if (Curve != nullptr)
     {
         // No return-value capture: the typed worker publishes its original80.
@@ -4550,12 +4987,16 @@ void FThornEvent::EvaluateProgressExtended(int TimeMs, FThornExtendedProgress* R
     }
     else
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld Ratio
             mov edx, Result
             fstp tbyte ptr [edx]
         }
+#else
+        Result->Set(static_cast<double>(Ratio));
+#endif
     }
 }
 
@@ -4744,6 +5185,7 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
     const float* PositionSource = TransformedPosition;
     float* PositionResult = NegativePosition;
     // 47b63..47b84: each Z/Y/X word is rounded immediately after FCHS.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
     __asm {
         mov ecx, PositionSource
         mov eax, PositionResult
@@ -4757,6 +5199,11 @@ unsigned char FThornEvent::StartAttachEntity(FThornScene* Scene)
         fchs
         fstp dword ptr [eax]
     }
+#else
+    PositionResult[2] = -PortableQuietF32(PositionSource[2]);
+    PositionResult[1] = -PortableQuietF32(PositionSource[1]);
+    PositionResult[0] = -PortableQuietF32(PositionSource[0]);
+#endif
     // 47b8c..47bc0/428b0 pass raw DWORDs in transpose order. In contrast to
     // FUN_3b670, this path has no x87 load/store of the nine matrix words.
     float InverseChild[12];
@@ -4965,11 +5412,15 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
             EvaluateProgressExtended(TimeMs, &Progress, false);
             // Retain the existing typed80 result through baseline and every selected term.
             const FThornExtendedProgress* ProgressValue = &Progress;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 mov eax, ProgressValue
                 fld tbyte ptr [eax]
             }
+#else
+            G_PortableX87Progress = ProgressValue->Get();
+#endif
             // 47438..47448 selects the current payload AFTER the curve callback.
             FThornEntity* Primary = *PrimaryEntry;
             const int Mask = AudioMask;
@@ -4999,7 +5450,11 @@ unsigned char FThornEvent::TickAudioPropAnim(int TimeMs, FThornScene* Scene)
             if ((Mask & 0x80) != 0)
                 AudioLerpFloat(&AudioCapture.Rmix, &To.Rmix, &Out.Rmix);
             // 47592 waits and discards progress before the output callback.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm { fstp st(0) }
+#else
+            static_cast<void>(0);
+#endif
             float OutWords[8];
             std::memcpy(OutWords, &Out, sizeof(Out));
             ApplyAudioProps(Primary, OutWords);
@@ -5442,6 +5897,7 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
                 if ((PsysMask & 1) != 0)
                 {
                     const float* Capture = &SparamCapture;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                     __asm {
                         mov edx, Capture
                         fld dword ptr [edx]
@@ -5452,6 +5908,13 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
                         fstp dword ptr Result
                         fstp st(0)
                     }
+#else
+                    {
+                        const double CaptureValue = *Capture;
+                        Result = static_cast<float>((static_cast<double>(Target) - CaptureValue) *
+                                                    static_cast<double>(Scale) + CaptureValue);
+                    }
+#endif
                 }
                 ApplyPsysSparam(Primary, &Result);
             }
@@ -6840,14 +7303,14 @@ FThornEvent* FThornScene::AddEvent(int DescriptorStorageType)
     return Event;
 }
 
-unsigned long FThornScene::EntityCount() const
+uint32_t FThornScene::EntityCount() const
 {
-    return static_cast<unsigned long>(EntityCount_);
+    return static_cast<uint32_t>(EntityCount_);
 }
 
-unsigned long FThornScene::LiveEntityCount() const
+uint32_t FThornScene::LiveEntityCount() const
 {
-    return static_cast<unsigned long>(Entities_.size());
+    return static_cast<uint32_t>(Entities_.size());
 }
 
 bool FThornScene::EntityExists(int Index) const
@@ -7042,12 +7505,12 @@ FThornEntitySnap* FThornScene::EntitySnapInorder(int Index)
     return nullptr;
 }
 
-unsigned long FThornScene::UserPropCount(int Index) const
+uint32_t FThornScene::UserPropCount(int Index) const
 {
     // LAB_06f38ca0: lookup by key; *(inner+0x80). Miss РІвЂ вЂ™ 0.
     if (!EntityExists(Index))
         return 0;
-    return static_cast<unsigned long>(EntityAt(Index)->UserProps->size());
+    return static_cast<uint32_t>(EntityAt(Index)->UserProps->size());
 }
 
 const char* FThornScene::UserPropKey(int Index, int N) const
@@ -8060,10 +8523,10 @@ namespace
         // discards the entire pending buffer, and is never retried.
         if (Buf->Len == 0)
             return 0;
-        unsigned long Written = 0;
-        Buf->FileSystemOwner.FileSystem->Write(0, Buf->Data, static_cast<unsigned long>(Buf->Len),
+        uint32_t Written = 0;
+        Buf->FileSystemOwner.FileSystem->Write(0, Buf->Data, static_cast<uint32_t>(Buf->Len),
                                &Written, nullptr);
-        const int Result = Written == static_cast<unsigned long>(Buf->Len) ? 0 : -1;
+        const int Result = Written == static_cast<uint32_t>(Buf->Len) ? 0 : -1;
         Buf->Len = 0;
         return Result;
     }
@@ -8238,6 +8701,7 @@ namespace
     {
         const float Zero = 0.0f;
         unsigned char Emit;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov edx, Value
             fld dword ptr [edx]
@@ -8247,6 +8711,9 @@ namespace
             setp al
             mov Emit, al
         }
+#else
+        Emit = (*Value == Zero) ? 0 : 1;
+#endif
         // TEST AH,44h / JNP skips equality; unordered and nonzero emit.
         return Emit != 0;
     }
@@ -8848,7 +9315,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             IPersistString* Persist = Entity->MotionPath.MotionPath;
             if (Persist != nullptr)
             {
-                const unsigned long Size = Persist->Slot5EstimateSize();
+                const uint32_t Size = Persist->Slot5EstimateSize();
                 if (Size != 0)
                 {
                     char* Data = new char[Size + 1u];
@@ -8868,11 +9335,11 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
 
-        const unsigned long PropCount = UserPropCount(Index);
+        const uint32_t PropCount = UserPropCount(Index);
         if (PropCount > 0)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tuserprops =\r\n\t\t{\r\n");
-            for (unsigned long Prop = 0; Prop < PropCount; ++Prop)
+            for (uint32_t Prop = 0; Prop < PropCount; ++Prop)
             {
                 char* Value = nullptr;
                 const char* Key = UserPropKey(Index, static_cast<int>(Prop));

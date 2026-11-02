@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "menu_sound_arch.h"
+#include "fl/handles.h"
 
 #include "perf_options.h"
 
@@ -142,18 +143,18 @@ namespace
         // RET 4, while SoundManager calls six of those slots with an out-pointer -- four bytes
         // of stack leaked per call. Real virtuals make that shape impossible to get wrong.
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
-        unsigned long DACOM_API Slot3() override;
-        unsigned long DACOM_API GetStartTick() override;
+        uint32_t DACOM_API Slot3() override;
+        uint32_t DACOM_API GetStartTick() override;
         unsigned char DACOM_API IsActive() override;
         unsigned char DACOM_API Is3d() override;
         unsigned char DACOM_API IsLooping() override;
         int DACOM_API GetArchId() override;
         GENRESULT DACOM_API GetAttenuation(float* Out) override;
         GENRESULT DACOM_API GetPitch(float* Out) override;
-        GENRESULT DACOM_API GetPan(long* Out) override;
+        GENRESULT DACOM_API GetPan(int32_t* Out) override;
         // Slots 12 and 15..18 are the 3D block. In retail the base class does NOT implement
         // them: Sound::Source and Sound::StreamedSource carry the shared "unsupported" stubs
         // (LAB_0044fce0 for slot 15, LAB_00454190 for the rest), and only Sound::Source3D has
@@ -161,14 +162,14 @@ namespace
         GENRESULT DACOM_API GetPosition(FVec3* Out) override;
         GENRESULT DACOM_API GetMinDistance(float* Out) override;
         GENRESULT DACOM_API GetMaxDistance(float* Out) override;
-        GENRESULT DACOM_API GetConeAngles(unsigned long* Inside,
-                                          unsigned long* Outside) override;
+        GENRESULT DACOM_API GetConeAngles(uint32_t* Inside,
+                                          uint32_t* Outside) override;
         GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override;
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override;
         GENRESULT DACOM_API GetVelocity(FVec3* Out) override;
-        GENRESULT DACOM_API GetEaxEnvironment(unsigned long* Out) override;
-        GENRESULT DACOM_API GetSoundMode(unsigned long* Out) override;
-        GENRESULT DACOM_API GetApplyMode(unsigned long* Out) override;
+        GENRESULT DACOM_API GetEaxEnvironment(uint32_t* Out) override;
+        GENRESULT DACOM_API GetSoundMode(uint32_t* Out) override;
+        GENRESULT DACOM_API GetApplyMode(uint32_t* Out) override;
 
         unsigned char __thiscall Start(void* Arch, int Extra) override;
         unsigned char __thiscall AltStart(void* Arch) override;
@@ -177,9 +178,9 @@ namespace
 
         void __thiscall Pause() override;
         void __thiscall Resume() override;
-        unsigned long __thiscall IsPaused() override { return Field08 != 0 ? 1u : 0u; }
+        uint32_t __thiscall IsPaused() override { return Field08 != 0 ? 1u : 0u; }
         unsigned char __thiscall IsFinished() override;
-        unsigned long __thiscall Slot30() override;
+        uint32_t __thiscall Slot30() override;
         void __thiscall ComputeMixerScore(const float* Listener) override;
         void __thiscall SetAttenuation(float Attenuation) override;
         void __thiscall SetPan(float NewPan) override;
@@ -190,7 +191,7 @@ namespace
         // Slots 35..37 in the Sound::Source and Sound::StreamedSource tables are the imported
         // do-nothings IDPMsgHandler::OnAddHost (RET 4, slots 35 and 36) and
         // IDPMsgHandler::OnReceive (RET 8, slot 37); only Sound::Source3D has bodies.
-        unsigned long __thiscall Slot35(void* /*Arg*/) override { return 0; }
+        uint32_t __thiscall Slot35(void* /*Arg*/) override { return 0; }
         void __thiscall SetVelocity(const float* /*Velocity*/) override {}
         void __thiscall SetPose(int /*AttachHandle*/, const float* /*Transform*/) override {}
         void __thiscall SetPitch(float NewPitch) override;
@@ -251,9 +252,9 @@ namespace
     // the static initializers LAB_00428ef0 / LAB_00428f20 / LAB_00428f50 (the Heap ctor
     // inlined). FUN_00428f80 / FUN_00428fc0 dispatch on the element size; FUN_004284f0 shrinks
     // all three.
-    Heap G_SourceHeap(0x30u, -1);   // DAT_00667a44 -- Sound::Source
-    Heap G_Source3DHeap(0x64u, -1); // DAT_00667a34 -- Sound::Source3D
-    Heap G_StreamedHeap(0x40u, -1); // DAT_00667a24 -- Sound::StreamedSource
+    Heap G_SourceHeap(0x100u, -1);   // (retail 0x30; host objects are wider)   // DAT_00667a44 -- Sound::Source
+    Heap G_Source3DHeap(0x100u, -1); // (retail 0x64) // DAT_00667a34 -- Sound::Source3D
+    Heap G_StreamedHeap(0x100u, -1); // (retail 0x40) // DAT_00667a24 -- Sound::StreamedSource
 
     // DAT_00667cbc — live Sound::Source instance count (ctor INC / dtor DEC; FUN_004284f0 warns if != 0).
     int G_AliveSoundSourceCount = 0;
@@ -265,7 +266,7 @@ namespace
     // (the paired `TEST EAX,EAX` / `CMP EAX,-1` of 0x0042a1f0, 0x0042a256, 0x0042a2b1, ...).
     bool IsStreamHandle(void* Handle)
     {
-        return Handle != nullptr && Handle != reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return Handle != nullptr && Handle != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     // Sound::StreamedSource (vtable 0x005ca05c), retail sizeof 0x40 (pool DAT_00667a24): a
@@ -318,13 +319,13 @@ namespace
 
         // The five slots only Sound::Source3D implements.
         GENRESULT DACOM_API GetPosition(FVec3* Out) override;
-        GENRESULT DACOM_API GetConeAngles(unsigned long* Inside,
-                                          unsigned long* Outside) override;
+        GENRESULT DACOM_API GetConeAngles(uint32_t* Inside,
+                                          uint32_t* Outside) override;
         GENRESULT DACOM_API GetConeOrientation(FVec3* Out) override;
         GENRESULT DACOM_API GetConeOutsideVolume(float* Out) override;
         GENRESULT DACOM_API GetVelocity(FVec3* Out) override;
         // Slot 35 (+0x8c), LAB_00429ca0: the world position setter (see the body).
-        unsigned long __thiscall Slot35(void* Arg) override;
+        uint32_t __thiscall Slot35(void* Arg) override;
         void __thiscall SetVelocity(const float* Velocity) override;
         void __thiscall SetPose(int AttachHandle, const float* Transform) override;
         // LAB_00428810 -- slot 39: `MOV EAX,[ECX+0x60]; RET`.
@@ -342,6 +343,7 @@ namespace
                 float Y;
                 float Z;
                 // Only the Z product is rounded to float before adding the old position.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 __asm
                 {
                     mov eax, Position
@@ -361,6 +363,14 @@ namespace
                     fadd dword ptr [eax + 8]
                     fstp Z
                 }
+#else
+                // x87 stack modelled in double; only the Z product is rounded to float.
+                const double Step = static_cast<double>(DeltaSeconds);
+                ZStep = static_cast<float>(Step * static_cast<double>(Position[8]));
+                X = static_cast<float>(Step * static_cast<double>(Position[6]) + static_cast<double>(Position[0]));
+                Y = static_cast<float>(Step * static_cast<double>(Position[7]) + static_cast<double>(Position[1]));
+                Z = static_cast<float>(static_cast<double>(ZStep) + static_cast<double>(Position[2]));
+#endif
                 Spatial[0] = X;
                 Spatial[1] = Y;
                 Spatial[2] = Z;
@@ -632,10 +642,10 @@ namespace
 
     // The low dword of MSVCRT ftol's 64-bit truncation: a value outside the int64 range (NaN
     // included) is the integer indefinite 0x8000000000000000, whose low dword is 0.
-    long FtolLow32(double Value)
+    int32_t FtolLow32(double Value)
     {
         if (Value >= -9223372036854775808.0 && Value < 9223372036854775808.0)
-            return static_cast<long>(static_cast<long long>(Value));
+            return static_cast<int32_t>(static_cast<long long>(Value));
         return 0;
     }
 
@@ -647,15 +657,15 @@ namespace
         return kGrNoValue;
     }
 
-    unsigned long DACOM_API FSoundSource::AddRef()
+    uint32_t DACOM_API FSoundSource::AddRef()
     {
         ++RefCount;
-        return static_cast<unsigned long>(RefCount);
+        return static_cast<uint32_t>(RefCount);
     }
 
     void SourceTeardown(FSoundSource* Source);
 
-    unsigned long DACOM_API FSoundSource::Release()
+    uint32_t DACOM_API FSoundSource::Release()
     {
         // FUN_00429c70 -- listing 00429c70..00429c8f: --[this+0x24] with no floor; at exactly
         // zero, slot 41 (+0xa4) with 1 -- the scalar deleting destructor of whatever class the
@@ -666,24 +676,24 @@ namespace
         int const Remaining = RefCount;
         if (Remaining == 0)
             ScalarDeletingDestructor(1);
-        return static_cast<unsigned long>(Remaining);
+        return static_cast<uint32_t>(Remaining);
     }
 
     // FUN_004298b0 / FUN_004298f0 -- slots 3 and 4. Retail's slot 4 calls slot 3 and then
     // hands back this+0x14, the tick the sound started on. The port used to install its
     // zero-returning stub in both, so every one-shot looked like it had started at tick 0 and
     // ISoundManager::OneShotAlreadyExpired treated it as already over.
-    unsigned long DACOM_API FSoundSource::Slot3()
+    uint32_t DACOM_API FSoundSource::Slot3()
     {
         SourceMarkStarted(this);
         return 0;
     }
 
-    unsigned long DACOM_API FSoundSource::GetStartTick()
+    uint32_t DACOM_API FSoundSource::GetStartTick()
     {
         if ((Flags & 0x10u) == 0)
             Slot3();
-        return static_cast<unsigned long>(StartTick);
+        return static_cast<uint32_t>(StartTick);
     }
 
     // FUN_00429910 -- slot 5: `[this+0x2c] != 0`, the source has a node in DAT_00667c70.
@@ -764,11 +774,11 @@ namespace
         AttenuationDb = Attenuation;
     }
 
-    GENRESULT DACOM_API FSoundSource::GetPan(long* Out)
+    GENRESULT DACOM_API FSoundSource::GetPan(int32_t* Out)
     {
         // Retail ftol returns low32 of int64 truncation; invalid conversions have low32 zero.
         *Out = Pan >= -0x1p63f && Pan < 0x1p63f
-            ? static_cast<long>(static_cast<long long>(Pan)) : 0;
+            ? static_cast<int32_t>(static_cast<long long>(Pan)) : 0;
         return GR_OK;
     }
 
@@ -789,8 +799,8 @@ namespace
         return kGrNoValue;
     }
 
-    GENRESULT DACOM_API FSoundSource::GetConeAngles(unsigned long* /*Inside*/,
-                                                    unsigned long* /*Outside*/)
+    GENRESULT DACOM_API FSoundSource::GetConeAngles(uint32_t* /*Inside*/,
+                                                    uint32_t* /*Outside*/)
     {
         return kGrNoValue;
     }
@@ -828,7 +838,7 @@ namespace
         // the math engine; both arms return 0.
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Source3dId)));
             FTransform const* const InstXform =
                 reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
             // 0x00429d54..0x00429d62: DAT_00667c98 tested and filled.
@@ -852,12 +862,12 @@ namespace
     // the point into the instance's frame, stored at +0x30; unattached, the point is stored as
     // it is. No null test on the argument, the engine or the transform, as in retail. The
     // non-3D tables fold this slot onto a `RET 0x4` no-op (the base Slot35).
-    unsigned long __thiscall FSpatialSource::Slot35(void* Arg)
+    uint32_t __thiscall FSpatialSource::Slot35(void* Arg)
     {
         FVector const* const WorldPos = static_cast<FVector const*>(Arg);
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Source3dId)));
             FTransform const* const InstXform =
                 reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
             FVector Local;
@@ -907,13 +917,13 @@ namespace
 
     // FUN_00429ec0 — slot 15. Retail ftol()s both angles into ints. No test of the out
     // pointers (0x00429ec0..0x00429f07).
-    GENRESULT DACOM_API FSpatialSource::GetConeAngles(unsigned long* Inside,
-                                                      unsigned long* Outside)
+    GENRESULT DACOM_API FSpatialSource::GetConeAngles(uint32_t* Inside,
+                                                      uint32_t* Outside)
     {
         if (!SourceHasCone(this))
             return kGrNoValue;
-        *Inside = static_cast<unsigned long>(Ftol(Spatial[9]));
-        *Outside = static_cast<unsigned long>(Ftol(Spatial[10]));
+        *Inside = static_cast<uint32_t>(Ftol(Spatial[9]));
+        *Outside = static_cast<uint32_t>(Ftol(Spatial[10]));
         return GR_OK;
     }
 
@@ -927,7 +937,7 @@ namespace
             return kGrNoValue;
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Source3dId)));
             FMatrix const* const Orient =
                 reinterpret_cast<FMatrix const*>(DALib::Engine->GetInstanceOrientation(Instance));
             // 0x00429fa8..0x00429fb6: DAT_00667c98 tested and filled.
@@ -964,7 +974,7 @@ namespace
         // user-data pointer is tested (0x00429e02).
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Source3dId)));
             CObject* const User = (CObject*)DALib::Engine->GetInstanceUserData(Instance);
             if (User == nullptr)
             {
@@ -988,17 +998,17 @@ namespace
     // LAB_00454190 -- slots 19, 20 and 21 share one retail body: MOV EAX,0xFFFFFFF9; RET 0x8.
     // "Unsupported", one argument. The port installed its zero-argument stub in all three,
     // so SoundManager pushed eight bytes and the callee popped four, three times over.
-    GENRESULT DACOM_API FSoundSource::GetEaxEnvironment(unsigned long* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetEaxEnvironment(uint32_t* /*Out*/)
     {
         return static_cast<GENRESULT>(-7);
     }
 
-    GENRESULT DACOM_API FSoundSource::GetSoundMode(unsigned long* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetSoundMode(uint32_t* /*Out*/)
     {
         return static_cast<GENRESULT>(-7);
     }
 
-    GENRESULT DACOM_API FSoundSource::GetApplyMode(unsigned long* /*Out*/)
+    GENRESULT DACOM_API FSoundSource::GetApplyMode(uint32_t* /*Out*/)
     {
         return static_cast<GENRESULT>(-7);
     }
@@ -1209,7 +1219,7 @@ namespace
     // setter is not ported yet, so this holds retail's own initial .data value. Port
     // FUN_005a9c10 and its caller before treating this as final; do not guess a meaning for
     // the index from AttachPlayKey's insert-before-Index behaviour.
-    unsigned long G_SoundAttachIndex = 0;
+    uint32_t G_SoundAttachIndex = 0;
 
     // The power-ratio fade step shared by the ducking fade of FUN_00428040 (0x0042809a..
     // 0x0042811f) and the streamed fade of LAB_0042a6b0 (0x0042a71a..0x0042a78d), the same
@@ -1236,7 +1246,7 @@ namespace
     // a pitch, that pitch clamped to [-100, 100] (DAT_005ca234 `TEST AH,5 / JP`, DAT_005ca230
     // `TEST AH,0x41 / JNZ`) divides it by pow(2.0, pitch * 0.01f) -- the length as an unsigned
     // FILD qword --, truncated by ftol. The archetype reference is released on every path.
-    unsigned long SourceDurationMs(FSoundSource* Source)
+    uint32_t SourceDurationMs(FSoundSource* Source)
     {
         if (Source->Arch == nullptr)
             return 0;
@@ -1248,7 +1258,7 @@ namespace
         DALib::Sound->QueryArchetype(ArchId, reinterpret_cast<void**>(Archetype.GetAddressOf()));
         if (Archetype == nullptr)
             return 0;
-        unsigned long Result = Archetype->GetDurationMs();
+        uint32_t Result = Archetype->GetDurationMs();
 
         float Pitch = 0.f;
         if (Source->GetPitch(&Pitch) == GR_OK)
@@ -1260,12 +1270,12 @@ namespace
             double const Adjusted = static_cast<double>(Result) /
                 pow(2.0, static_cast<double>(Pitch) * static_cast<double>(0.01f));
             // Retail ftol returns the low dword of a signed 64-bit truncation.
-            Result = static_cast<unsigned long>(FtolLow32(Adjusted));
+            Result = static_cast<uint32_t>(FtolLow32(Adjusted));
         }
         return Result;
     }
 
-    unsigned long __thiscall FSoundSource::Slot30()
+    uint32_t __thiscall FSoundSource::Slot30()
     {
         return SourceDurationMs(this);
     }
@@ -1325,12 +1335,16 @@ namespace
             float SourceDb = AttenuationDb;
             float CombinedDb;
             // Retail rounds this sum to float, but keeps the following category sum in x87.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 fild ArchDb
                 fadd SourceDb
                 fstp CombinedDb
             }
+#else
+            CombinedDb = static_cast<float>(static_cast<double>(ArchDb) + static_cast<double>(SourceDb));
+#endif
             float Base = 0.f;
             float ModeDb = 0.f;
             bool bDuck = false;
@@ -1365,6 +1379,7 @@ namespace
                 break;
             }
             unsigned char bSilent;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 fld Base
@@ -1379,6 +1394,17 @@ namespace
                 test ah, 41h
                 setnp bSilent
             }
+#else
+            {
+                double Sum = static_cast<double>(Base);
+                if (bDuck != 0)
+                    Sum += static_cast<double>(G_DuckCurrentDb);
+                Sum += static_cast<double>(ModeDb);
+                Sum += static_cast<double>(CombinedDb);
+                // fcomp + test ah,41h + setnp: set for strictly-less or equal, clear for greater/unordered.
+                bSilent = (Sum <= static_cast<double>(kSilenceDb)) ? 1 : 0;
+            }
+#endif
             if (bSilent != 0)
             {
                 MixerScale = kMixerNoScore;
@@ -1396,6 +1422,7 @@ namespace
         GetPosition(&Pos);
         float DistSq;
         // No intermediate float stores: retail adds Z squared, Y squared, then X squared.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov eax, Listener
@@ -1419,11 +1446,20 @@ namespace
             fstp st(0)
             fstp st(0)
         }
+#else
+        {
+            const double Dz = static_cast<double>(Listener[2]) - static_cast<double>(Pos.Z);
+            const double Dy = static_cast<double>(Listener[1]) - static_cast<double>(Pos.Y);
+            const double Dx = static_cast<double>(Listener[0]) - static_cast<double>(Pos.X);
+            DistSq = static_cast<float>(Dz * Dz + Dy * Dy + Dx * Dx);
+        }
+#endif
 
         float MaxRange;
         if (GetMaxDistance(&MaxRange) == GR_OK)
         {
             unsigned char bOutside;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
             __asm
             {
                 fld MaxRange
@@ -1433,6 +1469,9 @@ namespace
                 test ah, 5
                 setnp bOutside
             }
+#else
+            bOutside = (static_cast<double>(MaxRange) * static_cast<double>(MaxRange) < static_cast<double>(DistSq)) ? 1 : 0;
+#endif
             if (bOutside != 0)
             {
                 MixerScale = kMixerNoScore;
@@ -1453,6 +1492,7 @@ namespace
         double const Ten = 10.0;
         float Score;
         // A float inverse-sqrt intermediate or libm log10 changes retail's final rounding.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld MinRange
@@ -1470,6 +1510,18 @@ namespace
             fstp st(1)
             fstp Score
         }
+#else
+        {
+            const double G = static_cast<double>(Guess);
+            double T = G * G;
+            T *= static_cast<double>(DistSq);
+            T *= static_cast<double>(Half);
+            T = static_cast<double>(ThreeHalves) - T;
+            T *= G;
+            T *= static_cast<double>(MinRange);
+            Score = static_cast<float>(std::log10(T) * Ten);
+        }
+#endif
         MixerScale = Score;
     }
 
@@ -1495,7 +1547,7 @@ namespace
         SourceCategoryDb(Source, &Base, &ModeDb);
         double const Sum = ((Base + ModeDb) + ArchDb) + static_cast<double>(SourceDb);
         float const Hundredths = static_cast<float>(Sum * 100.0);
-        long Volume = 0;
+        int32_t Volume = 0;
         if (Hundredths < -9600.f)
             Volume = -9999;
         else if (Hundredths > 0.f)
@@ -1951,7 +2003,7 @@ namespace
         Archetype::ISound* const SoundArch = static_cast<Archetype::ISound*>(ArchArg);
         if (DALib::Streamer == nullptr)
             return 1;
-        unsigned long const Mode = IsLooping() != 0 ? 2u : 0u;
+        uint32_t const Mode = IsLooping() != 0 ? 2u : 0u;
         char const* const Name = SoundArch->GetFileName();
         StreamHandle = DALib::Streamer->CreateStream(Name, DALib::Data, Mode);
         if (!IsStreamHandle(StreamHandle))
@@ -2025,7 +2077,7 @@ namespace
             return 1;
         if (Slot40() != 0)
             return 1;
-        unsigned long const Status = DALib::Streamer->QueryStatus(StreamHandle);
+        uint32_t const Status = DALib::Streamer->QueryStatus(StreamHandle);
         if (Status == 4 || Status == 0)
             return 1;
         return SourceIsFinished(this);
@@ -2062,7 +2114,7 @@ namespace
         Pan = Value;
         if (StreamHandle == nullptr)
             return;
-        long PanOut = 0;
+        int32_t PanOut = 0;
         GetPan(&PanOut);
         if (PanOut < -10000)
             PanOut = -10000;
@@ -2545,10 +2597,10 @@ namespace
         }
         // LAB_0052f430 -- slot 15: ftol of ThrusterEquipConsts::INSIDE_CONE_ANGLE and
         // OUTSIDE_CONE_ANGLE, GR_OK.
-        GENRESULT DACOM_API GetConeAngles(unsigned long* Inside, unsigned long* Outside) override
+        GENRESULT DACOM_API GetConeAngles(uint32_t* Inside, uint32_t* Outside) override
         {
-            *Inside = static_cast<unsigned long>(Ftol(ThrusterEquipConsts::INSIDE_CONE_ANGLE));
-            *Outside = static_cast<unsigned long>(Ftol(ThrusterEquipConsts::OUTSIDE_CONE_ANGLE));
+            *Inside = static_cast<uint32_t>(Ftol(ThrusterEquipConsts::INSIDE_CONE_ANGLE));
+            *Outside = static_cast<uint32_t>(Ftol(ThrusterEquipConsts::OUTSIDE_CONE_ANGLE));
             return GR_OK;
         }
         // LAB_0052f460 -- slot 16: the ship's transform (IObjInspect slot 3) third column,

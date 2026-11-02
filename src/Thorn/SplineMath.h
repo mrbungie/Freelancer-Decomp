@@ -6,12 +6,15 @@
 
 #pragma once
 
+#include <cmath>
+
 // Private Thorn arithmetic. FUN_06f21000 and its vector helpers retain
 // extended x87 values only where the retail listing omits a float store.
 namespace ThornSplineMath
 {
     inline void Scale(float* Dst, const float* Src, float Factor)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Src
@@ -26,10 +29,16 @@ namespace ThornSplineMath
             fstp dword ptr [eax + 4]
             fstp dword ptr [eax + 8]
         }
+#else
+        Dst[0] = Src[0] * Factor;
+        Dst[1] = Src[1] * Factor;
+        Dst[2] = Src[2] * Factor;
+#endif
     }
 
     inline void Add(float* Dst, const float* A, const float* B)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, A
@@ -45,10 +54,16 @@ namespace ThornSplineMath
             fstp dword ptr [eax + 4]
             fstp dword ptr [eax + 8]
         }
+#else
+        Dst[0] = A[0] + B[0];
+        Dst[1] = A[1] + B[1];
+        Dst[2] = A[2] + B[2];
+#endif
     }
 
     inline void SubtractVector(float* Dst, const float* A, const float* B)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, A
@@ -64,10 +79,16 @@ namespace ThornSplineMath
             fstp dword ptr [eax + 4]
             fstp dword ptr [eax + 8]
         }
+#else
+        Dst[0] = A[0] - B[0];
+        Dst[1] = A[1] - B[1];
+        Dst[2] = A[2] - B[2];
+#endif
     }
 
     inline void DoubleStored(float* Dst, const float* Src)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Src
@@ -82,11 +103,17 @@ namespace ThornSplineMath
             fadd st(0), st(0)
             fstp dword ptr [eax]
         }
+#else
+        Dst[2] = Src[2] * 2.0f;
+        Dst[1] = Src[1] * 2.0f;
+        Dst[0] = Src[0] * 2.0f;
+#endif
     }
 
     // Inlined operations in 21000 evaluate/store Z, Y, X in that order.
     inline void Subtract(float* Dst, const float* A, const float* B)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, A
@@ -102,10 +129,16 @@ namespace ThornSplineMath
             fsub dword ptr [edx]
             fstp dword ptr [eax]
         }
+#else
+        Dst[2] = A[2] - B[2];
+        Dst[1] = A[1] - B[1];
+        Dst[0] = A[0] - B[0];
+#endif
     }
 
     inline void AddStored(float* Dst, const float* A, const float* B)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, A
@@ -121,10 +154,16 @@ namespace ThornSplineMath
             fadd dword ptr [edx]
             fstp dword ptr [eax]
         }
+#else
+        Dst[2] = A[2] + B[2];
+        Dst[1] = A[1] + B[1];
+        Dst[0] = A[0] + B[0];
+#endif
     }
 
     inline void Negate(float* Dst, const float* Src)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Src
@@ -139,10 +178,16 @@ namespace ThornSplineMath
             fstp dword ptr [eax + 4]
             fstp dword ptr [eax + 8]
         }
+#else
+        Dst[0] = -Src[0];
+        Dst[1] = -Src[1];
+        Dst[2] = -Src[2];
+#endif
     }
 
     inline void ScaleStored(float* Dst, const float* Src, float Factor)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Src
@@ -157,10 +202,16 @@ namespace ThornSplineMath
             fmul Factor
             fstp dword ptr [eax]
         }
+#else
+        Dst[2] = Src[2] * Factor;
+        Dst[1] = Src[1] * Factor;
+        Dst[0] = Src[0] * Factor;
+#endif
     }
 
     inline void NegateStored(float* Dst, const float* Src)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             mov ecx, Src
@@ -175,13 +226,19 @@ namespace ThornSplineMath
             fchs
             fstp dword ptr [eax]
         }
+#else
+        Dst[2] = -Src[2];
+        Dst[1] = -Src[1];
+        Dst[0] = -Src[0];
+#endif
     }
 
     inline void CatmullRom3D(const float* P0, const float* P1, const float* P2,
                              const float* P3, float U, float* ResultVector)
     {
-        float U2;
-        float U3;
+        float U2 = U * U;
+        float U3 = U2 * U;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             fld U
@@ -190,6 +247,7 @@ namespace ThornSplineMath
             fmul U
             fstp U3
         }
+#endif
         float TwiceP1[3], MinusP0[3], Delta[3], Linear[3];
         float FourP2[3], FiveP1[3], TwiceP0[3], Quadratic[3];
         float ThreeP2[3], ThreeP1[3], Cubic[3], Sum[3];
@@ -214,6 +272,7 @@ namespace ThornSplineMath
         AddStored(Sum, Quadratic, Cubic);    // 212f3..21323
         AddStored(Sum, Linear, Sum);         // 2132b..21352
         const float Half = 0.5f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         float RoundedZ;
         __asm
         {
@@ -236,11 +295,17 @@ namespace ThornSplineMath
             fmul Half
             fstp dword ptr [eax + 8]
         }
+#else
+        ResultVector[0] = (TwiceP1[0] + Sum[0]) * Half;
+        ResultVector[1] = (TwiceP1[1] + Sum[1]) * Half;
+        ResultVector[2] = (TwiceP1[2] + Sum[2]) * Half;
+#endif
     }
     // 23145/23181, 232c5/23301, and 2347c/234b8 zero-extend the
     // sample-index dword before FILD qword, then store the float product.
     inline float SampleParameter(int Index, float Step)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const unsigned long long UnsignedIndex = static_cast<unsigned int>(Index);
         float Result;
         __asm
@@ -250,11 +315,15 @@ namespace ThornSplineMath
             fstp Result
         }
         return Result;
+#else
+        return static_cast<float>(static_cast<unsigned int>(Index)) * Step;
+#endif
     }
 
     // Identical interpolation tails at 231ac..2321b and 2332c..2339b.
     inline void Lerp3D(const float* A, const float* B, float Fraction, float* ResultVector)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         float ZDifference;
         float XProduct;
         float XResult;
@@ -296,6 +365,11 @@ namespace ThornSplineMath
             mov dword ptr [eax + 8], edx
             fstp st(0)
         }
+#else
+        ResultVector[0] = A[0] + (B[0] - A[0]) * Fraction;
+        ResultVector[1] = A[1] + (B[1] - A[1]) * Fraction;
+        ResultVector[2] = A[2] + (B[2] - A[2]) * Fraction;
+#endif
     }
 
     inline void CatmullRomTangent3D(const float* P0, const float* P1, const float* P2,
@@ -312,6 +386,7 @@ namespace ThornSplineMath
         Add(Quadratic, Quadratic, FourP2);   // 21491
         Subtract(Quadratic, Quadratic, P3);  // 21496..214c3
         // 214cb..21501 keeps 2U extended across all three products.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             lea eax, Quadratic
@@ -328,6 +403,12 @@ namespace ThornSplineMath
             fstp dword ptr [eax]
             fstp st(0)
         }
+#else
+        float TwoU = 2.0f * U;
+        Quadratic[2] *= TwoU;
+        Quadratic[1] *= TwoU;
+        Quadratic[0] *= TwoU;
+#endif
         ScaleStored(ThreeP2, P2, 3.0f);      // 21508..21531
         ScaleStored(ThreeP1, P1, 3.0f);      // 21539..21566
         NegateStored(MinusP0, P0);           // 2156e..2158b
@@ -336,6 +417,7 @@ namespace ThornSplineMath
         AddStored(Cubic, Cubic, P3);         // 21609..21635
         const float Three = 3.0f;
         // 2163d..2167b never stores U^2 or 3U^2 before multiplication.
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm
         {
             lea eax, Cubic
@@ -353,9 +435,16 @@ namespace ThornSplineMath
             fstp dword ptr [eax]
             fstp st(0)
         }
+#else
+        float ThreeUSq = 3.0f * U * U;
+        Cubic[2] *= ThreeUSq;
+        Cubic[1] *= ThreeUSq;
+        Cubic[0] *= ThreeUSq;
+#endif
         AddStored(Sum, Quadratic, Cubic);    // 21682..216a9
         AddStored(Sum, Delta, Sum);          // 216b1..216d8
         const float Half = 0.5f;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         const float One = 1.0f;
         __asm
         {
@@ -397,5 +486,17 @@ namespace ThornSplineMath
             fmul dword ptr [eax + 8]
             fstp dword ptr [eax + 8]
         }
+#else
+        ResultVector[0] = Sum[0] * Half;
+        ResultVector[1] = Sum[1] * Half;
+        ResultVector[2] = Sum[2] * Half;
+        float Length = std::sqrt(ResultVector[0] * ResultVector[0] +
+                                 ResultVector[1] * ResultVector[1] +
+                                 ResultVector[2] * ResultVector[2]);
+        float InvLength = 1.0f / Length;
+        ResultVector[0] *= InvLength;
+        ResultVector[1] *= InvLength;
+        ResultVector[2] *= InvLength;
+#endif
     }
 }

@@ -24,42 +24,42 @@ struct IMaterial : IDAComponent
     virtual GENRESULT DACOM_API ResolveTextures(float Delta) = 0;
     virtual GENRESULT DACOM_API Bind(void* Context) = 0;
     virtual GENRESULT DACOM_API Teardown(void* Context) = 0;
-    virtual GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType,
-                                       unsigned long Start, unsigned long Count,
-                                       unsigned long IbStart, unsigned long IndexSpan,
-                                       unsigned long Flags) = 0;
+    virtual GENRESULT DACOM_API Submit(void* Context, uint32_t PrimType,
+                                       uint32_t Start, uint32_t Count,
+                                       uint32_t IbStart, uint32_t IndexSpan,
+                                       uint32_t Flags) = 0;
     virtual GENRESULT DACOM_API SetName(const char* Name) = 0;
-    virtual GENRESULT DACOM_API GetName(char* Out, unsigned long Size) = 0;
-    virtual GENRESULT DACOM_API CopyClassName(char* Out, unsigned long Size) = 0;
+    virtual GENRESULT DACOM_API GetName(char* Out, uint32_t Size) = 0;
+    virtual GENRESULT DACOM_API CopyClassName(char* Out, uint32_t Size) = 0;
     virtual GENRESULT DACOM_API GetPassCount(int* Out) = 0;
-    virtual GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) = 0;
-    virtual GENRESULT DACOM_API GetParameterCount(unsigned long* OutCount) = 0;
+    virtual GENRESULT DACOM_API GetRenderFlags(uint32_t* Out) = 0;
+    virtual GENRESULT DACOM_API GetParameterCount(uint32_t* OutCount) = 0;
     // OutDesc receives one kMaterialParamDescSize-byte property descriptor.
-    virtual GENRESULT DACOM_API GetParameterDescriptor(unsigned long Index, void* OutDesc) = 0;
-    virtual GENRESULT DACOM_API GetParameterValue(unsigned long Index, void* InOutDesc) = 0;
-    virtual GENRESULT DACOM_API SetParameterValue(unsigned long Index, void* Value) = 0;
+    virtual GENRESULT DACOM_API GetParameterDescriptor(uint32_t Index, void* OutDesc) = 0;
+    virtual GENRESULT DACOM_API GetParameterValue(uint32_t Index, void* InOutDesc) = 0;
+    virtual GENRESULT DACOM_API SetParameterValue(uint32_t Index, void* Value) = 0;
     virtual const char* __thiscall ClassName() = 0;
     virtual void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) = 0;
     virtual GENRESULT __thiscall InitializeFromDescriptor(void* Arg) = 0;
     virtual GENRESULT __thiscall ApplyInitialRenderStates(void* Arg) = 0;
     virtual GENRESULT __thiscall Setup() = 0;
-    virtual bool __thiscall ValueWithinDeclaredRange(unsigned long Index, void* Entry,
+    virtual bool __thiscall ValueWithinDeclaredRange(uint32_t Index, void* Entry,
                                                      void* Value) = 0;
-    virtual GENRESULT __thiscall StoreParameterValue(unsigned long Index, void* Entry,
+    virtual GENRESULT __thiscall StoreParameterValue(uint32_t Index, void* Entry,
                                                      void* Value) = 0;
     // Return the count; OutBase is optional and receives the shared contiguous table.
-    virtual unsigned long __thiscall GetParameterTable(void** OutBase) = 0;
+    virtual uint32_t __thiscall GetParameterTable(void** OutBase) = 0;
     // Return the live backing address of the indexed property.
-    virtual void* __thiscall GetParameterAddress(unsigned long Index) = 0;
+    virtual void* __thiscall GetParameterAddress(uint32_t Index) = 0;
     virtual GENRESULT DACOM_API InnerQueryInterface(const char* Iid, void** Out) = 0;
-    virtual unsigned long DACOM_API InnerAddRef() = 0;
-    virtual unsigned long DACOM_API InnerRelease() = 0;
+    virtual uint32_t DACOM_API InnerAddRef() = 0;
+    virtual uint32_t DACOM_API InnerRelease() = 0;
 };
-static const unsigned long kMaterialParamDescSize = 0x4C;
+static const uint32_t kMaterialParamDescSize = 0x4C;
 // Descriptor shared by material factories and their controlling outer component.
 struct FMaterialAggregateDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     IDAComponent* OuterAt8;
     void** InnerOutAtC;
@@ -82,7 +82,7 @@ inline GENRESULT GetMaterialBlock(IRenderPipeline* Pipeline, float* Block)
 struct FIbScratch
 {
     void* IndexBuffer;          // IRPIndexBuffer handle
-    unsigned long Bias;         // RendComp: VMeshData+0x1C + VMeshRef.IndexStart;
+    uint32_t Bias;         // RendComp: VMeshData+0x1C + VMeshRef.IndexStart;
 };
 
 // Borrowed context for Bind, Teardown and Submit.

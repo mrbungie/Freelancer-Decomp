@@ -84,7 +84,7 @@ namespace
             return false;
         }
 
-        bool Slot02(unsigned A, unsigned B, unsigned long Packed) override
+        bool Slot02(unsigned A, unsigned B, uint32_t Packed) override
         {
             (void)A;
             (void)B;
@@ -92,7 +92,7 @@ namespace
             return false;
         }
 
-        bool Slot03(unsigned A, unsigned Message, unsigned B, unsigned long Packed) override
+        bool Slot03(unsigned A, unsigned Message, unsigned B, uint32_t Packed) override
         {
             (void)A;
             (void)Message;

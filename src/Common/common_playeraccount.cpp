@@ -91,7 +91,7 @@ namespace
         DWORD UserNameSize = 0x101;
         if (!GetUserNameA(UserName, &UserNameSize))
             sprintf(UserName, "%u", timeGetTime());
-        Hash.AddData(UserName, (unsigned long)strlen(UserName));
+        Hash.AddData(UserName, (uint32_t)strlen(UserName));
         return true;
     }
 
@@ -112,7 +112,7 @@ namespace
 // CPlayerAccount
 // ===========================================================================
 
-unsigned long CPlayerAccount::g_dwAccountIndex = 0;
+uint32_t CPlayerAccount::g_dwAccountIndex = 0;
 
 CPlayerAccount::CPlayerAccount()
     : HashName(nullptr)
@@ -131,7 +131,7 @@ CPlayerAccount::~CPlayerAccount()
     TossHashes();
 }
 
-void CPlayerAccount::SetAcctIndex(unsigned long Index)
+void CPlayerAccount::SetAcctIndex(uint32_t Index)
 {
     // 0x062a8920: a single RET. Retail ignores Index and leaves g_dwAccountIndex untouched.
     (void)Index;
@@ -169,10 +169,10 @@ void CPlayerAccount::GenerateAccount(const char* Name)
     }
 
     if (Name != nullptr)
-        HashName->AddData((void*)Name, (unsigned long)strlen(Name));
+        HashName->AddData((void*)Name, (uint32_t)strlen(Name));
     HashName->CalcValue();
 
-    const unsigned long NameLength = (unsigned long)strlen(HashName->AsString());
+    const uint32_t NameLength = (uint32_t)strlen(HashName->AsString());
     HashVerify->AddData((void*)HashName->AsString(), NameLength);
     HashVerify->CalcValue();
 }
@@ -223,7 +223,7 @@ bool CPlayerAccount::VerifyAccount()
 
     const char* NameStr = HashName->AsString();
     MD5Hash TempHash;
-    TempHash.AddData((void*)NameStr, (unsigned long)strlen(NameStr));
+    TempHash.AddData((void*)NameStr, (uint32_t)strlen(NameStr));
     TempHash.CalcValue();
     return HashVerify->Compare(TempHash);
 }
@@ -246,7 +246,7 @@ bool CPlayerAccount::GenerateTextKey(char* OutKey)
 
     MD5Hash VerifyHash;
     OutputDebugStringA(FormatDebugLine(DebugLine, "Raw key length: %d\n", (int)strlen(RawKey)));
-    VerifyHash.AddData((void*)RawKey, (unsigned long)strlen(RawKey));
+    VerifyHash.AddData((void*)RawKey, (uint32_t)strlen(RawKey));
     VerifyHash.CalcValue();
 
     // 06306f2a: the '-' goes on OutKey's terminator (word store 2D 00 at the NUL).
@@ -283,14 +283,14 @@ bool CPlayerAccount::SetTextKey(char* Key)
     RegSetValueExA(RegKey, "InstallKey", 0, REG_SZ, (const BYTE*)Key, (DWORD)strlen(Key));
 
     MD5Hash NameHash;
-    NameHash.AddData(Key, (unsigned long)strlen(Key));
+    NameHash.AddData(Key, (uint32_t)strlen(Key));
     NameHash.CalcValue();
     const char* NameHashStr = NameHash.AsString();
     RegSetValueExA(RegKey, "MPAccountName", 0, REG_SZ, (const BYTE*)NameHashStr,
                    (DWORD)strlen(NameHashStr));
 
     MD5Hash SigHash;
-    SigHash.AddData((void*)NameHashStr, (unsigned long)strlen(NameHashStr));
+    SigHash.AddData((void*)NameHashStr, (uint32_t)strlen(NameHashStr));
     SigHash.CalcValue();
     const char* SigHashStr = SigHash.AsString();
     RegSetValueExA(RegKey, "MPAccountNameSig", 0, REG_SZ, (const BYTE*)SigHashStr,

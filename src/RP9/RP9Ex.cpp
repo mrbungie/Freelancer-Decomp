@@ -42,7 +42,7 @@ namespace
     const D3DFORMAT kIntzFormat = (D3DFORMAT)(MAKEFOURCC('I', 'N', 'T', 'Z'));
 
     // ps_3_0 has 16 samplers; fixed-function stages are 0..7.
-    const unsigned long kExSamplerCount = 16;
+    const uint32_t kExSamplerCount = 16;
 
     // One FDUMP line per text line ("%s(%d) : <KIND>:General:RP9Ex: <text>"), so a long
     // compiler log is never cut by the 0x400-byte line buffer of the log hook.
@@ -96,16 +96,16 @@ namespace
         const int Handle = FileSystem->OpenByDesc(&Desc);
         if (Handle == -1)
             return false;
-        const unsigned long Size = FileSystem->GetSize((unsigned long)(Handle), nullptr);
+        const uint32_t Size = FileSystem->GetSize((uint32_t)(Handle), nullptr);
         bool bOk = Size != 0xFFFFFFFF;
         if (bOk && Size != 0)
         {
             Out->resize(Size);
-            unsigned long Got = 0;
-            bOk = FileSystem->Read((unsigned long)(Handle), &(*Out)[0], Size, &Got, 0) != 0 &&
+            uint32_t Got = 0;
+            bOk = FileSystem->Read((uint32_t)(Handle), &(*Out)[0], Size, &Got, 0) != 0 &&
                   Got == Size;
         }
-        FileSystem->CloseFile((unsigned long)(Handle));
+        FileSystem->CloseFile((uint32_t)(Handle));
         if (!bOk)
             Out->clear();
         return bOk;
@@ -287,7 +287,7 @@ namespace
     }
 
     // ERPExFormat -> D3DFORMAT and bytes per texel; D3DFMT_UNKNOWN for an unknown value.
-    D3DFORMAT ExFormatToD3d(ERPExFormat Format, unsigned long* OutBytes)
+    D3DFORMAT ExFormatToD3d(ERPExFormat Format, uint32_t* OutBytes)
     {
         switch (Format)
         {
@@ -318,20 +318,20 @@ namespace
     // A D3DPOOL_DEFAULT render target at its requested size (absolute, or a fraction of the
     // back buffer). Failure leaves the handle without GPU objects (binding it then fails).
     HRESULT CreateRenderTargetGpu(IDirect3DDevice9* Device, FRPExTexture* Target,
-                                  unsigned long BackBufferWidth, unsigned long BackBufferHeight)
+                                  uint32_t BackBufferWidth, uint32_t BackBufferHeight)
     {
-        unsigned long Width = Target->TargetDesc.Width;
-        unsigned long Height = Target->TargetDesc.Height;
+        uint32_t Width = Target->TargetDesc.Width;
+        uint32_t Height = Target->TargetDesc.Height;
         if (Width == 0 || Height == 0)
         {
-            Width = (unsigned long)((float)(BackBufferWidth) * Target->TargetDesc.BackBufferScale);
-            Height = (unsigned long)((float)(BackBufferHeight) * Target->TargetDesc.BackBufferScale);
+            Width = (uint32_t)((float)(BackBufferWidth) * Target->TargetDesc.BackBufferScale);
+            Height = (uint32_t)((float)(BackBufferHeight) * Target->TargetDesc.BackBufferScale);
         }
         if (Width == 0)
             Width = 1;
         if (Height == 0)
             Height = 1;
-        unsigned long Bytes = 0;
+        uint32_t Bytes = 0;
         const D3DFORMAT Format = ExFormatToD3d(Target->Format, &Bytes);
         IDirect3DTexture9* Texture = nullptr;
         HRESULT Hr = Device->CreateTexture((UINT)(Width), (UINT)(Height), 1, D3DUSAGE_RENDERTARGET,
@@ -358,7 +358,7 @@ namespace
     // A D3DPOOL_MANAGED one-level volume texture filled from the kept texels.
     HRESULT CreateVolumeGpu(IDirect3DDevice9* Device, FRPExTexture* Volume)
     {
-        unsigned long Bytes = 0;
+        uint32_t Bytes = 0;
         const D3DFORMAT Format = ExFormatToD3d(Volume->Format, &Bytes);
         IDirect3DVolumeTexture9* Texture = nullptr;
         HRESULT Hr = Device->CreateVolumeTexture((UINT)(Volume->Width), (UINT)(Volume->Height),
@@ -370,13 +370,13 @@ namespace
             Hr = Texture->LockBox(0, &Box, nullptr, 0);
             if (SUCCEEDED(Hr))
             {
-                const unsigned long RowBytes = Volume->Width * Bytes;
+                const uint32_t RowBytes = Volume->Width * Bytes;
                 const unsigned char* Source = Volume->VolumeData.empty() ? nullptr
                                                                          : &Volume->VolumeData[0];
-                for (unsigned long Slice = 0; Slice < Volume->Depth; ++Slice)
+                for (uint32_t Slice = 0; Slice < Volume->Depth; ++Slice)
                 {
                     unsigned char* SliceBits = (unsigned char*)(Box.pBits) + Slice * Box.SlicePitch;
-                    for (unsigned long Row = 0; Row < Volume->Height; ++Row)
+                    for (uint32_t Row = 0; Row < Volume->Height; ++Row)
                     {
                         unsigned char* Dest = SliceBits + Row * Box.RowPitch;
                         if (Source != nullptr)
@@ -428,7 +428,7 @@ namespace
 
     // Pass-scoped render state through RP9's own cache: it reaches the device at the next
     // flush, and EndExPass re-queues the pre-pass value (FRp9RenderStateCache::RestorePending).
-    void ExSetPassState(FDirectX9* Self, D3DRENDERSTATETYPE State, unsigned long Value)
+    void ExSetPassState(FDirectX9* Self, D3DRENDERSTATETYPE State, uint32_t Value)
     {
         Self->RenderStates_.MarkDirty((unsigned int)(State), Value);
     }
@@ -453,7 +453,7 @@ namespace
         if (Surface == nullptr)
             return E_FAIL;
         // A texture cannot be sampled while it is the render target.
-        for (unsigned long Sampler = 0; Target != nullptr && Sampler < kExSamplerCount; ++Sampler)
+        for (uint32_t Sampler = 0; Target != nullptr && Sampler < kExSamplerCount; ++Sampler)
         {
             if (Ex->BoundTextures[Sampler] != nullptr && Ex->BoundTextures[Sampler] == Target->Texture)
             {
@@ -478,7 +478,7 @@ namespace
         if (bKeepDepth && Ex->SavedDepth != nullptr)
         {
             // The scene depth cannot be sampled while it is the bound depth surface.
-            for (unsigned long Sampler = 0; Sampler < kExSamplerCount; ++Sampler)
+            for (uint32_t Sampler = 0; Sampler < kExSamplerCount; ++Sampler)
             {
                 if ((Ex->SceneDepthSamplers & (1ul << Sampler)) != 0)
                 {
@@ -497,14 +497,14 @@ namespace
 
     // Binds a D3D texture on a sampler with explicit states. The first touch of a
     // fixed-function stage saves its cache entries (restored by EndExPass).
-    GENRESULT ExBindSampler(FDirectX9* Self, unsigned long Sampler, IDirect3DBaseTexture9* Texture,
+    GENRESULT ExBindSampler(FDirectX9* Self, uint32_t Sampler, IDirect3DBaseTexture9* Texture,
                             const FRPExSamplerState* State, bool bSceneDepth)
     {
         FRp9ExState* Ex = Self->Ex_;
         IDirect3DDevice9* Device = Self->Device_;
         if (bSceneDepth && Ex->bDepthBound)
             ExUnbindDepth(Self);
-        const unsigned long Bit = 1ul << Sampler;
+        const uint32_t Bit = 1ul << Sampler;
         if ((Ex->TouchedSamplers & Bit) == 0)
         {
             if (Sampler < FRp9DeviceStateCaches::StageCount)
@@ -548,7 +548,7 @@ namespace
         {
             Device->SetVertexShader(nullptr);
             Device->SetPixelShader(nullptr);
-            for (unsigned long Sampler = 0; Sampler < kExSamplerCount; ++Sampler)
+            for (uint32_t Sampler = 0; Sampler < kExSamplerCount; ++Sampler)
             {
                 if ((Ex->TouchedSamplers & (1ul << Sampler)) == 0)
                     continue;
@@ -589,8 +589,8 @@ namespace
 
     // The IRPDraw::DrawPrimitive sequence: the stream cache selects the FVF, FlushDrawState
     // sends the queued render states (the pass's included), DrawPrimitiveUP, stream cache reset.
-    GENRESULT ExDrawUp(FDirectX9* Self, unsigned long Prim, unsigned long Fvf, const void* Verts,
-                       unsigned long Count)
+    GENRESULT ExDrawUp(FDirectX9* Self, uint32_t Prim, uint32_t Fvf, const void* Verts,
+                       uint32_t Count)
     {
         const unsigned int PrimCount = Self->PrimCountFromVerts(Prim, (unsigned int)(Count));
         if ((int)(PrimCount) <= 0 || Verts == nullptr)
@@ -826,9 +826,9 @@ GENRESULT DACOM_API FDirectX9::GetExCaps(FRPExCaps* Out)
                 sizeof(Full.AdapterDescription) - 1);
         Full.AdapterDescription[sizeof(Full.AdapterDescription) - 1] = '\0';
     }
-    const unsigned long Filled =
-        Out->Size < (unsigned long)(sizeof(FRPExCaps)) ? Out->Size
-                                                       : (unsigned long)(sizeof(FRPExCaps));
+    const uint32_t Filled =
+        Out->Size < (uint32_t)(sizeof(FRPExCaps)) ? Out->Size
+                                                       : (uint32_t)(sizeof(FRPExCaps));
     Full.Size = Filled;
     memcpy(Out, &Full, Filled);
     return GR_OK;
@@ -905,7 +905,7 @@ GENRESULT DACOM_API FDirectX9::CreateExRenderTarget(const FRPExRenderTargetDesc*
     if (Out == nullptr || Desc == nullptr)
         return GR_INVALID_PARMS;
     *Out = nullptr;
-    unsigned long Bytes = 0;
+    uint32_t Bytes = 0;
     if (ExFormatToD3d(Desc->Format, &Bytes) == D3DFMT_UNKNOWN)
         return GR_INVALID_PARMS;
     if ((Desc->Width == 0 || Desc->Height == 0) && !(Desc->BackBufferScale > 0.0f))
@@ -929,14 +929,14 @@ GENRESULT DACOM_API FDirectX9::CreateExRenderTarget(const FRPExRenderTargetDesc*
     return GR_OK;
 }
 
-GENRESULT DACOM_API FDirectX9::CreateExVolumeTexture(unsigned long Width, unsigned long Height,
-                                                     unsigned long Depth, ERPExFormat Format,
+GENRESULT DACOM_API FDirectX9::CreateExVolumeTexture(uint32_t Width, uint32_t Height,
+                                                     uint32_t Depth, ERPExFormat Format,
                                                      const void* Data, FRPExTexture** Out)
 {
     if (Out == nullptr)
         return GR_INVALID_PARMS;
     *Out = nullptr;
-    unsigned long Bytes = 0;
+    uint32_t Bytes = 0;
     if (ExFormatToD3d(Format, &Bytes) == D3DFMT_UNKNOWN || Width == 0 || Height == 0 || Depth == 0)
         return GR_INVALID_PARMS;
     FRPExTexture* Volume = new FRPExTexture();
@@ -984,8 +984,8 @@ GENRESULT DACOM_API FDirectX9::DestroyExTexture(FRPExTexture* Texture)
     return GR_INVALID_PARMS;
 }
 
-GENRESULT DACOM_API FDirectX9::GetExTextureSize(FRPExTexture* Texture, unsigned long* OutWidth,
-                                                unsigned long* OutHeight)
+GENRESULT DACOM_API FDirectX9::GetExTextureSize(FRPExTexture* Texture, uint32_t* OutWidth,
+                                                uint32_t* OutHeight)
 {
     if (Texture == nullptr || OutWidth == nullptr || OutHeight == nullptr)
         return GR_INVALID_PARMS;
@@ -1088,7 +1088,7 @@ GENRESULT DACOM_API FDirectX9::EndExPass()
 }
 
 GENRESULT DACOM_API FDirectX9::SetExRenderTarget(FRPExTexture* ColorTarget,
-                                                 unsigned long bKeepDepth)
+                                                 uint32_t bKeepDepth)
 {
     const GENRESULT Ready = NeedExPass(this, "set_ex_render_target");
     if (Ready != GR_OK)
@@ -1120,8 +1120,8 @@ GENRESULT DACOM_API FDirectX9::BindExProgram(FRPExProgram* Program)
     return GR_OK;
 }
 
-GENRESULT DACOM_API FDirectX9::SetExVertexConstants(unsigned long StartRegister, const float* Data,
-                                                    unsigned long Vector4Count)
+GENRESULT DACOM_API FDirectX9::SetExVertexConstants(uint32_t StartRegister, const float* Data,
+                                                    uint32_t Vector4Count)
 {
     if (Device_ == nullptr || Data == nullptr)
         return GR_GENERIC;
@@ -1129,8 +1129,8 @@ GENRESULT DACOM_API FDirectX9::SetExVertexConstants(unsigned long StartRegister,
                                                          (UINT)(Vector4Count)));
 }
 
-GENRESULT DACOM_API FDirectX9::SetExPixelConstants(unsigned long StartRegister, const float* Data,
-                                                   unsigned long Vector4Count)
+GENRESULT DACOM_API FDirectX9::SetExPixelConstants(uint32_t StartRegister, const float* Data,
+                                                   uint32_t Vector4Count)
 {
     if (Device_ == nullptr || Data == nullptr)
         return GR_GENERIC;
@@ -1138,7 +1138,7 @@ GENRESULT DACOM_API FDirectX9::SetExPixelConstants(unsigned long StartRegister, 
                                                         (UINT)(Vector4Count)));
 }
 
-GENRESULT DACOM_API FDirectX9::BindExTexture(unsigned long Sampler, FRPExTexture* Texture,
+GENRESULT DACOM_API FDirectX9::BindExTexture(uint32_t Sampler, FRPExTexture* Texture,
                                              const FRPExSamplerState* State)
 {
     const GENRESULT Ready = NeedExPass(this, "bind_ex_texture");
@@ -1162,7 +1162,7 @@ GENRESULT DACOM_API FDirectX9::BindExTexture(unsigned long Sampler, FRPExTexture
                          bSceneDepth);
 }
 
-GENRESULT DACOM_API FDirectX9::BindExPipelineTexture(unsigned long Sampler, void* Handle,
+GENRESULT DACOM_API FDirectX9::BindExPipelineTexture(uint32_t Sampler, void* Handle,
                                                      const FRPExSamplerState* State)
 {
     const GENRESULT Ready = NeedExPass(this, "bind_ex_pipeline_texture");
@@ -1207,8 +1207,8 @@ GENRESULT DACOM_API FDirectX9::DrawFullscreenQuad()
     return ExDrawUp(this, D3DPT_TRIANGLESTRIP, D3DFVF_XYZ | D3DFVF_TEX1, Quad, 4);
 }
 
-GENRESULT DACOM_API FDirectX9::DrawExPrimitiveUp(unsigned long Prim, unsigned long Fvf,
-                                                 const void* Verts, unsigned long Count)
+GENRESULT DACOM_API FDirectX9::DrawExPrimitiveUp(uint32_t Prim, uint32_t Fvf,
+                                                 const void* Verts, uint32_t Count)
 {
     const GENRESULT Ready = NeedExPass(this, "draw_ex_primitive_up");
     if (Ready != GR_OK)

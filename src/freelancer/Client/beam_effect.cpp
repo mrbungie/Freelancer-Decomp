@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "beam_effect.h"
+#include "fl/handles.h"
 
 #include "effect_base.h"
 #include "effect_type_info.h"
@@ -79,7 +80,7 @@ namespace
     unsigned char ColorByte(float Component, float Scale)
     {
         double const V = static_cast<double>(Scale) * static_cast<double>(Component) * kByteScale;
-        return static_cast<unsigned char>(static_cast<long>(V));
+        return static_cast<unsigned char>(static_cast<int32_t>(V));
     }
 
     void SetBatchColorRgb(FEffectVertexBatch* Batch, float Scale, float R, float G, float B)
@@ -389,7 +390,7 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
         This->EngineIndex != -1)
     {
         float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex)));
+            static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(This->EngineIndex))));
         EffectMath()->MulTransform(StackXform, *reinterpret_cast<FTransform const*>(InstanceRaw),
                                    This->LocalXform);
         UseXform = &StackXform;

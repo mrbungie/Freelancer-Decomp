@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "wincontrol_base.h"
+#include "fl/handles.h"
 #include "hud_widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
 
 #include "common_ini.h"
@@ -50,7 +51,7 @@ namespace
     {
         // The `CMP [ESI+0x84],-1` test several slots inline instead of calling FUN_00420d60.
         return Control->MeshHolder.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 }
 
@@ -478,7 +479,7 @@ void WinControl::ShowToolTip()
     FToolTipHoverInfo Info;
     Info.AuxField = 0;                // +0x44
     Info.bLive = 0;                   // +0x60
-    Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this)); // +0x00
+    Info.Ids = static_cast<int>(fl::PtrToHandle(this)); // +0x00
     Info.IdsAlt = ToolTipIds;         // +0x04 <- +0xcc
     NnToolTipFeedHover(&Info);        // FUN_004be370
 

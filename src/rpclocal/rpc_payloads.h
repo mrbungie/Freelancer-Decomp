@@ -58,7 +58,7 @@ class IChatClient;
 
 // Packs the sender's raw argument dwords into the retail payload. Returns false when the
 // arguments cannot be marshalled (a null struct pointer, a payload that is too small).
-typedef bool (*FRpcMarshalFn)(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount);
+typedef bool (*FRpcMarshalFn)(FPacketBase* Packet, const uintptr_t* Args, unsigned int ArgCount);
 
 // Rebuilds the retail argument list out of the payload and makes the one call retail's
 // HandlePacket case makes. Returns false when the packet cannot be delivered.
@@ -1660,8 +1660,8 @@ static_assert(sizeof(FPayloadClientDwordQuad) == 0x10, "ch3 dword-quad payload 0
 // DEVIATION: retail blits the whole 0x402-byte stack window, so everything past each
 // string's NUL is uninitialised stack. The marshal below zeroes the payload first.
 struct FPayloadClientLogin {
-    wchar_t AccountName[0x100];   // +0x000  wcscpy'd, receiver re-caps it at 0x28 wchars
-    wchar_t Password[0x100];      // +0x200  wcscpy'd from SLoginInfo+0xa0, re-capped at 0x10
+    unsigned short AccountName[0x100];   // +0x000  UTF-16 as on retail's wire/packet (host wchar_t is 4 bytes)
+    unsigned short Password[0x100];      // +0x200  from SLoginInfo's second string, re-capped at 0x10
     unsigned char CreateFlag;     // +0x400  <- SLoginInfo+0xc0
     unsigned char Pad_0x401[3];
 };

@@ -577,7 +577,7 @@ void RemoveMissionRtc(FMissionScript* Script, TString<0x80> const* Path)
                 if (Room->FindCharacter(GetFirstRtcRole(It->Field_0x90), Script->PlayerId,
                                         &Character))
                 {
-                    Character->SetBehavior(static_cast<unsigned long>(-1));
+                    Character->SetBehavior(static_cast<uint32_t>(-1));
                 }
             }
         }
@@ -683,7 +683,7 @@ FMissionScript::~FMissionScript()
     {
         if (SceneIt->Handle != -1)
         {
-            unsigned long Handle = static_cast<unsigned long>(SceneIt->Handle);
+            uint32_t Handle = static_cast<uint32_t>(SceneIt->Handle);
             pub::GF::AmbientScriptDestroy(&Handle);
             SceneIt->Handle = -1;
         }
@@ -1060,7 +1060,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         bBaseBody = false;
         if (Parms[0] != PlayerId || !pub::SinglePlayer())
             break;
-        FILE* File = reinterpret_cast<FILE*>(static_cast<uintptr_t>(Parms[1]));
+        FILE* File = *reinterpret_cast<FILE* const*>(reinterpret_cast<unsigned char const*>(Parms) + sizeof(void*))   /* {player id, pointer}: the pointer is naturally aligned */;
         fprintf(File, "\n[MissionState]\n");
         SaveMissionState(File);
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
@@ -1079,7 +1079,7 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         else if (Parms[0] == PlayerId)
         {
-            INI_Reader* Reader = reinterpret_cast<INI_Reader*>(static_cast<uintptr_t>(Parms[1]));
+            INI_Reader* Reader = *reinterpret_cast<INI_Reader* const*>(reinterpret_cast<unsigned char const*>(Parms) + sizeof(void*));
             INI_Reader::State SavedState;
             Reader->get_state(SavedState);
             Reader->reset();
@@ -1357,7 +1357,7 @@ void FMissionScript::OnBaseExit(void const* MessageParms)
     {
         if (SceneIt->Handle != -1)
         {
-            unsigned long Handle = static_cast<unsigned long>(SceneIt->Handle);
+            uint32_t Handle = static_cast<uint32_t>(SceneIt->Handle);
             pub::GF::AmbientScriptDestroy(&Handle);
             SceneIt->Handle = -1;
         }
@@ -1392,7 +1392,7 @@ void FMissionScript::OnCharacterSelect(void const* MessageParms)
             continue;
         if (Character->CharacterId != *static_cast<unsigned int const*>(MessageParms))
             continue;
-        Character->SetBehavior(static_cast<unsigned long>(-1));
+        Character->SetBehavior(static_cast<uint32_t>(-1));
         It->Field_0x94 = 1;
     }
     EMessage EventId = EMessage::GFObjSelect;

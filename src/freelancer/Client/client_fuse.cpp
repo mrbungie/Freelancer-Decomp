@@ -8,6 +8,7 @@
 // See client_fuse.h for what is and is not ported.
 
 #include "client_fuse.h"
+#include "fl/handles.h"
 
 #include "cli_projectile_fx.h" // CliEffectListRemove (FUN_004fcef0), CliEffectCompanionClear
 #include "client_explosion.h" // Action_Explode::Create (FUN_005361e0)
@@ -251,9 +252,9 @@ void StartExplosionAction::Trigger(unsigned SourceId, unsigned short SubObjId)
         {
             // 0x0052b185..0x0052b1a7: the host's hardpoint in object space (FindHardpoint_OS
             // on its engine index, vt+0x1c).
-            long HpHandle = 0;
+            int32_t HpHandle = 0;
             HardpointInfo Info;
-            if (FindHardpoint_OS(static_cast<long>(Host->get_index()), Hardpoint.Value, HpHandle,
+            if (FindHardpoint_OS(static_cast<int32_t>(Host->get_index()), Hardpoint.Value, HpHandle,
                                  Info))
             {
                 // 0x0052b1ad..0x0052b1b7: into world space on the handle it came back with.
@@ -529,7 +530,7 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
     {
         // 0x0052bb1a..0x0052bb42: engine index -1, the local transform identity (FUN_004215b0)
         // with a zero position, nothing found yet (BL).
-        long EngineIndex = -1;
+        int32_t EngineIndex = -1;
         FTransform Local;
         reinterpret_cast<Matrix&>(Local.Rotation) =
             Matrix(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
@@ -630,7 +631,7 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
             // 0x0052bd72..0x0052bdc5: world transform = the engine instance's (DALib::Engine
             // vt+0xa0) * local (vt+0x1c MulTransform), copied (0xc dwords).
             float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)));
+                static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(EngineIndex))));
             FTransform World;
             FuseMath()->MulTransform(World, *reinterpret_cast<FTransform const*>(InstanceRaw),
                                      Local);
@@ -745,7 +746,7 @@ void ClientImpulseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
     {
         // 0x0052c0d4..0x0052c0fe: FindHardpoint_PS (import 0x005c65e8, not _OS) on the host's
         // index, the out handle starting at -1; not found goes to the tail.
-        long HpHandle = -1;
+        int32_t HpHandle = -1;
         HardpointInfo Info;
         if (FindHardpoint_PS(Host->get_index(), Hardpoint.Value, HpHandle, Info))
         {

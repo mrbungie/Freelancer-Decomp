@@ -27,7 +27,7 @@ namespace
 
     unsigned HashObjectKey(IVP_Real_Object* Object)
     {
-        return IVP_VHash_HashPointer((unsigned)Object); // FUN_0635d4d0
+        return IVP_VHash_HashPointer((unsigned)(intptr_t)(Object)); // FUN_0635d4d0
     }
 
     // 0635d510 / 0635d450 (.text:0635d534-0635d560 / 0635d474-0635d4a0): from

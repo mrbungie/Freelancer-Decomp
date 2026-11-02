@@ -2502,7 +2502,7 @@ void EqObj::process_dock_queue(float Dt)
         // .text:06ce79f7 .. 06ce7a52 -- the ship's "hpmount" hardpoint in object
         // space (FindHardpoint_OS on the ship's engine index, IObjInspect slot 7),
         // copied into a Transform {Orient, Position}.
-        long HpHandle = 0;
+        int32_t HpHandle = 0;
         HardpointInfo Hp;
         FindHardpoint_OS(ShipObj->get_index(), "hpmount", HpHandle, Hp);
         Transform HpXform;
@@ -3848,7 +3848,7 @@ void EqObj::destroy_group_contents(CArchGroup* Group, DamageList& Out)
     for (CEquip const* Equip = Equipment.Traverse(Walk); Equip != nullptr; Equip = Equipment.Traverse(Walk))
     {
         // vt +0x64: CExternalEquip::GetParentConnector(false).
-        long const Parent = static_cast<CExternalEquip const*>(Equip)->GetParentConnector(false);
+        int32_t const Parent = static_cast<CExternalEquip const*>(Equip)->GetParentConnector(false);
         if (!Group->IsInstInGroup(Parent))
             continue;
         if (Equip->Type == 1 || Equip->Type == 2)
@@ -4034,7 +4034,7 @@ bool EqObj::build_equip_loot(CAttachedEquip const* Equip, FLootRecord& Out)
 
     // .text:06cec2e2 .. 06cec339 -- the root instance (vt +0x84), its position
     // (IEngine slot 36) and orientation (slot 38).
-    long const Instance = Equip->GetRootIndex();
+    int32_t const Instance = Equip->GetRootIndex();
     float const* const Position =
         DALib::Engine->GetInstancePosition(reinterpret_cast<void*>(Instance));
     Out.Position.x = Position[0];
@@ -5210,8 +5210,8 @@ void Ship::compute_jettison_launch(Vector* OutPos, Matrix* OutOrient, Vector* Ou
     // .text:06d01872 .. 06d018af -- both bay hardpoints must exist on the
     // engine instance (IObjInspect +0x1c get_index): HpBaySurface (+0xe0)
     // into S+0xc, HpBayExternal (+0xe4) into S+0x10.
-    long Surface = 0;
-    long External = 0;
+    int32_t Surface = 0;
+    int32_t External = 0;
     Vector Dir;
     if (FindHardpoint(get_index(), Arch->HpBaySurface.Value, Surface) &&
         FindHardpoint(get_index(), Arch->HpBayExternal.Value, External))

@@ -216,8 +216,8 @@ namespace AlchemyImpl
         FRampSingle();
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API Reset() override;
         GENRESULT DACOM_API CopyFrom(IRampSingle* Other) override;
@@ -228,8 +228,8 @@ namespace AlchemyImpl
         GENRESULT DACOM_API GetKeyValue(int Index, float* Out) override;
         GENRESULT DACOM_API SetKeyTime(int Index, float Time, int* OutNewIndex) override;
         GENRESULT DACOM_API SetKeyValue(int Index, const float* Value) override;
-        unsigned long DACOM_API GetMode() override;
-        GENRESULT DACOM_API SetMode(unsigned long Mode) override;
+        uint32_t DACOM_API GetMode() override;
+        GENRESULT DACOM_API SetMode(uint32_t Mode) override;
         int DACOM_API GetKeyCount() override;
         GENRESULT DACOM_API GetKeyFactoryName(const char** Out) override;
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
@@ -239,12 +239,12 @@ namespace AlchemyImpl
         // with two or more keys InvSpan = 1 / (t1 - t0) unless that span is exactly zero.
         void ResetEvalCache();
 
-        unsigned long Mode_;          // +0x04
+        uint32_t Mode_;          // +0x04
         TRampKeyVector<float> Keys_;  // +0x08
         float InvSpan_;               // +0x1C
         int Cache_;                   // +0x20
         FInterpolator Interpolator_;  // +0x24
-        unsigned long RefCount_;      // +0x28
+        uint32_t RefCount_;      // +0x28
     };
 
     // FxRampColor (vtable 0x0624bc40): FxRampSingle's layout and search with packed
@@ -252,42 +252,42 @@ namespace AlchemyImpl
     class FRampColor final : public IRampColor
     {
     public:
-        typedef unsigned long (*FInterpolator)(unsigned long A, unsigned long B, float T);
+        typedef uint32_t (*FInterpolator)(uint32_t A, uint32_t B, float T);
 
         FRampColor();
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API Reset() override;
         GENRESULT DACOM_API CopyFrom(IRampColor* Other) override;
         int DACOM_API AddKey(float Time, const float* Rgb) override;
         GENRESULT DACOM_API RemoveKey(int Index) override;
         float* DACOM_API EvalRgb(float* Out, float Time) override;
-        unsigned long DACOM_API EvalPacked(float Time) override;
+        uint32_t DACOM_API EvalPacked(float Time) override;
         GENRESULT DACOM_API GetKeyTime(int Index, float* Out) override;
         GENRESULT DACOM_API GetKeyRgb(int Index, float* Out) override;
         GENRESULT DACOM_API SetKeyTime(int Index, float Time, int* OutNewIndex) override;
         GENRESULT DACOM_API SetKeyRgb(int Index, const float* Rgb) override;
-        unsigned long DACOM_API GetMode() override;
-        GENRESULT DACOM_API SetMode(unsigned long Mode) override;
+        uint32_t DACOM_API GetMode() override;
+        GENRESULT DACOM_API SetMode(uint32_t Mode) override;
         int DACOM_API GetKeyCount() override;
         GENRESULT DACOM_API GetKeyFactoryName(const char** Out) override;
-        int DACOM_API AddKeyPacked(float Time, const unsigned long* Packed) override;
-        GENRESULT DACOM_API GetKeyPacked(int Index, unsigned long* Out) override;
-        GENRESULT DACOM_API SetKeyPacked(int Index, const unsigned long* Packed) override;
+        int DACOM_API AddKeyPacked(float Time, const uint32_t* Packed) override;
+        GENRESULT DACOM_API GetKeyPacked(int Index, uint32_t* Out) override;
+        GENRESULT DACOM_API SetKeyPacked(int Index, const uint32_t* Packed) override;
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
 
     private:
         void ResetEvalCache();
 
-        unsigned long Mode_;                  // +0x04
-        TRampKeyVector<unsigned long> Keys_;  // +0x08
+        uint32_t Mode_;                  // +0x04
+        TRampKeyVector<uint32_t> Keys_;  // +0x08
         float InvSpan_;                       // +0x1C
         int Cache_;                           // +0x20
         FInterpolator Interpolator_;          // +0x24
-        unsigned long RefCount_;              // +0x28
+        uint32_t RefCount_;              // +0x28
     };
 
     // FxAnimatedSingle (vtable 0x0624bca0; interface and object layout in alchemy_types.h,
@@ -311,7 +311,7 @@ namespace AlchemyImpl
         // (allocator byte, begin, end, capacity end), held here as a std::vector.
         struct FTrack
         {
-            unsigned long LoopType;
+            uint32_t LoopType;
             std::vector<FKey> Keys;
         };
 
@@ -322,8 +322,8 @@ namespace AlchemyImpl
         ~FFxAnimatedSingle();
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API Reset() override;
         GENRESULT DACOM_API CopyFrom(IFxAnimatedSingle* Other) override;
@@ -337,9 +337,9 @@ namespace AlchemyImpl
         GENRESULT DACOM_API GetKeyValue(int Index, float* Out) override;
         GENRESULT DACOM_API SetKeyTime(int Index, float Time, int* OutNewIndex) override;
         GENRESULT DACOM_API SetKeyValue(int Index, const float* Value) override;
-        GENRESULT DACOM_API SetLoopType(unsigned long LoopType) override;
-        GENRESULT DACOM_API GetLoopType(unsigned long* Out) override;
-        GENRESULT DACOM_API ComputeSlopes(unsigned long Mode) override;
+        GENRESULT DACOM_API SetLoopType(uint32_t LoopType) override;
+        GENRESULT DACOM_API GetLoopType(uint32_t* Out) override;
+        GENRESULT DACOM_API ComputeSlopes(uint32_t Mode) override;
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
 
     private:
@@ -349,13 +349,13 @@ namespace AlchemyImpl
         // The track's own thiscall helpers.
         static int InsertTrackKey(FTrack* Track, const FKey& Key);              // 06246780
         static int SetTrackKeyTime(FTrack* Track, int Index, float NewTime);    // 06246660
-        static void ComputeTrackSlopes(FTrack* Track, unsigned long Mode);      // 06246550
+        static void ComputeTrackSlopes(FTrack* Track, uint32_t Mode);      // 06246550
         static double EvalTrack(FTrack* Track, float Time);                     // 062469f0
         static double EvalSegment(const FKey* A, const FKey* B, float Time);    // 06246950
 
         float Weight_;              // +0x04
         FTrack* Track_;             // +0x08
-        unsigned long RefCount_;    // +0x0C
+        uint32_t RefCount_;    // +0x0C
     };
 
     // One class template for the two scalar nested ramps (see INestedSingleRamp in
@@ -374,8 +374,8 @@ namespace AlchemyImpl
         ~TNestedSingleRamp();
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API Reset() override;
         GENRESULT DACOM_API CopyFrom(INestedSingleRamp* Other) override;
@@ -386,8 +386,8 @@ namespace AlchemyImpl
         GENRESULT DACOM_API GetKeyValue(int Index, IDAComponent** Out) override;
         GENRESULT DACOM_API SetKeyTime(int Index, float Time, int* OutNewIndex) override;
         GENRESULT DACOM_API SetKeyValue(int Index, IDAComponent* Child) override;
-        unsigned long DACOM_API GetMode() override;
-        GENRESULT DACOM_API SetMode(unsigned long Mode) override;
+        uint32_t DACOM_API GetMode() override;
+        GENRESULT DACOM_API SetMode(uint32_t Mode) override;
         int DACOM_API GetKeyCount() override;
         GENRESULT DACOM_API GetKeyFactoryName(const char** Out) override;
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
@@ -398,9 +398,9 @@ namespace AlchemyImpl
         // Release at zero -- FUN_0620cf20 / FUN_0620cde0).
         void ReleaseChildren();
 
-        unsigned long Mode_;              // +0x04
+        uint32_t Mode_;              // +0x04
         TRampKeyVector<FChild*> Keys_;    // +0x08
-        unsigned long RefCount_;          // +0x1C
+        uint32_t RefCount_;          // +0x1C
     };
 
     struct FRampSingleRampTraits
@@ -443,21 +443,21 @@ namespace AlchemyImpl
         ~FRampColorRamp();
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API Reset() override;
         GENRESULT DACOM_API CopyFrom(IRampColorRamp* Other) override;
         int DACOM_API AddKey(float Time, IRampColor* Child) override;
         GENRESULT DACOM_API RemoveKey(int Index) override;
         float* DACOM_API EvalRgb(float* Out, float OuterTime, float InnerTime) override;
-        unsigned long DACOM_API EvalPacked(float OuterTime, float InnerTime) override;
+        uint32_t DACOM_API EvalPacked(float OuterTime, float InnerTime) override;
         GENRESULT DACOM_API GetKeyTime(int Index, float* Out) override;
         GENRESULT DACOM_API GetKeyValue(int Index, IRampColor** Out) override;
         GENRESULT DACOM_API SetKeyTime(int Index, float Time, int* OutNewIndex) override;
         GENRESULT DACOM_API SetKeyValue(int Index, IRampColor* Child) override;
-        unsigned long DACOM_API GetMode() override;
-        GENRESULT DACOM_API SetMode(unsigned long Mode) override;
+        uint32_t DACOM_API GetMode() override;
+        GENRESULT DACOM_API SetMode(uint32_t Mode) override;
         int DACOM_API GetKeyCount() override;
         GENRESULT DACOM_API GetKeyFactoryName(const char** Out) override;
         GENRESULT DACOM_API Initialize(AGGDESC* Desc) override;
@@ -466,9 +466,9 @@ namespace AlchemyImpl
     private:
         void ReleaseChildren();
 
-        unsigned long Mode_;                  // +0x04
+        uint32_t Mode_;                  // +0x04
         TRampKeyVector<IRampColor*> Keys_;    // +0x08
-        unsigned long RefCount_;              // +0x1C
+        uint32_t RefCount_;              // +0x1C
     };
 
     // The nested ramps' CreateKeyValue tail (06207be0, 06208450, 06207430): DACOM_Acquire()
@@ -508,7 +508,7 @@ namespace AlchemyImpl
             struct FChildCleanup
             {
                 FAnimatedSingleRamp** Children;
-                unsigned long Remaining;
+                uint32_t Remaining;
 
                 ~FChildCleanup() noexcept(false) { ReleaseRemaining(); }
 
@@ -532,8 +532,8 @@ namespace AlchemyImpl
         }
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override { return ++RefCount_; }
+        uint32_t DACOM_API Release() override;
 
         // +0xC FUN_062436a0: see IAnimatedTransform's class comment for the
         // full trace. Rebuilds every channel to a fresh single default key
@@ -546,14 +546,14 @@ namespace AlchemyImpl
         GENRESULT DACOM_API CopyFrom(IAnimatedTransform* Other) override;
 
         // +0x14 LAB_06243830: `*Out = Children_[Index]; (*Out)->AddRef();`
-        GENRESULT DACOM_API GetChild(unsigned long Index, IDAComponent** Out) override;
+        GENRESULT DACOM_API GetChild(uint32_t Index, IDAComponent** Out) override;
 
         // +0x18 FUN_06243850: see IAnimatedTransform's class comment for the
         // full byte trace of this genuinely subtle algorithm.
         GENRESULT DACOM_API UpdateChannelFlags() override;
 
         // +0x1C LAB_062439b0: *Out = [+8], returns 0.
-        GENRESULT DACOM_API GetChannelFlags(unsigned long* Out) override
+        GENRESULT DACOM_API GetChannelFlags(uint32_t* Out) override
         {
             *Out = ChannelFlags_;
             return GR_OK;
@@ -567,8 +567,8 @@ namespace AlchemyImpl
 
         // +0x24 LAB_062439f0: packs 3 nibbles, no masking on write (matches
         // retail -- a caller value >0xF bleeds into the adjacent nibble).
-        GENRESULT DACOM_API SetPackedModes(unsigned long A, unsigned long B,
-                                           unsigned long C) override
+        GENRESULT DACOM_API SetPackedModes(uint32_t A, uint32_t B,
+                                           uint32_t C) override
         {
             PackedModes_ = (((A << 4) | B) << 4) | C;
             return GR_OK;
@@ -576,8 +576,8 @@ namespace AlchemyImpl
 
         // +0x28 LAB_06243a20: unpacks the same 3 nibbles (top/mid/low),
         // masked 0xF on read; no null tests.
-        GENRESULT DACOM_API GetPackedModes(unsigned long* A, unsigned long* B,
-                                           unsigned long* C) override
+        GENRESULT DACOM_API GetPackedModes(uint32_t* A, uint32_t* B,
+                                           uint32_t* C) override
         {
             *A = (PackedModes_ >> 8) & 0xF;
             *B = (PackedModes_ >> 4) & 0xF;
@@ -586,14 +586,14 @@ namespace AlchemyImpl
         }
 
         // +0x2C LAB_06243a60: see the body in alchemy_ramp.cpp.
-        void DACOM_API Evaluate(unsigned long TimeA, unsigned long TimeB, float* Out12) override;
+        void DACOM_API Evaluate(uint32_t TimeA, uint32_t TimeB, float* Out12) override;
 
         // +0x30 LAB_06243690: always-success 1-arg stub, no observable
         // retail behavior beyond returning GR_OK.
-        GENRESULT DACOM_API Slot0x30(unsigned long /*Arg*/) override { return GR_OK; }
+        GENRESULT DACOM_API Slot0x30(uint32_t /*Arg*/) override { return GR_OK; }
 
     private:
-        static const unsigned long kChannelCount = 9;
+        static const uint32_t kChannelCount = 9;
         // Translate X/Y/Z, Rotate X/Y/Z (degrees), Scale X/Y/Z -- read
         // directly from retail's DAT_062575e8 (alchemy.dll.txt:180638-180672,
         // 9 dwords: 0,0,0,0,0,0,0x3f800000,0x3f800000,0x3f800000).
@@ -606,9 +606,9 @@ namespace AlchemyImpl
 
         // Retail keeps RefCount at +0x30, after the children; the order here is the
         // port's own (no raw offset reaches this object).
-        unsigned long RefCount_;
-        unsigned long PackedModes_;              // +0x04
-        unsigned long ChannelFlags_;             // +0x08
+        uint32_t RefCount_;
+        uint32_t PackedModes_;              // +0x04
+        uint32_t ChannelFlags_;             // +0x08
         FAnimatedSingleRamp* Children_[kChannelCount]; // +0x0C
     };
 

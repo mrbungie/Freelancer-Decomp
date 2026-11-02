@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "page_character_select_single.h"
+#include "fl/handles.h"
 
 #include "font_string.h"       // FHudWideText, WideTextAssign (FUN_00413df0)
 #include "globals.h"           // GetClientFrameTimeCapped (FUN_0042d680)
@@ -48,12 +49,12 @@ namespace
     // The UIListBox rows carry the CharacterInfo* as their data word (0x0056b667 / 0x0056b685).
     int InfoToItemData(CCharacterSet::CharacterInfo* Info)
     {
-        return static_cast<int>(reinterpret_cast<intptr_t>(Info));
+        return static_cast<int>(fl::PtrToHandle(Info));
     }
 
     CCharacterSet::CharacterInfo* ItemDataToInfo(int Data)
     {
-        return reinterpret_cast<CCharacterSet::CharacterInfo*>(static_cast<intptr_t>(Data));
+        return static_cast<CCharacterSet::CharacterInfo*>(fl::HandleToPtr(static_cast<uint32_t>(Data)));
     }
 
     void AppendStyle(UiRichTextWin* Win, unsigned short Style)

@@ -18,6 +18,7 @@
 #include <windows.h>
 
 #include <map>
+#include "fl/text.h"
 
 struct IFileSystem;
 
@@ -59,7 +60,7 @@ public:
     char const* Slot00() override;
     char const* GetName() override;
     float GetFixedHeight() override;
-    HFONT__* Slot03() override;
+    void* Slot03() override;
     LOGFONTA const* GetLogFont() override;
     float GetGlyphAdvance(wchar_t Ch) override;
     int GetLineHeight() override;
@@ -96,11 +97,10 @@ private:
     TString<64> Face;                 // +0x8c GDI face name
     float FixedHeight;                // +0xd0
     int InitLineHeight;               // +0xd4 tmHeight snapshot of FUN_00415a80 (Slot07)
-    HDC Dc;                           // +0xd8 CreateCompatibleDC(0)
     LOGFONTA LogFont;                 // +0xdc
-    HFONT Font;                       // +0x118
+    fl::text::IFont* Font;            // +0x118 the realized face (platform text rasterizer)
     int RealizedHeight;               // +0x11c lfHeight of the realized face
-    TEXTMETRICA Metrics;              // +0x120
+    fl::text::FontMetrics Metrics;    // +0x120
     int LayoutGeneration;             // +0x158 vs DAT_006105b0
     std::map<int, int> ScaleDeltaByWidth; // +0x15c surface width -> pixel delta
 };

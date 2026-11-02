@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_marker.h"
+#include "fl/handles.h"
 
 #include "gf_thorn_light.h" // the reference forwarders shared with the light reference
 
@@ -83,7 +84,7 @@ GENRESULT DACOM_API FThornMarker::GetOrientation(float* OutOrient9)
 // FUN_00450870.
 void* FThornMarker::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // ---------------------------------------------------------------------------------------

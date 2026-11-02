@@ -79,3 +79,14 @@ tools/_*
 build/
 Cab1/
 QATA/
+
+# portable build output (exe is built into bin/ next to the retail .ini files)
+/bin/freelancer
+/bin/freelancer.dSYM/
+/build/
+/bin-asan/
+/build-asan/
+
+/bin/*.dylib
+/build-audit/
+/build-strict/

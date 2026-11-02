@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include <windows.h>
+#include "platform/fl_x87.h"
 #include "ClientImpl.h"
 #include "../include/common_server_types.h"
 #include "common_text.h"
@@ -287,7 +288,7 @@ void CClientImpl::SendCommonPlayerTradeAcceptTrade(unsigned int ClientId, unsign
     }
 }
 
-void CClientImpl::SendCommonPlayerTradeSetTradeMoney(unsigned int ClientId, unsigned int ShipId, unsigned long Money) {
+void CClientImpl::SendCommonPlayerTradeSetTradeMoney(unsigned int ClientId, unsigned int ShipId, uint32_t Money) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 0x12, &Packet) == 0)
     {
@@ -309,12 +310,16 @@ void CClientImpl::SendCommonPlayerTradeAddTradeEquip(unsigned int ClientId, unsi
         TypedPacket->EquipCount = Item.Count;
         const float* SourceHealth = &Item.Health;
         float* DestinationHealth = &TypedPacket->EquipHealth;
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         __asm {
             mov eax, SourceHealth
             mov edx, DestinationHealth
             fld dword ptr [eax]
             fstp dword ptr [edx]
         }
+#else
+        FlX87CopyFloat(SourceHealth, DestinationHealth);
+#endif
         TypedPacket->TargetPlayer = ShipId;
         TypedPacket->EquipId = Item.Id;
         PushToClient(ClientId, Packet->AsRaw());
@@ -361,7 +366,7 @@ void CClientImpl::DumpPacketStats(const char* Name) {
     RpcGetRemotePacketSerializer()->DumpStats(Name);
 }
 
-void CClientImpl::SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, unsigned long Size, const void* Data) {
+void CClientImpl::SendCommonChatMsg(CHAT_ID TargetId, CHAT_ID SenderId, uint32_t Size, const void* Data) {
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(1, 5, &Packet) == 0)
     {

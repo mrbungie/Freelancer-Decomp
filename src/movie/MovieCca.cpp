@@ -35,11 +35,11 @@ static FRngState GRngState;
 static unsigned char GComputerName[0x10];
 static unsigned char GUserName[0x101];
 
-typedef long (__stdcall* FNtQuerySystemInformation)(unsigned int Class, void* Buffer, unsigned int Length, unsigned int* Returned);
-typedef long (__stdcall* FNtOpenFile)(void** Handle, unsigned int Access, void* Attributes, void* IoStatus, unsigned int Share, unsigned int Options);
+typedef int32_t (__stdcall* FNtQuerySystemInformation)(unsigned int Class, void* Buffer, unsigned int Length, unsigned int* Returned);
+typedef int32_t (__stdcall* FNtOpenFile)(void** Handle, unsigned int Access, void* Attributes, void* IoStatus, unsigned int Share, unsigned int Options);
 typedef void (__stdcall* FRtlInitUnicodeString)(void* Destination, const wchar_t* Source);
 typedef int (__stdcall* FGetCursorPos)(void* Point);
-typedef long (__stdcall* FGetMessageTime)();
+typedef int32_t (__stdcall* FGetMessageTime)();
 
 // DAT_06ae0e6c, DAT_06ae0e70, DAT_06ae0e74, DAT_06ae0e78, DAT_06ae0e7c.
 static FNtQuerySystemInformation GNtQuerySystemInformation = 0;
@@ -162,7 +162,7 @@ static bool AppendDword(unsigned char*& Cursor, unsigned int& Remaining, unsigne
 static bool AppendSystemInfo(unsigned char*& Cursor, unsigned int& Remaining, unsigned int Class, unsigned int Want)
 {
     unsigned int Returned = 0u;
-    long Status;
+    int32_t Status;
     if (Remaining < Want)
     {
         return false;
@@ -239,7 +239,7 @@ static int __stdcall ReadKsecRandom(void* Input, unsigned int InputLength, void*
     FKernelObjectAttributes Attributes;
     unsigned int IoStatus[2];
     void* Handle;
-    long Status;
+    int32_t Status;
     int Control;
     if (QueryRngPlatform() == 0u || GNtOpenFile == 0 || GRtlInitUnicodeString == 0)
     {
@@ -272,7 +272,7 @@ static unsigned int CollectEntropy(unsigned char* Entropy, const unsigned char* 
     unsigned int NameSize;
     unsigned int UserSize;
     unsigned int Returned;
-    long Status;
+    int32_t Status;
     if (SeedLength > 0xE00u)
     {
         return Remaining;

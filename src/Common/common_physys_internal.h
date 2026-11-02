@@ -15,6 +15,7 @@
 // (FLControllerGolemParms, src/IVP/ivp_physics/ivp_controller.h).
 
 #include "common_physys.h"
+#include "fl/handles.h"
 #include "common_cobject.h"
 #include "x86math.h"  // FQuaternion, FMatrix
 #include "DALib.h"    // DALib::Engine (the instance-id helpers below)
@@ -142,50 +143,60 @@ namespace CmnPhySys
     // Shutdown, BuildPartIVP_Real 0628929e, FindRayCollisions 06289c5b) keep using find().
     inline PhysicalSystem& PhySys_FindSystem(unsigned SystemId)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         return G_PhysicalSystems.find(SystemId)._Ptr->_Myval.second;
+#else
+        // Portable STL has no public node pointer. Retail's miss path reads uninitialised
+        // head-node storage (undefined content in both binaries); use a stable placeholder.
+        auto Found = G_PhysicalSystems.find(SystemId);
+        alignas(PhysicalSystem) static unsigned char MissStorage[sizeof(PhysicalSystem)];
+        return Found != G_PhysicalSystems.end()
+                   ? Found->second
+                   : *reinterpret_cast<PhysicalSystem*>(MissStorage);
+#endif
     }
 
     // IEngine (engine/engbase.h) types its instance parameters and results as void*, but
     // they carry retail's engine instance id -- a long, -1 for "none". The physics code
     // keeps ids in a long and converts only at the IEngine call; each helper below is
     // exactly one IEngine slot call, nothing more.
-    inline void* PhySys_InstanceHandle(long Instance)
+    inline void* PhySys_InstanceHandle(int32_t Instance)
     {
-        return (void*)(intptr_t)Instance;
+        return (void*)fl::HandleToPtr((uint32_t)(Instance));
     }
 
-    inline long PhySys_InstanceId(void* Handle)
+    inline int32_t PhySys_InstanceId(void* Handle)
     {
-        return (long)(intptr_t)Handle;
+        return (int32_t)fl::PtrToHandle(Handle);
     }
 
     // IEngine +0xd8 GetRelatedInstance(From, Flags, Cursor): Cursor -1 starts a walk, -1 ends it.
-    inline long PhySys_RelatedInstance(long From, unsigned long Flags, long Cursor)
+    inline int32_t PhySys_RelatedInstance(int32_t From, uint32_t Flags, int32_t Cursor)
     {
         return PhySys_InstanceId(
             DALib::Engine->GetRelatedInstance(PhySys_InstanceHandle(From), Flags, PhySys_InstanceHandle(Cursor)));
     }
 
     // IEngine +0x80 GetInstanceUserData: the CObject PhySys stored on the instance, or null.
-    inline CObject* PhySys_InstanceObject(long Instance)
+    inline CObject* PhySys_InstanceObject(int32_t Instance)
     {
         return (CObject*)DALib::Engine->GetInstanceUserData(PhySys_InstanceHandle(Instance));
     }
 
     // IEngine +0x7c SetInstanceUserData.
-    inline void PhySys_SetInstanceObject(long Instance, CObject* Object)
+    inline void PhySys_SetInstanceObject(int32_t Instance, CObject* Object)
     {
         DALib::Engine->SetInstanceUserData(PhySys_InstanceHandle(Instance), Object);
     }
 
     // IEngine +0xd4 GetInstanceParent.
-    inline long PhySys_InstanceParent(long Instance)
+    inline int32_t PhySys_InstanceParent(int32_t Instance)
     {
         return PhySys_InstanceId(DALib::Engine->GetInstanceParent(PhySys_InstanceHandle(Instance)));
     }
 
     // FUN_062883c0: re-pose Object's jointed child instances (common_physys.cpp).
-    void PhySys_UpdateJointedChildren(long Instance, CObject* Object);
+    void PhySys_UpdateJointedChildren(int32_t Instance, CObject* Object);
     // The MatrixToQuaternion pose conversion of FUN_0628c7b0 / FUN_0628c860 and the
     // CreatePhantom bodies (common_physicalsystem.cpp).
     void PhySys_OrientationToIvpQuat(Matrix const& Orientation, IVP_U_Quat& Out);
