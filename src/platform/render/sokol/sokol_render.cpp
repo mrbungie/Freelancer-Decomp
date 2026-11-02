@@ -472,6 +472,24 @@ namespace
             if (!sgReady_ || !verts || nverts == 0) return GR_GENERIC;
             const fldraw::FvfLayout L = fldraw::MakeLayout(fvf);
             if (!L.pos || L.stride == 0) return GR_GENERIC;
+            if (TraceCam()) fprintf(stderr, "[cam] draw fvf=0x%x n=%u tex0=%p world.t=(%g %g %g)\n", fvf, nverts, stageTex_[0], worldV_[12], worldV_[13], worldV_[14]);
+            if (TraceCam() && !L.rhw && (fvf == 0x102 || fvf == 0x142))
+            {   // NDC bounding box of the mesh under the current world/view/projection
+                float wv[16], m[16]; fldraw::Mul(wv, worldV_, viewV_); fldraw::Mul(m, wv, projV_);
+                float mnx = 1e30f, mny = 1e30f, mxx = -1e30f, mxy = -1e30f; unsigned front = 0;
+                float mnpx = 1e30f, mxpx = -1e30f, mnpy = 1e30f, mxpy = -1e30f, mnpz = 1e30f, mxpz = -1e30f;
+                for (unsigned i = 0; i < nverts; ++i)
+                {
+                    const float* v = (const float*)(verts + (size_t)i * L.stride);
+                    mnpx = fminf(mnpx, v[0]); mxpx = fmaxf(mxpx, v[0]); mnpy = fminf(mnpy, v[1]); mxpy = fmaxf(mxpy, v[1]); mnpz = fminf(mnpz, v[2]); mxpz = fmaxf(mxpz, v[2]);
+                    const float cx = v[0] * m[0] + v[1] * m[4] + v[2] * m[8] + m[12], cy = v[0] * m[1] + v[1] * m[5] + v[2] * m[9] + m[13];
+                    const float cw = v[0] * m[3] + v[1] * m[7] + v[2] * m[11] + m[15];
+                    if (cw <= 0) continue;
+                    ++front; mnx = fminf(mnx, cx / cw); mxx = fmaxf(mxx, cx / cw); mny = fminf(mny, cy / cw); mxy = fmaxf(mxy, cy / cw);
+                }
+                if (L.diffuse >= 0) { unsigned long long sa = 0, sr = 0; for (unsigned i = 0; i < nverts; ++i) { const uint32_t c = *(const uint32_t*)(verts + (size_t)i * L.stride + L.diffuse); sa += c >> 24; sr += (c >> 16) & 255; } fprintf(stderr, "[cam]   mean vertex alpha=%.1f red=%.1f\n", (double)sa / nverts, (double)sr / nverts); }
+                fprintf(stderr, "[cam]   model bbox x[%g %g] y[%g %g] z[%g %g]; in front: %u/%u; ndc x[%g %g] y[%g %g]\n", mnpx, mxpx, mnpy, mxpy, mnpz, mxpz, front, nverts, mnx, mxx, mny, mxy);
+            }
             BeginPassIfNeeded();
             if (!passOpen_) return GR_OK;
 
@@ -821,7 +839,8 @@ namespace
         GENRESULT DACOM_API VerifyState() override { return GR_OK; }
 
         // ------------------------------------------------------------ viewport / window / matrices
-        GENRESULT DACOM_API SetViewportRect(int x, int y, int w, int h) override { vpX_ = x; vpY_ = y; vpW_ = w; vpH_ = h; return GR_OK; }
+        static bool TraceCam() { static const bool on = getenv("FL_TRACE_CAM") != nullptr; return on; }
+        GENRESULT DACOM_API SetViewportRect(int x, int y, int w, int h) override { if (TraceCam()) fprintf(stderr, "[cam] viewport %d,%d %dx%d\n", x, y, w, h); vpX_ = x; vpY_ = y; vpW_ = w; vpH_ = h; return GR_OK; }
         GENRESULT DACOM_API GetViewportRect(int* x, int* y, int* w, int* h) override { *x = vpX_; *y = vpY_; *w = vpW_; *h = vpH_; return GR_OK; }
         GENRESULT DACOM_API SetDepthRange(float a, float b) override { depthMin_ = a; depthMax_ = b; return GR_OK; }
         GENRESULT DACOM_API GetDepthRange(float* a, float* b) override { *a = depthMin_; *b = depthMax_; return GR_OK; }
@@ -846,7 +865,7 @@ namespace
             return GR_OK;
         }
         GENRESULT DACOM_API GetModelview(float* m) override { memcpy(m, modelviewRaw_, sizeof(modelviewRaw_)); return GR_OK; }
-        GENRESULT DACOM_API SetProjection(const float* m) override { memcpy(proj_, m, sizeof(proj_)); fldraw::FromTransposed(projV_, m); return GR_OK; }
+        GENRESULT DACOM_API SetProjection(const float* m) override { if (TraceCam()) fprintf(stderr, "[cam] projection [%g %g %g %g | %g %g %g %g]\n", m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7]); memcpy(proj_, m, sizeof(proj_)); fldraw::FromTransposed(projV_, m); return GR_OK; }
         GENRESULT DACOM_API GetProjection(float* m) override { memcpy(m, proj_, sizeof(proj_)); return GR_OK; }
         GENRESULT DACOM_API SetLookat(float ex, float ey, float ez, float ax, float ay, float az, float ux, float uy, float uz) override
         {
@@ -869,6 +888,7 @@ namespace
         }
         GENRESULT DACOM_API SetOrtho(float l, float r, float b, float t, float n, float f) override
         {
+            if (TraceCam()) fprintf(stderr, "[cam] ortho l=%g r=%g b=%g t=%g n=%g f=%g\n", l, r, b, t, n, f);
             memset(projV_, 0, sizeof(projV_));
             const double w = (double)r - l, h = (double)t - b, d = (double)f - n;
             projV_[0] = (float)(2.0 / w); projV_[5] = (float)(2.0 / h); projV_[10] = (float)(2.0 / d);
@@ -877,6 +897,7 @@ namespace
         }
         GENRESULT DACOM_API SetPerspective(float fov, float aspect, float n, float f) override
         {
+            if (TraceCam()) fprintf(stderr, "[cam] perspective fov=%g aspect=%g near=%g far=%g\n", fov, aspect, n, f);
             if (n <= 0.0f || f <= 0.0f || f == n) return GR_GENERIC;
             const float cot = (float)(1.0 / tan(3.141592653589793 / 180.0 * (double)fov));
             const float inv = 1.0f / (f - n);

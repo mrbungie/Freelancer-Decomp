@@ -181,7 +181,8 @@ void SubmitWin3DEngineInstance(FClientMeshHolder* Holder, void* ArchAnchor, unsi
 #ifdef FREELANCER_WALK_MODE
     FBaseWalkInterfaceAlpha InterfaceAlpha(Holder->UserFloats[4]);
 #endif
-    DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Matrix, nullptr);
+    int const Res = DALib::Renderer->RenderInstance(ArchAnchor, Holder->EngineInstance, 1.0f, SlotFlags, Matrix, nullptr);
+    if (getenv("FL_TRACE_UI")) { static int n = 0; if (n++ < 12) fprintf(stderr, "[fl] ui: SubmitWin3DEngineInstance anchor=%p inst=%p flags=%x -> %d\n", ArchAnchor, Holder->EngineInstance, SlotFlags, Res); }
 }
 
 void SubmitWin3DTintedEngineInstance(void* ArchAnchor, void* EngineInstance,
@@ -343,6 +344,7 @@ int SubmitWin3DMaterialEngineInstance(void* Camera, void* EngineInstance, unsign
     int const Result =
         DALib::Renderer->RenderInstance(Camera, EngineInstance, 1.0f, SlotFlags, Matrix, Material);
 
+    if (getenv("FL_TRACE_UI")) { static int n = 0; if (n++ < 12) fprintf(stderr, "[fl] ui: RenderInstance(camera=%p inst=%p flags=%x mat=%p) -> %d\n", Camera, EngineInstance, SlotFlags, (void*)Material, Result); }
     // 0x00434238..0x00434262: both states restored. The two parameter values are plain
     // (types 4 and 1), so their destructors (types 5..7 free) do nothing.
     Pipe->SetRenderState(kRsDepthFunction, SavedCull);

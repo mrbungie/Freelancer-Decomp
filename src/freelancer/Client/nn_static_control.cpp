@@ -468,6 +468,7 @@ void NnStaticControl::Draw()
 #endif
     // LAB_00588770.
     Win3D::Draw(); // FUN_0059e5c0
+    if (getenv("FL_TRACE_UI")) { static int n = 0; if (n++ < 12) fprintf(stderr, "[fl] ui: NnStaticControl::Draw neuronet=%d group=%d statics=%d hasInstance=%d\n", (int)GetGameOption(kGameOptNeuronet), (int)GetGameOption(kGameOptInterfaceGroup), (int)GetGameOption(kGameOptDrawStaticControls), (int)HasInstance(this)); }
     if (GetGameOption(kGameOptNeuronet) == 0)
         return;
     if (GetGameOption(kGameOptInterfaceGroup) == 0)
@@ -554,6 +555,7 @@ void NnStaticControl::Draw()
         Rect[1] = Top + 2;
         Rect[2] = Right - 2;
         Rect[3] = Bottom - 2;
+        if (getenv("FL_TRACE_UI")) { static int n = 0; if (n++ < 12) fprintf(stderr, "[fl] ui: static window rect=%d,%d,%d,%d screen=%dx%d placed=(%g %g %g) half=(%g %g %g)\n", Rect[0], Rect[1], Rect[2], Rect[3], (int)G_RenderSurfaceWidth, (int)G_RenderSurfaceHeight, Placed[0], Placed[1], Placed[2], HalfExtents[0], HalfExtents[1], HalfExtents[2]); }
         int const Height = static_cast<int>(G_RenderSurfaceHeight); // DAT_00610854
         if (Rect[1] >= Height || Rect[3] >= Height)
             return;

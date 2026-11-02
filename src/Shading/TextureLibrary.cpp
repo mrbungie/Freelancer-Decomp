@@ -1062,6 +1062,7 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
         TextureDdsWarning(0x24d, "load_dds_mips: %s: failed to create texture!", Name);
         return GR_GENERIC;
     }
+    if (getenv("FL_TRACE_TEX")) fprintf(stderr, "[fl] dds-handle: '%s' -> %p\n", Name, Handle);
     FTextureDdsCursor Cursor = {Map.View + 0x80,
         bPitch ? Header[0x14 / 4] * Header[0x0c / 4] : Header[0x14 / 4],
         MinimumBlock, Header[0x10 / 4], Header[0x0c / 4]};
