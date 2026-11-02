@@ -9,6 +9,8 @@
 #include "portable_double_load.h"
 #include "portable_vector_load.h"
 #include "rpc_server_channel_codec.h"
+#include "wire_wchar.h"
+#include "platform/fl_x87.h"
 #include "common_goods.h" // RS-P2: EquipDesc, EquipDescVector, StringAlloc (0x24/0x25)
 
 // ===== shared SERVER helpers =====
@@ -3147,7 +3149,7 @@ unsigned int FRpcServerPlayerListPacket::Encode(unsigned char** BufferHolder,
     }
     if (!Stream.Put(&Count, 1u)) return 0x16u;
     if (Count != 0) {
-        if (!Stream.PutBlock(Name, static_cast<unsigned int>(Count) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(Name, static_cast<unsigned int>(Count)), static_cast<unsigned int>(Count) * 2u)) return 0x16u;
     }
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b4689f
 }
@@ -3172,8 +3174,9 @@ unsigned int FRpcServerPlayerListPacket::Decode(const unsigned char* Buffer,
         if (MarshalCursor + Bytes > MarshalLimit) MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
 #endif
-        Name = static_cast<wchar_t*>(std::malloc(Bytes));
-        if (!Stream.Get(Name, Bytes)) return MarshalError;
+        Name = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Count) + 1u) * sizeof(wchar_t)));
+        if (!Stream.Get(FlWire16In(Name, Count), Bytes)) return MarshalError;
+        Name[Count] = 0;
     }
     return Stream.Finish(OutLength, false);
 }
@@ -3434,7 +3437,7 @@ unsigned int FRpcServerMiscObjUpdatePacket::Encode(unsigned char** BufferHolder,
     if ((Flags & 0x10u) != 0) {
         const unsigned short Length = static_cast<unsigned short>(Text.size());
         if (!Stream.Put(&Length, 2u)) return 0x16u;
-        if (!Stream.PutBlock(Text.c_str(), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(Text.c_str(), static_cast<unsigned int>(Length)), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
     }
     if ((Flags & 0x20u) != 0) {
         if (!Stream.Put(&Field_0x54, 4u)) return 0x16u;
@@ -3486,12 +3489,12 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
 #if defined(REMOTECLIENT_EXPORTS)
         if (MarshalCursor + Length > MarshalLimit) MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Length) + 1u) * sizeof(wchar_t)));
         if (Chars == nullptr) return 5u;
 #else
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc((static_cast<size_t>(Length) + 1u) * sizeof(wchar_t)));
 #endif
-        if (!Stream.Get(Chars, static_cast<unsigned int>(Length) * 2u)) return MarshalError;
+        if (!Stream.Get(FlWire16In(Chars, static_cast<unsigned int>(Length)), static_cast<unsigned int>(Length) * 2u)) return MarshalError;
         Chars[Length] = 0;
         Text.assign(Chars, std::wcslen(Chars));
         std::free(Chars);

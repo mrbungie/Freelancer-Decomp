@@ -90,7 +90,7 @@ void FPacketBase::AddRef() {
 // inside the class's own size.
 void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int Width,
                          unsigned int Value) {
-    unsigned char* Bytes = reinterpret_cast<unsigned char*>(Packet) + Offset;
+    unsigned char* Bytes = reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset);
     switch (Width) {
         case 1:
             *Bytes = (unsigned char)(Value & 0xffu);
@@ -129,10 +129,10 @@ struct FRpcEmbeddedListNode {
 void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
                                 unsigned int NodeSize) {
     FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+        reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
     Header->Allocator = 0;                                  // 06d9d535 MOV [ESI+0x24],AL
     FRpcEmbeddedListNode* Sentinel =
-        static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize));   // 06d9d52f / 06d9d538
+        static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize * 2u + 0x10u));   // host nodes carry 8-byte links   // 06d9d52f / 06d9d538
     Sentinel->Next = Sentinel;                              // 06d9d541 MOV [EAX],EAX
     Sentinel->Prev = Sentinel;                              // 06d9d543 MOV [EAX+0x4],EAX
     Header->Size = 0;                                       // 06d9d546 MOV [ESI+0x2c],EDI
@@ -143,7 +143,7 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
 // list::erase in a loop, then the sentinel.
 void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset) {
     FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+        reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
     FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(Header->Head);
     FRpcEmbeddedListNode* Node = Sentinel->Next;            // 06d9d1f8 MOV ESI,[EBX]
     while (Node != Sentinel) {                              // 06d9d1fa / 06d9d220 CMP
@@ -178,7 +178,7 @@ FRpcMarshalStream::FRpcMarshalStream(FPacketBase& InPacket, void* InBuffer,
     : Packet(InPacket) {
     Packet.MarshalCursor = 0;
     Packet.MarshalLimit = InCapacity;
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(InBuffer);
+    Packet.MarshalPtr = reinterpret_cast<uintptr_t>(InBuffer);
     Packet.MarshalError = 0;
 }
 
@@ -239,7 +239,7 @@ bool FRpcMarshalStream::PutWideString(const wchar_t* Text) {
     if (Bytes != 0 && Text != nullptr) {
         memcpy(Local, Text, Bytes);                                    // 06da1557
     }
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(Local + Bytes); // 06da1565/06da1569
+    Packet.MarshalPtr = reinterpret_cast<uintptr_t>(Local + Bytes); // 06da1565/06da1569
     return true;
 }
 
@@ -268,7 +268,7 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
     memcpy(Block, After, Bytes);                                       // 06da15f8
     Block[Count] = 0;                                                  // 06da1607
     OutText = Block;
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(After + Bytes); // 06da1610/06da1612
+    Packet.MarshalPtr = reinterpret_cast<uintptr_t>(After + Bytes); // 06da1610/06da1612
     return true;
 }
 
@@ -379,15 +379,15 @@ bool FRpcMarshalStream::PutGap(unsigned int Count) {
 // 06da398f..06da39ac: FLD the float, FMUL the scale, MSVCRT ftol, store one byte.
 // ftol truncates toward zero, so a plain cast to long is the same operation.
 bool FRpcMarshalStream::PutQuantized(float Value, double Scale) {
-    const long Scaled = static_cast<long>(static_cast<double>(Value) * Scale);
-    return PutByte(static_cast<unsigned char>(static_cast<unsigned long>(Scaled) & 0xffu));
+    const int32_t Scaled = static_cast<int32_t>(static_cast<double>(Value) * Scale);
+    return PutByte(static_cast<unsigned char>(static_cast<uint32_t>(Scaled) & 0xffu));
 }
 
 // 06da5208..06da524d, the FIREWEAPON middle tier: the same truncating ftol, stored as a
 // word instead of a byte.
 bool FRpcMarshalStream::PutQuantizedWord(float Value, double Scale) {
-    const long Scaled = static_cast<long>(static_cast<double>(Value) * Scale);
-    return PutWord(static_cast<unsigned short>(static_cast<unsigned long>(Scaled) & 0xffffu));
+    const int32_t Scaled = static_cast<int32_t>(static_cast<double>(Value) * Scale);
+    return PutWord(static_cast<unsigned short>(static_cast<uint32_t>(Scaled) & 0xffffu));
 }
 
 // 06dad26a..06dad27e, the SENDCOMM tier: FLD the float, FMUL the float 0.1f, FMUL the
@@ -395,8 +395,8 @@ bool FRpcMarshalStream::PutQuantizedWord(float Value, double Scale) {
 // see the note on the declaration.
 bool FRpcMarshalStream::PutQuantizedTwoStage(float Value, double Scale1, double Scale2) {
     const double Stage1 = static_cast<double>(Value) * Scale1;   // 06dad26d
-    const long Scaled = static_cast<long>(Stage1 * Scale2);      // 06dad278 + ftol
-    return PutByte(static_cast<unsigned char>(static_cast<unsigned long>(Scaled) & 0xffu));
+    const int32_t Scaled = static_cast<int32_t>(Stage1 * Scale2);      // 06dad278 + ftol
+    return PutByte(static_cast<unsigned char>(static_cast<uint32_t>(Scaled) & 0xffu));
 }
 
 bool FRpcMarshalStream::GetDword(unsigned int& OutValue) {

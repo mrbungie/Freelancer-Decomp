@@ -51,8 +51,8 @@ namespace
     {
     public:
         ~CRemoteClientProxy() override;
-        void OnReceive(unsigned char* Data, unsigned long Size) override;
-        void OnConnect(long Result) override;
+        void OnReceive(unsigned char* Data, uint32_t Size) override;
+        void OnConnect(int32_t Result) override;
         void OnDisconnect() override;
 
         unsigned int ClientId = 0;
@@ -203,7 +203,7 @@ void ForceClientLogout(unsigned int ClientId)
         Proxy->Disconnect();
 }
 
-void GetRemoteClientPort(std::vector<unsigned long>& Ports)
+void GetRemoteClientPort(std::vector<uint32_t>& Ports)
 {
     Client.Host->GetPort(Ports);
 }
@@ -272,7 +272,7 @@ void CRemoteClientProxy::OnDisconnect()
     Client.DisconnectClient(ClientId);
 }
 
-void CRemoteClientProxy::OnConnect(long Result)
+void CRemoteClientProxy::OnConnect(int32_t Result)
 {
     if (ClientId == 0)
     {
@@ -296,7 +296,7 @@ void CRemoteClientProxy::OnConnect(long Result)
     RemoteClientGetServer()->OnConnect(ClientId);
 }
 
-void CRemoteClientProxy::OnReceive(unsigned char* Data, unsigned long Size)
+void CRemoteClientProxy::OnReceive(unsigned char* Data, uint32_t Size)
 {
     int Remaining = static_cast<int>(Size);
     if (Data == nullptr || Remaining <= 0)

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "alchemy_effectlibrary.h"
+#include "fl/handles.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
 #include "alchemy_common.h"
@@ -47,7 +48,7 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FFxEffectLibrary::Release()
+    uint32_t DACOM_API FFxEffectLibrary::Release()
     {
         // FUN_06222ab0 (alchemy.dll.txt:71581-71606, wired as IFxEffectLibrary
         // vtable slot 2 at 0624d980, immediately after QueryInterface/AddRef
@@ -91,9 +92,9 @@ namespace AlchemyImpl
     // record also carries borrowed Next/Prev links for insertion-order iteration.
     // Temporary smart-pointer copies preserve the individual reference calls.
     GENRESULT DACOM_API FFxEffectLibrary::InsertArchetype(IFxEffectArchetype* Archetype,
-                                                          unsigned long* OutHash)
+                                                          uint32_t* OutHash)
     {
-        const unsigned long Hash = G_EffectAlchemy->HashNodeName(Archetype->GetName());
+        const uint32_t Hash = G_EffectAlchemy->HashNodeName(Archetype->GetName());
         FAleLibEntry::FArchetypeReference Existing;
         if (FindByHash(Hash, &Existing.Archetype) >= 0)
         {
@@ -140,7 +141,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectLibrary::RemoveByHash(unsigned long Hash)
+    GENRESULT DACOM_API FFxEffectLibrary::RemoveByHash(uint32_t Hash)
     {
         FArchetypeMap::iterator Found = Entries_->find(Hash);
         if (Found == Entries_->end())
@@ -178,7 +179,7 @@ namespace AlchemyImpl
     {
         FFxEffectObject* const Effect = new FFxEffectObject();
         IFxEffectArchetype* Archetype = nullptr;
-        const unsigned long Hash = static_cast<unsigned long>(reinterpret_cast<unsigned int>(Key));
+        const uint32_t Hash = static_cast<uint32_t>(fl::PtrToHandle(Key));
         if (FindByHash(Hash, &Archetype) != GR_OK)
         {
             if (Archetype != nullptr)
@@ -206,7 +207,7 @@ namespace AlchemyImpl
         Chunk.DeleteNode(kAleNodeName);
         Chunk.OpenNode(kAleNodeName);
         Chunk.OpenChunk(Filesys, kAleNodeName, 1);
-        const unsigned long VersionBits = kAleVersion11Bits;
+        const uint32_t VersionBits = kAleVersion11Bits;
         Chunk.WriteBytes(&VersionBits, 4);
         Chunk.WriteBytes(&EntryCount_, 4);
         FAleLibEntry* Entry = Head_;
@@ -218,20 +219,20 @@ namespace AlchemyImpl
             Archetype->GetHeader16(Header16);
             Chunk.WriteBytes(Header16, 12);
             Chunk.WriteBytes(Header16 + 12, 4);
-            unsigned long RecCount = Archetype->GetRec16Count();
+            uint32_t RecCount = Archetype->GetRec16Count();
             Chunk.WriteBytes(&RecCount, 4);
-            for (long Index = 0; Index < static_cast<long>(RecCount); ++Index)
+            for (int32_t Index = 0; Index < static_cast<int32_t>(RecCount); ++Index)
             {
                 FAleRec16 Rec;
-                Archetype->GetRec16(static_cast<unsigned long>(Index), &Rec);
+                Archetype->GetRec16(static_cast<uint32_t>(Index), &Rec);
                 Chunk.WriteBytes(&Rec, 16);
             }
             RecCount = Archetype->GetRec8Count();
             Chunk.WriteBytes(&RecCount, 4);
-            for (long Index = 0; Index < static_cast<long>(RecCount); ++Index)
+            for (int32_t Index = 0; Index < static_cast<int32_t>(RecCount); ++Index)
             {
                 FAleRec8 Rec;
-                Archetype->GetRec8(static_cast<unsigned long>(Index), &Rec);
+                Archetype->GetRec8(static_cast<uint32_t>(Index), &Rec);
                 Chunk.WriteBytes(&Rec, 8);
             }
             Entry = Entry->Next;
@@ -251,8 +252,8 @@ namespace AlchemyImpl
 
         FAleChunk Chunk;
         Chunk.OpenChunk(Filesys, kAleNodeName, 0);
-        unsigned long VersionBits = 0;
-        long Count = 0;
+        uint32_t VersionBits = 0;
+        int32_t Count = 0;
         if (Chunk.ReadBytes(&VersionBits, 4) < 0 || Chunk.ReadBytes(&Count, 4) < 0)
         {
             Chunk.CloseChunk();
@@ -261,11 +262,11 @@ namespace AlchemyImpl
 
         float Version;
         std::memcpy(&Version, &VersionBits, sizeof(Version));
-        const unsigned long ThresholdBits = kAleVersion11Bits;
+        const uint32_t ThresholdBits = kAleVersion11Bits;
         float Threshold;
         std::memcpy(&Threshold, &ThresholdBits, sizeof(Threshold));
 
-        for (long Index = 0; Index < Count; ++Index)
+        for (int32_t Index = 0; Index < Count; ++Index)
         {
             FFxEffectArchetype* const Archetype = new (std::nothrow) FFxEffectArchetype();
             char Name[kAleNameMax];
@@ -293,10 +294,10 @@ namespace AlchemyImpl
             }
             Archetype->SetHeader16(Header16);
 
-            long RecCount = 0;
+            int32_t RecCount = 0;
             if (Chunk.ReadBytes(&RecCount, 4) < 0)
                 break;
-            for (long RecIndex = 0; RecIndex < RecCount; ++RecIndex)
+            for (int32_t RecIndex = 0; RecIndex < RecCount; ++RecIndex)
             {
                 FAleRec16 Rec;
                 if (Chunk.ReadBytes(&Rec, 16) < 0)
@@ -306,7 +307,7 @@ namespace AlchemyImpl
 
             if (Chunk.ReadBytes(&RecCount, 4) < 0)
                 break;
-            for (long RecIndex = 0; RecIndex < RecCount; ++RecIndex)
+            for (int32_t RecIndex = 0; RecIndex < RecCount; ++RecIndex)
             {
                 FAleRec8 Rec;
                 if (Chunk.ReadBytes(&Rec, 8) < 0)
@@ -345,7 +346,7 @@ namespace AlchemyImpl
     // LAB_06220760 (RET 0xC: this, Hash, Out): FUN_06222000 lower_bound on the map at this+4;
     // end or node key (+0xC) above Hash -> return -1, *Out untouched. Hit: *Out = node value
     // (+0x18) -- no null test on Out -- then AddRef on it, return 0.
-    GENRESULT DACOM_API FFxEffectLibrary::FindByHash(unsigned long Hash, IFxEffectArchetype** Out)
+    GENRESULT DACOM_API FFxEffectLibrary::FindByHash(uint32_t Hash, IFxEffectArchetype** Out)
     {
         FArchetypeMap::iterator Entry = Entries_->find(Hash);
         if (Entry == Entries_->end())
@@ -391,8 +392,8 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectLibrary::RemapAllRec16FieldD(unsigned long OldId,
-                                                               unsigned long NewId)
+    GENRESULT DACOM_API FFxEffectLibrary::RemapAllRec16FieldD(uint32_t OldId,
+                                                               uint32_t NewId)
     {
         FAleLibEntry* Entry = Head_;
         while (Entry != nullptr)
@@ -403,7 +404,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    unsigned char FFxEffectLibrary::ContainsHash(unsigned long Hash) const
+    unsigned char FFxEffectLibrary::ContainsHash(uint32_t Hash) const
     {
         return Entries_->find(Hash) != Entries_->end() ? 1 : 0;
     }

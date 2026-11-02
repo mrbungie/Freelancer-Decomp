@@ -52,8 +52,8 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         return GR_GENERIC;
     }
 
-    unsigned long DACOM_API AddRef() override { return 1; }
-    unsigned long DACOM_API Release() override { return 1; }
+    uint32_t DACOM_API AddRef() override { return 1; }
+    uint32_t DACOM_API Release() override { return 1; }
 
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
     {
@@ -65,7 +65,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
         if (Info == nullptr || Info->InterfaceName == nullptr)
             return GR_INVALID_PARMS;
 
-        if (Info->Size != sizeof(FMathDesc) ||
+        if (Info->Size != kRetailMathDescSize ||
             std::memcmp(Info->InterfaceName, G_ComponentName, G_ComponentNameBytes) != 0)
             return GR_INTERFACE_UNSUPPORTED;
 
@@ -289,7 +289,9 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     }
 };
 
+#if defined(_M_IX86) || defined(__i386__)
 static_assert(sizeof(FMathEngine) == 8, "retail DllMain allocates operator_new(8) — two vfptrs");
+#endif
 
 FMathEngine* G_Engine = nullptr;
 
@@ -299,7 +301,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
     {
         DisableThreadLibraryCalls(Module);
         // FUN_06f71090: PUSH 8 / operator_new. Null returns TRUE without registration.
-        void* Memory = ::operator new(8, std::nothrow);
+        void* Memory = ::operator new(sizeof(FMathEngine), std::nothrow);
         if (Memory == nullptr)
         {
             G_Engine = nullptr;

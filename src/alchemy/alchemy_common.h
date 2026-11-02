@@ -31,22 +31,22 @@ namespace AlchemyImpl
     extern const char kFxNodeFactory[];
     extern const char kColideTypo[];
     extern const char kCollideFixed[];
-    extern const unsigned long kNodeParentRoot;
+    extern const uint32_t kNodeParentRoot;
     extern const char kAleLeaveNode[];
     extern const char kAleFileSystemName[];
-    extern const unsigned long kAleDescSize;
-    extern const unsigned long kAleAccessRead;
-    extern const unsigned long kAleAccessWrite;
-    extern const unsigned long kAleShareRead;
-    extern const unsigned long kAleOpenExisting;
-    extern const unsigned long kAleCreateAlways;
-    extern const unsigned long kAleFileFlags;
-    extern const unsigned long kAleVersion10Bits; // 1.0f DAT_0624bac4
-    extern const unsigned long kAleVersion11Bits; // 1.1f
+    extern const uint32_t kAleDescSize;
+    extern const uint32_t kAleAccessRead;
+    extern const uint32_t kAleAccessWrite;
+    extern const uint32_t kAleShareRead;
+    extern const uint32_t kAleOpenExisting;
+    extern const uint32_t kAleCreateAlways;
+    extern const uint32_t kAleFileFlags;
+    extern const uint32_t kAleVersion10Bits; // 1.0f DAT_0624bac4
+    extern const uint32_t kAleVersion11Bits; // 1.1f
     // Used as an array bound (char NameBuf[kAleNameMax]) across translation
     // units, so it must be a real constant expression, not an extern const.
-    constexpr unsigned long kAleNameMax = 0x100;
-    extern const unsigned long kCrc32Poly;
+    constexpr uint32_t kAleNameMax = 0x100;
+    extern const uint32_t kCrc32Poly;
 
     extern const char kAlchemySection[];
     // FUN_062013f0 / LAB_06201330 FDUMP - EXE/alchemy.dll exact bytes.
@@ -63,30 +63,30 @@ namespace AlchemyImpl
     extern const char kMsgBeginWithoutEnd[];
     extern const char kMsgEndWithoutBegin[];
     extern const unsigned int kAlchemyVbFvf; // D3DFVF_XYZ|DIFFUSE|TEX1
-    extern const unsigned long kAlchemyVertexStride; // FUN_06208aa0 pointer += 0x18
-    extern const unsigned long kInitNodeBoundBits;
-    extern const unsigned long kBatchListCount; // DAT_062578b4 .. DAT_062578e4 stride 0xC
+    extern const uint32_t kAlchemyVertexStride; // FUN_06208aa0 pointer += 0x18
+    extern const uint32_t kInitNodeBoundBits;
+    extern const uint32_t kBatchListCount; // DAT_062578b4 .. DAT_062578e4 stride 0xC
     extern const char kDrawContextCpp[];
     extern const char kMsgEndBeforeBegin[];
     extern const char kMsgMoreVerts[];
     extern const char kMsgMoreIndices[];
     extern const char kMsgEndBeforeDraw[];
-    extern const unsigned long kAssocEmitterAppearance;
-    extern const unsigned long kAssocAppearanceField;
+    extern const uint32_t kAssocEmitterAppearance;
+    extern const uint32_t kAssocAppearanceField;
 
     // FUN_06203c20 / FUN_06203480 defaults when the key or parser is missing.
-    extern const unsigned long kDefaultPoolSize;
-    extern const unsigned long kDefaultUseMaterialBatcher;
+    extern const uint32_t kDefaultPoolSize;
+    extern const uint32_t kDefaultUseMaterialBatcher;
 
     // FUN_0623ebc0 element sizes (third arg) per appearance pool.
-    extern const unsigned long kStrideBasic;
-    extern const unsigned long kStrideParticle;
-    extern const unsigned long kStrideRect;
-    extern const unsigned long kStridePerp;
-    extern const unsigned long kStrideMesh;
-    extern const unsigned long kStrideOriented;
-    extern const unsigned long kStrideDust;
-    extern const unsigned long kStrideBeam;
+    extern const uint32_t kStrideBasic;
+    extern const uint32_t kStrideParticle;
+    extern const uint32_t kStrideRect;
+    extern const uint32_t kStridePerp;
+    extern const uint32_t kStrideMesh;
+    extern const uint32_t kStrideOriented;
+    extern const uint32_t kStrideDust;
+    extern const uint32_t kStrideBeam;
 
     extern const char kCharsetValue[];
     extern const char kCharsetDigits[];
@@ -116,12 +116,12 @@ namespace AlchemyImpl
     extern const float kDefaultCollideReflect;
     extern const float kDefaultCollideWidth;
     extern const float kDefaultCollideHeight;
-    extern const unsigned long kDustKillAgeBits;
+    extern const uint32_t kDustKillAgeBits;
 
     // ---- Shared globals -------------------------------------------------
     // FUN_0623ef70 / IAlchemy+0x14: DAT_06256d68 table (= dacom DAT_065b8530),
     // case-preserving. NOT IEEE 0xEDB88320. NOT DACOM_CRC::GetCRC32 (lowercase).
-    extern unsigned long G_Crc32Table[256];
+    extern uint32_t G_Crc32Table[256];
     extern unsigned char G_bCrc32Ready;
     extern char G_ResolvedName[0x100];
     extern char G_NodeLibraryResolvedName[0x100];
@@ -137,8 +137,8 @@ namespace AlchemyImpl
     extern FAppearancePool G_PoolDust;
     extern FAppearancePool G_PoolBeam;
 
-    extern unsigned long G_MaxVertices; // FUN_06202260 / DAT_06255064
-    extern unsigned long G_MaxIndices;  // FUN_06202270 / DAT_06255068
+    extern uint32_t G_MaxVertices; // FUN_06202260 / DAT_06255064
+    extern uint32_t G_MaxIndices;  // FUN_06202270 / DAT_06255068
 
     extern bool G_bInDraw;              // DAT_06257918
     extern IAlchemy* G_EffectAlchemy;             // DAT_06257a3c
@@ -165,8 +165,8 @@ namespace AlchemyImpl
     extern IDAComponent* G_RpDraw;          // DAT_06257bcc
     extern void* G_VbHandle;                // DAT_0625791c
     extern void* G_IbHandle;
-    extern unsigned long G_DrawCookie;            // DAT_06257908
-    extern unsigned long G_DrawCounters[9];       // DAT_062578e4
+    extern uint32_t G_DrawCookie;            // DAT_06257908
+    extern uint32_t G_DrawCounters[9];       // DAT_062578e4
     extern unsigned char G_DrawFlagA;             // DAT_06255060
     extern unsigned char G_DrawFlagB;             // DAT_06255061
 
@@ -182,13 +182,13 @@ namespace AlchemyImpl
     extern FAlDrawContext G_RectDrawContext;     // DAT_06257b40
     extern void* G_DrawVbHandle;                 // DAT_06257bd4
 
-    extern unsigned long G_AlchemyRandState;
-    extern unsigned long G_AlchemyRandCounter;
+    extern uint32_t G_AlchemyRandState;
+    extern uint32_t G_AlchemyRandCounter;
 
     // ---- CRC / hash / string helpers ------------------------------------
     void EnsureCrc32Table();
-    unsigned long HashNameCrc(const char* Name);
-    void CopyCString(char* Dest, unsigned long DestChars, const char* Src);
+    uint32_t HashNameCrc(const char* Name);
+    void CopyCString(char* Dest, uint32_t DestChars, const char* Src);
     void FixColideFieldAlias(char* Name);
 
     // ---- FDUMP helpers ----------------------------------------------------
@@ -230,10 +230,10 @@ namespace AlchemyImpl
     void PrependParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node);
     void ResetAppearancePoolLists(FAppearancePool* Pool);
     void FreeAppearancePool(FAppearancePool* Pool);
-    unsigned long PoolUsedCount(const FAppearancePool* Pool);
+    uint32_t PoolUsedCount(const FAppearancePool* Pool);
     FAppearancePool* PoolForAppearanceFactory(const char* Factory);
-    void AppearanceDrawUnits(const char* Factory, unsigned long* VertsPer,
-                             unsigned long* IndicesPer);
+    void AppearanceDrawUnits(const char* Factory, uint32_t* VertsPer,
+                             uint32_t* IndicesPer);
 
     // ---- COM-pointer helpers ----------------------------------------------
     IDAComponent** AssignComPtr(IDAComponent** Slot, IDAComponent* Value);
@@ -305,9 +305,9 @@ namespace AlchemyImpl
     void* AllocPoolItem(FAppearancePool* Pool);
     void FreePoolItem(FAppearancePool* Pool, void* Item);
     void ReleaseAppearancePoolItem(FAppearancePool* Pool, void* Item);
-    void AllocateAppearancePool(FAppearancePool* Pool, unsigned long Count, unsigned long Stride);
+    void AllocateAppearancePool(FAppearancePool* Pool, uint32_t Count, uint32_t Stride);
     void FreeAllAppearancePools();
-    unsigned long MaxULong(unsigned long Left, unsigned long Right);
+    uint32_t MaxULong(uint32_t Left, uint32_t Right);
     void ComputeDrawBufferHints();
 
     // ---- Byte-bag helpers ---------------------------------------------------
@@ -330,27 +330,27 @@ namespace AlchemyImpl
                          unsigned int Count);
     GENRESULT CallUnlockIb(IDAComponent* Ib, void* Handle);
     GENRESULT CallSelectIb(IDAComponent* Ib, void* Handle, unsigned int BaseVertexIndex);
-    GENRESULT CallDrawIndexed(IDAComponent* Draw, unsigned long Prim, unsigned int MinIndex,
+    GENRESULT CallDrawIndexed(IDAComponent* Draw, uint32_t Prim, unsigned int MinIndex,
                               unsigned int NumVerts, unsigned int StartIndex, unsigned int Count);
     // FUN_06208640: Out = I3DMathEngine::MulTransform(A, B), 12-float transforms.
     void ComposeTransform(float* Out12, const float* A12, const float* B12);
     unsigned short AlSubmitVertex(FAlDrawContext& Context, float X, float Y, float Z,
-                                  unsigned long Diffuse, float U, float V);
+                                  uint32_t Diffuse, float U, float V);
     void AlSubmitQuadIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,
                              unsigned short I2, unsigned short I3);
     void AlSubmitTriangleIndices(FAlDrawContext& Context, unsigned short I0, unsigned short I1,
                                  unsigned short I2);
-    bool AlDrawContextBegin(FAlDrawContext& Context, unsigned long Prim, unsigned long VertCount,
-                            unsigned long IndexCount);
-    unsigned long AlDrawContextEnd(FAlDrawContext& Context);
+    bool AlDrawContextBegin(FAlDrawContext& Context, uint32_t Prim, uint32_t VertCount,
+                            uint32_t IndexCount);
+    uint32_t AlDrawContextEnd(FAlDrawContext& Context);
     GENRESULT AlDrawContextDraw(FAlDrawContext& Context);
     void ClearBatchLists();
-    GENRESULT EnqueueAppearanceToList(unsigned long ListIndex, IDAComponent* Appearance);
+    GENRESULT EnqueueAppearanceToList(uint32_t ListIndex, IDAComponent* Appearance);
     void FlushAppearanceBatches();
-    unsigned long ParseAlchemyIniValue(char* Buffer, unsigned long Default);
-    unsigned long ReadAlchemyIniValue(ICOManager* Manager, IProfileParser* Parser,
+    uint32_t ParseAlchemyIniValue(char* Buffer, uint32_t Default);
+    uint32_t ReadAlchemyIniValue(ICOManager* Manager, IProfileParser* Parser,
                                      const char* SectionName, const char* Key,
-                                     unsigned long Default, unsigned long* Out);
+                                     uint32_t Default, uint32_t* Out);
     void ApplyAlchemyIniAndPools(ICOManager* Manager);
 
     // ---- ALE node-lib parsing helpers (shared by FAlchemy / FFxEffectArchetype
@@ -369,9 +369,9 @@ namespace AlchemyImpl
     int ReadRampColorBlock(FAleChunk* Chunk, IRampColor* Target);
     int ReadAnimatedSingleBlock(FAleChunk* Chunk, IFxAnimatedSingle* Target);
     int ReadAnimatedSingleRamp(FAleChunk* Chunk, INestedSingleRamp* Outer,
-                               unsigned long VersionBits);
+                               uint32_t VersionBits);
     int ReadAnimatedTransform(FAleChunk* Chunk, IAnimatedTransform* Anim,
-                              unsigned long VersionBits);
+                              uint32_t VersionBits);
     void CallAssociateAppearance(IGenericFx* Sink, IDAComponent* Appearance);
     void CallAssociateField(IGenericFx* Sink, IDAComponent* Field);
     IGenericFx* AsFxNode(void* Node);
@@ -386,11 +386,11 @@ namespace AlchemyImpl
     void CallSetNextSibling(IDAComponent* Node, IDAComponent* Next);
     void LinkNodeTree(IDAComponent* Parent, IDAComponent* Child);
     GENRESULT UnlinkNodeTree(IDAComponent* Node);
-    unsigned long RemapNodeLibHash(unsigned long Hash);
-    unsigned long RemapNodeLibKind(unsigned long Kind, unsigned long VersionBits);
+    uint32_t RemapNodeLibHash(uint32_t Hash);
+    uint32_t RemapNodeLibKind(uint32_t Kind, uint32_t VersionBits);
     // The node library's property stream: the loader's loop over FUN_062291a0 and the
     // save's per-node body of FUN_062281c0 (class name, LAB_06228350 per row, zero type).
-    int ReadNodeLibProperties(FAleChunk* Chunk, IFxNodePropertySet* Set, unsigned long VersionBits);
+    int ReadNodeLibProperties(FAleChunk* Chunk, IFxNodePropertySet* Set, uint32_t VersionBits);
     int WriteNodeLibProperties(FAleChunk* Chunk, IDAComponent* Node);
 
 } // namespace AlchemyImpl

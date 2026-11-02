@@ -48,6 +48,7 @@
 // FAnimSub { CObject* Root; std::list<CObject*> Members; }.
 
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "common_csys.h"  // Acquire3DMathEngine
 #include "common_physys.h"  // FLControllerGolem entry points, PhySys::GetCurrentTime
 #include "../IVP/ivp_physics/ivp_core.h"  // ::IVP_Time, GetCurrentTime's return type
@@ -374,7 +375,7 @@ void __cdecl Add(VChannel* Chan)
     // 0627d5f3..0627d621: Engine+0x80 GetInstanceUserData(Chan->GetId()) (a second GetId
     // call), Root = GetRoot(result). No null test on Engine or on the result: 0627d626 reads
     // the result's +4 unconditionally.
-    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Chan->GetId());
+    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)fl::HandleToPtr((uint32_t)(Chan->GetId())));
     Entry->Sub.Root = GetRoot(InstObj);
 
     // 0627d624..0627d633: InstObj->EngineInstanceId compared with a third Chan->GetId().
@@ -436,7 +437,7 @@ COMMON_API void __cdecl Add(int PlaybackId)
     // (+0x8c) EnumObjects(LAB_0627d700, PlaybackId, &vector); the callback push_backs every
     // typed channel and answers 1. The slot's own result is ignored.
     std::vector<void*> Channels;
-    DALib::Anim->EnumObjects((void*)&CollectChannel, (unsigned long)PlaybackId, &Channels);
+    DALib::Anim->EnumObjects((void*)&CollectChannel, (uint32_t)PlaybackId, &Channels);
 
     // 0627d9b2..0627da45. LastInstance (frame -0x64) starts at 0 (0627d9ba) and is written
     // with every GetInstanceUserData result at 0627d9ff -- BEFORE the EngineInstanceId
@@ -445,13 +446,13 @@ COMMON_API void __cdecl Add(int PlaybackId)
     for (std::vector<void*>::const_iterator ChanIt = Channels.begin(); ChanIt != Channels.end(); ++ChanIt)
     {
         // 0627d9c8..0627d9db: IChannel slot 16 (+0x40) GetHeader(&Header, channel).
-        unsigned long Header[4];
-        DALib::Channel->GetHeader(Header, (unsigned long)*ChanIt);
+        uint32_t Header[4];
+        DALib::Channel->GetHeader(Header, (uint32_t)fl::PtrToHandle(*ChanIt));
         // 0627d9de..0627d9e4: Header[0] != 0 -> next channel.
         if (Header[0] != 0)
             continue;
         // 0627d9e6..0627d9ff: Engine+0x80 GetInstanceUserData(Header[3]).
-        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData((void*)Header[3]);
+        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData((void*)fl::HandleToPtr(Header[3]));
         LastInstance = Inst;
         // 0627da03..0627da08: [Inst+4] == Header[3], no null test.
         if (Inst->EngineInstanceId == (int)Header[3])
@@ -539,14 +540,14 @@ static std::pair<typename std::vector<T>::iterator, bool> InsertUnique(std::vect
 // 0627e468); user data = Engine+0x80 (0627e3ec); insert via the inline find + vector
 // insert (0627e3fe..0627e43f, result unused); recursion at 0627e449; next sibling =
 // GetRelatedInstance(InstanceId, 1, Child) (0627e460). No null checks.
-static void CollectInstanceChildren(CObject* Obj, long InstanceId, std::vector<CObject*>& Objs)
+static void CollectInstanceChildren(CObject* Obj, int32_t InstanceId, std::vector<CObject*>& Objs)
 {
     // IEngine carries the instance id in a void* (engine/engbase.h).
-    long Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                   G_InvalidEngineHandle);
+    int32_t Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance((void*)fl::HandleToPtr((uint32_t)(InstanceId)), 1,
+                                                                   G_InvalidEngineHandle));
     while (Child != -1)
     {
-        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Child);
+        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)fl::HandleToPtr((uint32_t)(Child)));
         if (ChildObj != nullptr && ChildObj != Obj)
         {
             InsertUnique(Objs, ChildObj);
@@ -556,8 +557,8 @@ static void CollectInstanceChildren(CObject* Obj, long InstanceId, std::vector<C
         {
             CollectInstanceChildren(Obj, Child, Objs);
         }
-        Child = (long)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                  (void*)(intptr_t)Child);
+        Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance((void*)fl::HandleToPtr((uint32_t)(InstanceId)), 1,
+                                                                  (void*)fl::HandleToPtr((uint32_t)(Child))));
     }
 }
 
@@ -626,7 +627,7 @@ void __cdecl Update(float Dt)
             // spells the first parameter "PlaybackId", but retail loads it from
             // `(*(Root)) + 4` (58710-58712), i.e. the engine instance id of the
             // entry's root object -- not the map key.
-            DALib::Anim->MixerWalk((unsigned long)InstanceId, Dt);
+            DALib::Anim->MixerWalk((uint32_t)InstanceId, Dt);
         }
         if (Sub.Root->BodyPtr != nullptr)
             Subs.push_back(&Sub);
@@ -650,7 +651,7 @@ void __cdecl Update(float Dt)
     // ---- Phase C: Common.dll.txt:58804-58817 ------------------------------
     // Engine vtable +0x6c == IEngine slot 27, UpdateInstance(Instance, 0, 0).
     for (std::vector<int>::const_iterator It = SeenIds.begin(); It != SeenIds.end(); ++It)
-        DALib::Engine->UpdateInstance((void*)(intptr_t)*It, 0, nullptr);
+        DALib::Engine->UpdateInstance((void*)fl::HandleToPtr((uint32_t)(*It)), 0, nullptr);
 
     // ---- Phase D: Common.dll.txt:58829-58938 ------------------------------
     std::vector<CObject*> Objs;  // retail V3
@@ -786,7 +787,7 @@ void __cdecl Update(float Dt)
     PlayMap::iterator PlayIt = G_PlayMap.begin();
     while (PlayIt != G_PlayMap.end())
     {
-        if (DALib::Anim->FilterObjects((void*)(intptr_t)PlayIt->first) != 0)
+        if (DALib::Anim->FilterObjects((void*)fl::HandleToPtr((uint32_t)(PlayIt->first))) != 0)
             PlayIt = G_PlayMap.erase(PlayIt);
         else
             ++PlayIt;

@@ -2478,11 +2478,11 @@ static int __cdecl MovieInitOnexitTable()
     return 0;
 }
 
-#pragma section(".CRT$XIC", long, read)
+#pragma section(".CRT$XIC", int32_t, read)
 extern "C" __declspec(allocate(".CRT$XIC")) int (__cdecl* GMovieOnexitCrtInit)() = MovieInitOnexitTable;
 #pragma comment(linker, "/include:_GMovieOnexitCrtInit")
 
-#pragma section(".CRT$XID", long, read)
+#pragma section(".CRT$XID", int32_t, read)
 extern "C" __declspec(allocate(".CRT$XID")) int (__cdecl* GMovieFilterCrtInit)() = MovieInstallExceptionFilter;
 #pragma comment(linker, "/include:_GMovieFilterCrtInit")
 

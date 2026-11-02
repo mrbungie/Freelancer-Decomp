@@ -8,6 +8,7 @@
 // Retail Client\Interface\NeuroNet\NavMap.cpp, 0x0048d700..0x004a3f90.
 
 #include "nn_navmap.h"
+#include "fl/handles.h"
 #include "best_path.h"               // BestPathGetWaypointCount (FUN_004c4fb0)
 #include "character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "font_string.h"             // FFontString (the item label's dtor)
@@ -189,9 +190,9 @@ NeuroNetNavMap::NeuroNetNavMap()
 
     // 0048e178..0048e193 -- the three map holders' instance slot (already -1), the object
     // cache key and +0xaf0.
-    ZoomedMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    ZoomedMapMesh2.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    PrettyMapMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    ZoomedMapMesh.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
+    ZoomedMapMesh2.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
+    PrettyMapMesh.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     CachedObjectId = 0xffffffffu;
     HoveredObjective = -1;
 
@@ -249,7 +250,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     bResourcesLoaded = 0;
     Field_0x87e = 0;
     bDrawZoneOutlines = 0;
-    GroupMarkerMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    GroupMarkerMesh.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     Field_0x8c4 = 0;
     bViewSwitch = 0;
     Field_0xb48 = 0;
@@ -258,7 +259,7 @@ NeuroNetNavMap::NeuroNetNavMap()
     PulseIndex = -1;
     ZoomDistance = 1.0f;
     bBestPathObjectives = 1;
-    LegendMesh.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    LegendMesh.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     bItemClamped = 0;
 
     // 0048e380
@@ -360,15 +361,15 @@ NeuroNetNavMap::~NeuroNetNavMap()
     TradeLaneIndices = nullptr;
 
     // 0048e703..0048e76b: FUN_0059eee0 on the bound map / aux holders.
-    if (ZoomedMapMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (ZoomedMapMesh.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&ZoomedMapMesh);
-    if (ZoomedMapMesh2.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (ZoomedMapMesh2.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&ZoomedMapMesh2);
-    if (PrettyMapMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (PrettyMapMesh.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&PrettyMapMesh);
-    if (GroupMarkerMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (GroupMarkerMesh.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&GroupMarkerMesh);
-    if (LegendMesh.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (LegendMesh.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&LegendMesh);
 
     // 0048e770..0048e78b: FUN_0059eee0 on all ten +0x930 holders, unconditionally.
@@ -872,7 +873,7 @@ bool NeuroNetNavMap::Create(Win3D* NewParent, void* Data)
 
     // 0049064c..004908a3: the legend labels, hidden, in the idle palette colour (one stack
     // copy of DAT_00679bb0 handed to all five).
-    unsigned long LegendColor = G_NnPaletteArgb_679bb0;
+    uint32_t LegendColor = G_NnPaletteArgb_679bb0;
     static float const kLegendY[5] = {0.194f, 0.09f, 0.14f, -0.047f, -0.198f};
     static char const* const kLegendNames[5] = {"NavMapHostileLabel", "NavMapFriendlyLabel",
                                                 "NavMapNeutralLabel", "NavMapPlayerShipLabel",

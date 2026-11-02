@@ -870,13 +870,13 @@ GENRESULT DACOM_API FSpaceCamera::QueryInterface(char const* Iid, void** Out)
     return -1;
 }
 
-unsigned long DACOM_API FSpaceCamera::AddRef()
+uint32_t DACOM_API FSpaceCamera::AddRef()
 {
     // LAB_0040f360: MOV EAX,1 / RET 4. Occupies both slot 0x04 and slot 0x08.
     return 1;
 }
 
-unsigned long DACOM_API FSpaceCamera::Release()
+uint32_t DACOM_API FSpaceCamera::Release()
 {
     return 1;
 }

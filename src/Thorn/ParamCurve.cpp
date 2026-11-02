@@ -173,11 +173,36 @@ namespace
     {
         ThornExtendedProgress::StoreDouble(Output->Bytes, ThornCurvePolynomial::Catmull(P0, P1, P2, P3, U));
     }
+#else
+    void CatmullRom1D(const float* P0, const float* P1,
+                      const float* P2, const float* P3, float U, FThornExtendedProgress* Output)
+    {
+        float p0 = P0 ? *P0 : *P1;
+        float p1 = *P1;
+        float p2 = *P2;
+        float p3 = P3 ? *P3 : *P2;
+        float u2 = U * U;
+        float u3 = u2 * U;
+        double result = 0.5 * ((2.0 * p1) +
+                               (-p0 + p2) * U +
+                               (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u2 +
+                               (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u3);
+        Output->Set(result);
+    }
+#endif
 
     void __cdecl ParamLerp(const FParamKey* Left, const FParamKey* Right, const float* T, FThornExtendedProgress* Output)
     {
         ThornExtendedProgress::StoreDouble(Output->Bytes, ThornCurvePolynomial::Lerp(*Left, *Right, T));
     }
+#else
+    void ParamLerp(const FParamKey* Left, const FParamKey* Right, const float* T, FThornExtendedProgress* Output)
+    {
+        float fraction = (*T - Left->T) / (Right->T - Left->T);
+        double result = Left->Value + fraction * (Right->Value - Left->Value);
+        Output->Set(result);
+    }
+#endif
 
     // FUN_06f21000: shared exact x87 arithmetic including helper float stores.
     GENRESULT ThornEvalCatmullRom3D(const float* P0, const float* P1, const float* P2,
@@ -204,6 +229,42 @@ namespace
     {
         ThornExtendedProgress::StoreDouble(Output->Bytes, ThornCurvePolynomial::Hermite(A, B, T));
     }
+#else
+    void Hermite1D(const FHermiteKnot& A, const FHermiteKnot& B, const float* T, FThornExtendedProgress* Output)
+    {
+        float t = *T;
+        if (t <= A.T)
+        {
+            Output->Set(static_cast<double>(A.Value));
+            return;
+        }
+        if (t >= B.T)
+        {
+            Output->Set(static_cast<double>(B.Value));
+            return;
+        }
+        float dt = B.T - A.T;
+        float s = (t - A.T) / dt;
+        union { float f; int i; } outTangent;
+        outTangent.f = A.MOut;
+        if (outTangent.i == -1)
+        {
+            Output->Set(static_cast<double>(A.Value));
+            return;
+        }
+        double s2 = static_cast<double>(s) * static_cast<double>(s);
+        double s3 = s2 * static_cast<double>(s);
+        double h00 = 2.0 * s3 - 3.0 * s2 + 1.0;
+        double h10 = s3 - 2.0 * s2 + static_cast<double>(s);
+        double h01 = -2.0 * s3 + 3.0 * s2;
+        double h11 = s3 - s2;
+        double result = h00 * static_cast<double>(A.Value) +
+                       h10 * static_cast<double>(dt) * static_cast<double>(A.MOut) +
+                       h01 * static_cast<double>(B.Value) +
+                       h11 * static_cast<double>(dt) * static_cast<double>(B.MIn);
+        Output->Set(result);
+    }
+#endif
 
     // FUN_06f30520: exact endpoint/seed/walk arithmetic, followed by an
     // ordinary typed kernel call. No C++ function is invoked inside asm.
@@ -311,7 +372,7 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount_; }
 
         // Retail likewise clones Release per curve factory's vtable
         // (confirmed identical bodies at LAB_06f33710, LAB_06f33800,
@@ -319,7 +380,7 @@ namespace
         // dword at +0x3c, and when it reaches zero, force it to 1 and call
         // vtable+0x38 (Slot14Dtor) with DeleteFlag=1 before returning 0. All
         // of those clones are covered by this one method + Slot14Dtor.
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             // 33717/33719 only decrement a positive count; zero still tears down.
             if (RefCount_ != 0)
@@ -354,6 +415,11 @@ namespace
         {
             const float Normalized = ThornParamMath::WrappedRatio(A, B);
             EvaluateToExtended(&Normalized, Output);
+#else
+            int Remainder = A % B;
+            float Normalized = static_cast<float>(Remainder) / static_cast<float>(B);
+            EvaluateToExtended(&Normalized, Output);
+#endif
         }
 
         unsigned char DACOM_API Slot4Replace(int Id, float F0, float F1, float F2,
@@ -488,6 +554,11 @@ namespace
         {
             const float Normalized = ThornParamMath::WrappedRatio(A, B);
             return Evaluate(Normalized);
+#else
+            int Remainder = A % B;
+            float Normalized = static_cast<float>(Remainder) / static_cast<float>(B);
+            return Evaluate(Normalized);
+#endif
         }
 #pragma warning(pop)
 
@@ -550,6 +621,7 @@ namespace
             int InsertAt = 0;
             while (InsertAt < KnotCount_)
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* ExistingTime = &Knots_[InsertAt].T;
                 const float* NewTime = &Record.T;
                 unsigned char bInsertBefore;
@@ -558,6 +630,10 @@ namespace
                 bInsertBefore = ThornParamMath::LessEqual(NewTime, ExistingTime);
                 if (bInsertBefore)
                     break;
+#else
+                if (Record.T <= Knots_[InsertAt].T)
+                    break;
+#endif
                 InsertAt = InsertAt + 1;
             }
 
@@ -673,6 +749,7 @@ namespace
             FParamEvaluationList::const_iterator Previous = EvaluationKeys_.end();
             while (Key != EvaluationKeys_.end())
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* KeyTime = &Key->T;
                 unsigned char bGreater;
                 unsigned char bEqual;
@@ -690,6 +767,20 @@ namespace
                     StoreParamFloat(Output, &Key->Value);
                     return;
                 }
+#else
+                if (Key->T > *T)
+                {
+                    if (Previous == EvaluationKeys_.end())
+                        break;
+                    EvaluateCatmull(Previous, Key, T, Output);
+                    return;
+                }
+                if (Key->T == *T)
+                {
+                    StoreParamFloat(Output, &Key->Value);
+                    return;
+                }
+#endif
                 Previous = Key;
                 ++Key;
             }
@@ -705,6 +796,7 @@ namespace
             FParamEvaluationList::const_iterator Previous = EvaluationKeys_.end();
             while (Key != EvaluationKeys_.end())
             {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
                 const float* KeyTime = &Key->T;
                 unsigned char bGreater;
                 bGreater = ThornParamMath::Greater(KeyTime, T);
@@ -717,6 +809,17 @@ namespace
                     ParamLerp(Left, Right, T, Output);
                     return;
                 }
+#else
+                if (Key->T > *T)
+                {
+                    if (Previous == EvaluationKeys_.end())
+                        break;
+                    const FParamKey* Left = &*Previous;
+                    const FParamKey* Right = &*Key;
+                    ParamLerp(Left, Right, T, Output);
+                    return;
+                }
+#endif
                 Previous = Key;
                 ++Key;
             }
@@ -755,7 +858,7 @@ namespace
             HermiteEvaluate(Begin, Count, T, Output);
         }
 
-        unsigned long RefCount_;
+        uint32_t RefCount_;
         const FCurveSpec* Spec_;
         // Base2f090 destroys ID payloads/map before its evaluation list.
         // Declaration order also constructs the list before ID storage.

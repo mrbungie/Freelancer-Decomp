@@ -51,14 +51,14 @@ namespace
     }
 }
 
-unsigned long __cdecl compute_cube_id(Vector const& Pos)
+uint32_t __cdecl compute_cube_id(Vector const& Pos)
 {
     // .text:062a6010-062a60f2: each axis nudged and truncated (062a6017-062a608c), then
     // abs >> 7 per axis (CDQ/XOR/SUB, SAR 7), range checks X <= 0x3ff, Y <= 0x1ff,
     // Z <= 0x3ff (unsigned JA -> 0), sign bits from the truncated values.
-    long X = NudgeTruncate(Pos.x);
-    long Y = NudgeTruncate(Pos.y);
-    long Z = NudgeTruncate(Pos.z);
+    int32_t X = NudgeTruncate(Pos.x);
+    int32_t Y = NudgeTruncate(Pos.y);
+    int32_t Z = NudgeTruncate(Pos.z);
 
     unsigned GridX = (unsigned)std::abs(X) >> 7;
     unsigned GridY = (unsigned)std::abs(Y) >> 7;
@@ -105,7 +105,7 @@ namespace
     std::map<unsigned, CAsteroidSystem> GAsteroidSystems;
 }
 
-bool __cdecl compute_cube_orientation(unsigned long Seed, Matrix* InOutOrient, AxisRotations const& Rot, float Freq)
+bool __cdecl compute_cube_orientation(uint32_t Seed, Matrix* InOutOrient, AxisRotations const& Rot, float Freq)
 {
     // 062a4010..062a4244: Freq is the probability of an empty cube.
     unsigned RandState = Seed;
@@ -219,7 +219,7 @@ Matrix CAsteroidCube::get_orient()
     return Orient;
 }
 
-unsigned long CAsteroidCube::get_id()
+uint32_t CAsteroidCube::get_id()
 {
     // .text:062a66a0: MOV EAX,[this+0x8]; RET.
     return CubeId;
@@ -249,7 +249,7 @@ void CAsteroidCube::set_state(CubeState StateValue)
     State = StateValue;
 }
 
-void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
+void CAsteroidCube::init(Vector const& PosIn, uint32_t CubeIdValue,
                           AsteroidCubeArch* CubeArch,
                           AxisRotations const& Rot, float Freq)
 {
@@ -303,7 +303,7 @@ void CAsteroidCube::init(Vector const& PosIn, unsigned long CubeIdValue,
         // compute_asteroid_id runs on the pre-add LocalOffset, not the final world Pos
         // (Common.dll.txt 132767: compute_asteroid_id(this, &LocalOffset, &AsteroidLocalId)
         // happens before FUN_062887d0's add).
-        unsigned long AsteroidLocalId = 0;
+        uint32_t AsteroidLocalId = 0;
         if (!compute_asteroid_id(LocalOffset, AsteroidLocalId))
             continue;
 
@@ -382,7 +382,7 @@ asteroid_marker* CAsteroidCube::get_changes()
     return Head;
 }
 
-bool CAsteroidCube::compute_asteroid_id(Vector const& PosIn, unsigned long& OutId)
+bool CAsteroidCube::compute_asteroid_id(Vector const& PosIn, uint32_t& OutId)
 {
     // .text:062a66c0-062a67b0. Pure function of PosIn; does not touch *this despite being a
     // member (retail never dereferences its own "this" here). Packs abs(nudged coord) >> 1

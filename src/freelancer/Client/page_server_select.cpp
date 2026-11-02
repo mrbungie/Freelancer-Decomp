@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "page_server_select.h"
+#include "fl/handles.h"
 
 #include "chat_init.h"         // ChatAppendRdlCopy (the FUN_0046c800 / FUN_005754b0 clone loop)
 #include "connect_flow.h"      // ConnectToServer (FUN_005a8770)
@@ -897,8 +898,8 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
     // behind a TRANode (colour 0x1d1dbf, mask 0xffffff00) when it is not the client's.
     {
         std::wstringstream Stream;
-        Stream << static_cast<unsigned long>((Server->Version >> 24) & 0xffu) << L"."
-               << static_cast<unsigned long>((Server->Version >> 16) & 0xffu) << std::ends;
+        Stream << static_cast<uint32_t>((Server->Version >> 24) & 0xffu) << L"."
+               << static_cast<uint32_t>((Server->Version >> 16) & 0xffu) << std::ends;
         RenderDisplayList Text;
         if (Server->Version != static_cast<unsigned>(g_client.packed_version))
         {
@@ -946,7 +947,7 @@ void PageServerSelect::FillRow(unsigned Row, FServerInfo const* Server)
 bool PageServerSelect::Slot23(unsigned Msg, unsigned A, unsigned B)
 {
     // FUN_005714d0.
-    unsigned const TableId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(ServerTable));
+    unsigned const TableId = static_cast<unsigned>(fl::PtrToHandle(ServerTable));
     if (Msg == 0x3004)
     {
         PlayOrRewindUiSoundSlot(0); // FUN_005645c0(0)

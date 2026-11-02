@@ -382,7 +382,7 @@ static DWORD WINAPI ServerThreadProc(LPVOID)
 		// period <= Elapsed; the fall-through (period > Elapsed) sleeps the remainder.
 		if ((double)GServerFramePeriod > Elapsed)
 		{
-			SleepEx((DWORD)(long)(((double)GServerFramePeriod - Elapsed) * 1000.0), FALSE);
+			SleepEx((DWORD)(int32_t)(((double)GServerFramePeriod - Elapsed) * 1000.0), FALSE);
 		}
 		DWORD FrameStart = timeGetTime();
 		WaitForServerRunPermission();
@@ -837,9 +837,9 @@ bool CFLServerApp::UpdateGunReport()
 	{
 		wchar_t Text[0x400];
 		wchar_t* Cursor = Text;
-		std::vector<unsigned long> Ports;
+		std::vector<uint32_t> Ports;
 		GetRemoteClientPort(Ports);
-		std::vector<unsigned long>::iterator It = Ports.begin();
+		std::vector<uint32_t>::iterator It = Ports.begin();
 		while (It != Ports.end())
 		{
 			Cursor += _swprintf(Cursor, L"%u", *It);

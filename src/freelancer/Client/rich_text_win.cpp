@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "rich_text_win.h"
+#include "fl/handles.h"
 
 #include "fl_ime_input_box.h"
 #include "globals.h"
@@ -149,7 +150,7 @@ BaseRichTextWin::BaseRichTextWin()
     if (HoverInfo.CaptionW != nullptr && HoverInfo.CaptionW[0] != L'\0')
         HoverInfo.CaptionW[0] = L'\0';
     HoverInfo.bLive = 0;
-    HoverInfo.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this));
+    HoverInfo.Ids = static_cast<int>(fl::PtrToHandle(this));
     HoverInfo.IdsAlt = 0;
 
     bKeepScrolledToEnd = 0;
@@ -383,11 +384,11 @@ void BaseRichTextWin::Draw()
         {
             // 0x0057ad9a..0x0057adb6: FUN_005b7010(0) seeds the id, FUN_005b7050 (thiscall on it)
             // looks up 16 bpp, 5:5:5 colour, 1-bit alpha (A1R5G5B5); the result is not tested.
-            unsigned long Format = static_cast<unsigned long>(PixelFormatFromD3D(0));
+            uint32_t Format = static_cast<uint32_t>(PixelFormatFromD3D(0));
             PixelFormatFind(&Format, 0x10, 5, 5, 5, 1);
             GENRESULT const Result = Image->SetFromBuffer(
-                Buffer, &Format, static_cast<unsigned long>(Surface.Width),
-                static_cast<unsigned long>(Surface.Height), static_cast<unsigned long>(Pitch));
+                Buffer, &Format, static_cast<uint32_t>(Surface.Width),
+                static_cast<uint32_t>(Surface.Height), static_cast<uint32_t>(Pitch));
             if (Result == 0)
                 bSurfaceDirty = 0;
             else
@@ -446,13 +447,13 @@ bool BaseRichTextWin::Slot23(unsigned Msg, unsigned A, unsigned B)
     // FUN_0057afd0 (RET 0xc). 0xf005 is a scrollbar's value change; A is the sender.
     if (Msg == 0xf005)
     {
-        if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBarV)))
+        if (A == static_cast<unsigned>(fl::PtrToHandle(ScrollBarV)))
         {
             int const OriginX = ScrollX;
             SetScrollOrigin(OriginX, static_cast<int>(ScrollBarV->GetValue()));
             return true;
         }
-        if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBarH)))
+        if (A == static_cast<unsigned>(fl::PtrToHandle(ScrollBarH)))
         {
             int OriginY;
             switch (AlignMode)
@@ -507,7 +508,7 @@ void BaseRichTextWin::SetDrawFrame(bool bDraw)
     bDrawFrame = bDraw ? 1 : 0;
 }
 
-void BaseRichTextWin::SetFrameColor(unsigned long const* Rgba)
+void BaseRichTextWin::SetFrameColor(uint32_t const* Rgba)
 {
     memcpy(FrameColor, Rgba, 4);
 }
@@ -850,8 +851,8 @@ void BaseRichTextWin::EnsureSurface()
 
         // 0x0057a415..0x0057a44f: both ids seeded with FUN_005b7010(0), then FUN_005b7050 (thiscall
         // on each) with 16 bpp, 5:5:5 colour, 1-bit alpha (A1R5G5B5); results not tested.
-        unsigned long DstFormat = static_cast<unsigned long>(PixelFormatFromD3D(0)); // [esp+0x34]
-        unsigned long SrcFormat = static_cast<unsigned long>(PixelFormatFromD3D(0)); // [esp+0x38]
+        uint32_t DstFormat = static_cast<uint32_t>(PixelFormatFromD3D(0)); // [esp+0x34]
+        uint32_t SrcFormat = static_cast<uint32_t>(PixelFormatFromD3D(0)); // [esp+0x38]
         PixelFormatFind(&DstFormat, 0x10, 5, 5, 5, 1);
         PixelFormatFind(&SrcFormat, 0x10, 5, 5, 5, 1);
         FBigImageDesc Desc;
@@ -862,9 +863,9 @@ void BaseRichTextWin::EnsureSurface()
         Desc.SrcFormat = &SrcFormat;
         Desc.DstFormat = &DstFormat;
         Desc.Pixels = Buffer;
-        Desc.Width = static_cast<unsigned long>(Surface.Width);
-        Desc.Height = static_cast<unsigned long>(Surface.Height);
-        Desc.Pitch = static_cast<unsigned long>(Pitch);
+        Desc.Width = static_cast<uint32_t>(Surface.Width);
+        Desc.Height = static_cast<uint32_t>(Surface.Height);
+        Desc.Pitch = static_cast<uint32_t>(Pitch);
         Desc.DrawTile = &ScreenQuadDrawBigImageTile;
 
         void* Instance = nullptr;
@@ -1367,14 +1368,14 @@ bool RichTextEditWin::OnKeyDown(FHudCmdRecord const* Record)
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->Slot23(0xf004u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->Slot23(0xf004u, static_cast<unsigned>(fl::PtrToHandle(this)), 0u);
             return true;
         case 0x1b:
             // Escape (0x0057cd75): the same with 0xf003.
             if (ImeBox != nullptr)
                 ImeBox->HandleKey(Key);
             if (Parent != nullptr)
-                Parent->Slot23(0xf003u, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), 0u);
+                Parent->Slot23(0xf003u, static_cast<unsigned>(fl::PtrToHandle(this)), 0u);
             return true;
         case 0x23:
             // End (0x0057cc90).

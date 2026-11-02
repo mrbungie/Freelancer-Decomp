@@ -8,6 +8,7 @@
 // Retail source: E:\FL\Scratch\Source\Client\Interface\ShipViewControl.cpp (.rdata 0x005e4cd8).
 
 #include "ship_view_control.h"
+#include "fl/handles.h"
 
 #include "engine_light.h"      // FEngineLight, EngineLight* (FUN_00410ca0 .. FUN_004114f0)
 #include "gf_object_ship.h"    // GfShipApplyCollisionDamage (FUN_004482b0)
@@ -91,14 +92,14 @@ namespace
         return 0;
     }
 
-    void* HandleOf(long Instance)
+    void* HandleOf(int32_t Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Instance)));
     }
 
-    long InstanceOf(void* Handle)
+    int32_t InstanceOf(void* Handle)
     {
-        return static_cast<long>(reinterpret_cast<intptr_t>(Handle));
+        return static_cast<int32_t>(fl::PtrToHandle(Handle));
     }
 
     IRenderPipeline* ShipViewPipeline()
@@ -589,7 +590,7 @@ bool ShipViewControl::Slot6(unsigned A)
 {
     // LAB_005846b0 (RET 4): A is a position; true when its view box lies strictly inside the
     // Win3D camera's viewport (DAT_0067dca4..DAT_0067dcb0).
-    ComputeScreenRect(reinterpret_cast<float const*>(static_cast<uintptr_t>(A)), false);
+    ComputeScreenRect(static_cast<float const*>(fl::HandleToPtr(static_cast<uint32_t>(A))), false);
     FSpaceCamera const* const WinCamera = Win3DGetCamera();
     int const Width = WinCamera->Viewport[2] - WinCamera->Viewport[0] + 1;
     int const Height = WinCamera->Viewport[3] - WinCamera->Viewport[1] + 1;
@@ -881,7 +882,7 @@ void ShipViewControl::LoadEquipment(EquipDescList const* List)
     }
 }
 
-void ShipViewControl::SetInstance(long NewInstance, bool bFixedDistance)
+void ShipViewControl::SetInstance(int32_t NewInstance, bool bFixedDistance)
 {
     // FUN_00585380 (RET 8).
     if (NewInstance == -1)
@@ -1078,7 +1079,7 @@ bool ShipViewControl::LoadShip(ID_String const* NewShipId, bool bFixedDistance, 
     return true;
 }
 
-void ShipViewControl::SelectInstance(long NewSelection, bool bFlag, int Unused)
+void ShipViewControl::SelectInstance(int32_t NewSelection, bool bFlag, int Unused)
 {
     // FUN_00585bd0 (RET 0xc); the third argument's slot only serves as scratch.
     (void)Unused;
@@ -1151,7 +1152,7 @@ void ShipViewControl::SelectGood(unsigned GoodId, bool bFlag)
     SelInstance = -1;
 }
 
-char const* ShipViewControl::GetHardpointOfInstance(long ItemInstance) const
+char const* ShipViewControl::GetHardpointOfInstance(int32_t ItemInstance) const
 {
     // FUN_00585e20 (RET 4).
     if (ItemInstance == -1 || Visuals == nullptr)
@@ -1164,7 +1165,7 @@ char const* ShipViewControl::GetHardpointOfInstance(long ItemInstance) const
     return nullptr;
 }
 
-long ShipViewControl::GetInstanceOnHardpoint(char const* Name) const
+int32_t ShipViewControl::GetInstanceOnHardpoint(char const* Name) const
 {
     // FUN_00585e80 (RET 4).
     if (Visuals == nullptr)

@@ -196,8 +196,8 @@ const char* FMgsdbDatabase::GetError() const
 
 // The scanner buffer ends with one CR sentinel; remaining slack is uninitialized.
 bool FMgsdbDatabase::Load(const char* Path, const D3DADAPTER_IDENTIFIER8* Ident,
-                          const D3DCAPS8* Caps, unsigned long Ram, unsigned long VideoRam,
-                          unsigned long CpuSpeed)
+                          const D3DCAPS8* Caps, uint32_t Ram, uint32_t VideoRam,
+                          uint32_t CpuSpeed)
 {
     if (Records_ == nullptr)
         Records_ = new (std::nothrow) FMgsdbRecordSet(this);
@@ -223,7 +223,7 @@ bool FMgsdbDatabase::Load(const char* Path, const D3DADAPTER_IDENTIFIER8* Ident,
                 bOk = VerQueryValueA(Block, "\\", &Fixed, &FixedSize);
                 if (bOk != 0)
                 {
-                    unsigned long Info[13];
+                    uint32_t Info[13];
                     memcpy(Info, Fixed, sizeof(Info));
                     Ident_.DriverVersion.HighPart = (LONG)Info[2];
                     Ident_.DriverVersion.LowPart = Info[3];
@@ -327,7 +327,7 @@ int FMgsdbDatabase::ReadHexDigit()
     return -1;
 }
 
-unsigned long FMgsdbDatabase::ReadNumber()
+uint32_t FMgsdbDatabase::ReadNumber()
 {
     SkipWhite();
     if (Cursor_[0] == '0' && Cursor_[1] == 'x')
@@ -339,8 +339,8 @@ unsigned long FMgsdbDatabase::ReadNumber()
             SetError("Number expected");
             return 0xFFFFFFFF;
         }
-        unsigned long Value = 0;
-        unsigned long Count = 0;
+        uint32_t Value = 0;
+        uint32_t Count = 0;
         do
         {
             if (Count > 7)
@@ -348,7 +348,7 @@ unsigned long FMgsdbDatabase::ReadNumber()
                 SetError("Number too large");
                 return 0xFFFFFFFF;
             }
-            Value = Value * 0x10 + (unsigned long)Digit;
+            Value = Value * 0x10 + (uint32_t)Digit;
             ++Count;
             Digit = ReadHexDigit();
         } while (Digit != -1);
@@ -360,7 +360,7 @@ unsigned long FMgsdbDatabase::ReadNumber()
         SetError("Number expected");
         return 0xFFFFFFFF;
     }
-    unsigned long Value = (unsigned long)ReadHexDigit();
+    uint32_t Value = (uint32_t)ReadHexDigit();
     if (Value == 0xFFFFFFFF)
     {
         SetError("Number expected");
@@ -373,7 +373,7 @@ unsigned long FMgsdbDatabase::ReadNumber()
         const int Digit = ReadHexDigit();
         if (Digit == -1)
             break;
-        Value = Value * 10 + (unsigned long)Digit;
+        Value = Value * 10 + (uint32_t)Digit;
     }
     SkipWhite();
     return Value;
@@ -465,7 +465,7 @@ const char* FMgsdbDatabase::ReadFlag(FMgsdbRecordSet* Target)
     return nullptr;
 }
 
-unsigned long FMgsdbDatabase::ReadGuidWord()
+uint32_t FMgsdbDatabase::ReadGuidWord()
 {
     const int A = ReadHexDigit();
     if (A == -1)
@@ -476,16 +476,16 @@ unsigned long FMgsdbDatabase::ReadGuidWord()
     const int C = ReadHexDigit();
     if (C == -1)
         return 0xFFFFFFFF;
-    const unsigned long D = (unsigned long)ReadHexDigit();
+    const uint32_t D = (uint32_t)ReadHexDigit();
     if (D == 0xFFFFFFFF)
         return 0xFFFFFFFF;
-    return ((unsigned long)A << 12) | ((unsigned long)B << 8) |
-           ((unsigned long)C << 4) | D;
+    return ((uint32_t)A << 12) | ((uint32_t)B << 8) |
+           ((uint32_t)C << 4) | D;
 }
 
-unsigned long FMgsdbDatabase::ReadGuidWordSwapped()
+uint32_t FMgsdbDatabase::ReadGuidWordSwapped()
 {
-    const unsigned long Word = ReadGuidWord();
+    const uint32_t Word = ReadGuidWord();
     if (Word == 0xFFFFFFFF)
         return 0xFFFFFFFF;
     return ((Word & 0xFF00) >> 8) + (Word & 0xFF) * 0x100;
@@ -502,7 +502,7 @@ bool FMgsdbDatabase::Match(const char* Keyword) const
 // Operators: == = -> 0, != <> -> 1, > -> 2, < -> 3, >= => -> 4, <= =< -> 5, & -> 6.
 const char* FMgsdbDatabase::EvaluateIf()
 {
-    unsigned long Current = 0;
+    uint32_t Current = 0;
     int Kind = 0; // 0 number, 1 guid, 2 driver, 3 os
     SkipWhite();
     if (Match("cpuspeed"))
@@ -522,7 +522,7 @@ const char* FMgsdbDatabase::EvaluateIf()
         {
             if (Match(kMgsdbCapsKeys[Index].Name))
             {
-                Current = *(const unsigned long*)((const unsigned char*)&Caps_ + kMgsdbCapsKeys[Index].CapsOffset);
+                Current = *(const uint32_t*)((const unsigned char*)&Caps_ + kMgsdbCapsKeys[Index].CapsOffset);
                 Cursor_ += strlen(kMgsdbCapsKeys[Index].Name);
                 bFound = true;
                 break;
@@ -590,7 +590,7 @@ const char* FMgsdbDatabase::EvaluateIf()
     }
 
     SkipWhite();
-    unsigned long Op = 0;
+    uint32_t Op = 0;
     if (Cursor_[0] == '=' && Cursor_[1] == '=')
     {
         Cursor_ += 2;
@@ -654,40 +654,40 @@ const char* FMgsdbDatabase::EvaluateIf()
     {
         if (Op >= 2)
             return "Only == or != allowed";
-        unsigned long Guid[4];
-        const unsigned long W1 = ReadGuidWord();
+        uint32_t Guid[4];
+        const uint32_t W1 = ReadGuidWord();
         if (W1 == 0xFFFFFFFF)
             return "Invalid GUID";
-        unsigned long W2 = ReadGuidWord();
+        uint32_t W2 = ReadGuidWord();
         if (W2 == 0xFFFFFFFF)
             return "Invalid GUID";
         Guid[0] = W1 * 0x10000 + W2;
         if (*Cursor_++ != '-')
             return "Invalid GUID";
-        const unsigned long W3 = ReadGuidWord();
+        const uint32_t W3 = ReadGuidWord();
         if (W3 == 0xFFFFFFFF)
             return "Invalid GUID";
         if (*Cursor_++ != '-')
             return "Invalid GUID";
-        const unsigned long W4 = ReadGuidWord();
+        const uint32_t W4 = ReadGuidWord();
         if (W4 == 0xFFFFFFFF)
             return "Invalid GUID";
         Guid[1] = W4 * 0x10000 + W3;
         if (*Cursor_++ != '-')
             return "Invalid GUID";
-        const unsigned long B1 = ReadGuidWordSwapped();
+        const uint32_t B1 = ReadGuidWordSwapped();
         if (B1 == 0xFFFFFFFF)
             return "Invalid GUID";
         if (*Cursor_++ != '-')
             return "Invalid GUID";
-        const unsigned long B2 = ReadGuidWordSwapped();
+        const uint32_t B2 = ReadGuidWordSwapped();
         if (B2 == 0xFFFFFFFF)
             return "Invalid GUID";
         Guid[2] = B2 * 0x10000 + B1;
-        const unsigned long B3 = ReadGuidWordSwapped();
+        const uint32_t B3 = ReadGuidWordSwapped();
         if (B3 == 0xFFFFFFFF)
             return "Invalid GUID";
-        const unsigned long B4 = ReadGuidWordSwapped();
+        const uint32_t B4 = ReadGuidWordSwapped();
         if (B4 == 0xFFFFFFFF)
             return "Invalid GUID";
         Guid[3] = B4 * 0x10000 + B3;
@@ -701,22 +701,22 @@ const char* FMgsdbDatabase::EvaluateIf()
     {
         // A.B.C.D against DriverVersion: HighPart = A<<16 + B (signed), LowPart = C<<16 + D.
         // As in retail, the second and fourth checks test A and C again, not B and D.
-        const unsigned long A = ReadNumber();
+        const uint32_t A = ReadNumber();
         if (A == 0xFFFFFFFF || *Cursor_++ != '.')
             return "Invalid driver number";
-        const unsigned long B = ReadNumber();
-        const long RhsHi = (long)(A * 0x10000 + B);
+        const uint32_t B = ReadNumber();
+        const int32_t RhsHi = (int32_t)(A * 0x10000 + B);
         if (A == 0xFFFFFFFF || *Cursor_++ != '.')
             return "Invalid driver number";
-        const unsigned long C = ReadNumber();
+        const uint32_t C = ReadNumber();
         if (C == 0xFFFFFFFF || *Cursor_++ != '.')
             return "Invalid driver number";
-        const unsigned long D = ReadNumber();
-        const unsigned long RhsLo = C * 0x10000 + D;
+        const uint32_t D = ReadNumber();
+        const uint32_t RhsLo = C * 0x10000 + D;
         if (C == 0xFFFFFFFF)
             return "Invalid driver number";
-        const unsigned long Lo = Ident_.DriverVersion.LowPart;
-        const long Hi = Ident_.DriverVersion.HighPart;
+        const uint32_t Lo = Ident_.DriverVersion.LowPart;
+        const int32_t Hi = Ident_.DriverVersion.HighPart;
         switch (Op)
         {
         case 0:
@@ -736,7 +736,7 @@ const char* FMgsdbDatabase::EvaluateIf()
         }
     }
 
-    unsigned long Rhs = 0;
+    uint32_t Rhs = 0;
     if (Kind == 3)
     {
         if (Match("win95"))
@@ -870,7 +870,7 @@ bool FMgsdbDatabase::ReadLeadingApplyToAll()
 // id is the adapter's and that device's block, all into the live set.
 bool FMgsdbDatabase::ReadVendorDevice()
 {
-    unsigned long Vendor = 0xFFFFFFFF;
+    uint32_t Vendor = 0xFFFFFFFF;
     do
     {
         if (Match("vendor"))
@@ -886,7 +886,7 @@ bool FMgsdbDatabase::ReadVendorDevice()
                     Vendor = Ident_.VendorId;
                     break;
                 }
-                const unsigned long Id = ReadNumber();
+                const uint32_t Id = ReadNumber();
                 if (Id == Ident_.VendorId)
                 {
                     Vendor = Id;
@@ -924,7 +924,7 @@ bool FMgsdbDatabase::ReadVendorDevice()
         }
     } while (Cursor_ < End_);
 
-    unsigned long Device = 0xFFFFFFFF;
+    uint32_t Device = 0xFFFFFFFF;
     do
     {
         if (Match("vendor"))
@@ -939,7 +939,7 @@ bool FMgsdbDatabase::ReadVendorDevice()
         SkipWhite();
         if (*Cursor_ > '/' && *Cursor_ < ':')
         {
-            const unsigned long Id = ReadNumber();
+            const uint32_t Id = ReadNumber();
             if (Id == Ident_.DeviceId)
             {
                 Device = Id;
@@ -1015,7 +1015,7 @@ bool FMgsdbDatabase::ReadBlock(FMgsdbRecordSet* Target)
             }
             ++Cursor_;
             SkipWhite();
-            const unsigned long Max = ReadNumber();
+            const uint32_t Max = ReadNumber();
             if (Max == 0xFFFFFFFF)
             {
                 SetError("MaxOverallGraphicDetail did not specify a number!");
@@ -1027,7 +1027,7 @@ bool FMgsdbDatabase::ReadBlock(FMgsdbRecordSet* Target)
             char MaxText[0x10];
             sprintf(MaxText, "%d", (int)Max);
             if (Records_->Find("OverallGraphicDetail", Detail, 0x10) &&
-                (unsigned long)MsvcrtAtoi(Detail) > Max)
+                (uint32_t)MsvcrtAtoi(Detail) > Max)
             {
                 std::map<std::string, FMgsdbRecordSet*>::iterator It =
                     DetailSets_.find(std::string(MaxText));

@@ -5,6 +5,11 @@
 */
 
 
+#ifdef FREELANCER_PORTABLE
+#include <ctype.h>
+/* msvcrt _isctype(c, 0x103): 0x103 = _UPPER|_LOWER|_ALPHA */
+static int _isctype(int c, int mask) { (void)mask; return isalpha(c); }
+#endif
 #include <ctype.h>
 #include <stdio.h> /* Thorn: MSVC needs a prototype for sprintf (stock 3.2.2 omitted it). */
 #include <string.h>

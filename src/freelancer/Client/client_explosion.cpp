@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "client_explosion.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "client_cliobj.h"         // Archetype::HookUpInstanceTreeMaterials (FUN_00425480)
@@ -305,7 +306,7 @@ void Action_Explode::Shatter()
     // FUN_00536800.
     // 0x00536820..0x00536854: every piece of the Gameobj's instance tree, at most
     // num_child_pieces (FUN_00536c20 on get_index, vt+0x1c).
-    long const RootInstance = Gameobj->get_index();
+    int32_t const RootInstance = Gameobj->get_index();
     std::vector<CObject*> Pieces;
     CollectChildPieces(RootInstance, Arch->NumChildPieces, Pieces);
 
@@ -418,7 +419,7 @@ void Action_Explode::Shatter()
     // 0x00536b28..0x00536b29: the vector's buffer freed (the local's destructor).
 }
 
-void Action_Explode::CollectChildPieces(long Instance, int MaxPieces,
+void Action_Explode::CollectChildPieces(int32_t Instance, int MaxPieces,
                                         std::vector<CObject*>& Pieces)
 {
     // FUN_00536c20 (RET 0xc). `this` is not read.
@@ -432,7 +433,7 @@ void Action_Explode::CollectChildPieces(long Instance, int MaxPieces,
     {
         do
         {
-            CollectChildPieces(reinterpret_cast<long>(Child), MaxPieces, Pieces);
+            CollectChildPieces(static_cast<int32_t>(fl::PtrToHandle(Child)), MaxPieces, Pieces);
             Child = Engine->GetRelatedInstance(Inst, 1u, G_InvalidEngineHandle);
         } while (Child != G_InvalidEngineHandle);
         return;

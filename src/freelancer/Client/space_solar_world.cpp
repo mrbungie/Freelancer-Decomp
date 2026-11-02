@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "space_solar_world.h"
+#include "fl/handles.h"
 
 #include "character_select_equip.h"
 #include "client_cliobj.h" // Archetype::LoadMountedEquipmentCompanions / HookUpInstanceTreeMaterials
@@ -165,7 +166,7 @@ void SolarSpheresApplyDetail(float Detail)
             Simple = Obj;
         ISphereMesh* Sphere = nullptr;
         GENRESULT const Result = DALib::Engine->QueryInstance(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Simple->EngineInstanceId)),
+            static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Simple->EngineInstanceId))),
             Iids::SphereMesh, reinterpret_cast<void**>(&Sphere));
         if (Result < 0)
         {

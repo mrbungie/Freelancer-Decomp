@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "hud_target.h"
+#include "fl/handles.h"
 
 #include "character_select_equip.h" // GetPlayerBaseIdRetail (DAT_00673358)
 #include "client_gameobj.h"         // FClientGameobj : IObjInspectImpl
@@ -63,14 +64,14 @@ namespace
     }
 
     // Engine instance handles travel as void*; a GetRootIndex / get_index long converts 1:1.
-    void* InstanceFromIndex(long Index)
+    void* InstanceFromIndex(int32_t Index)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Index)));
     }
 
     void* NoInstance()
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     FTransform const* InstanceTransform(void* Instance)
@@ -272,7 +273,7 @@ bool FHudInstanceBounds::IsShieldPart(void* Instance) const
     // is_shield_part over the +0x68..+0x6c part map (no null test on the user data).
     CObject const* const Object = static_cast<CObject const*>(
         DALib::Engine->GetInstanceUserData(Instance));
-    long const EngineInst = static_cast<long>(reinterpret_cast<intptr_t>(Instance));
+    int32_t const EngineInst = static_cast<int32_t>(fl::PtrToHandle(Instance));
     return Object->is_shield_part(Object->inst_to_part(EngineInst));
 }
 
@@ -455,7 +456,7 @@ unsigned HudCollisionGroupTypeIds(unsigned CollisionGroupType)
     return 0;
 }
 
-unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
+uint32_t* HudDamageColorArgb(uint32_t* OutArgb, float Damage)
 {
     // FUN_0045a1a0. The first two bands: FCOMP / TEST AH,5 / JP leaves a band on "not below"
     // (unordered included), so each is taken only for Damage strictly below its bound.
@@ -484,8 +485,8 @@ unsigned long* HudDamageColorArgb(unsigned long* OutArgb, float Damage)
     unsigned char const Red = static_cast<unsigned char>(static_cast<int>(255.0 * Level));
     unsigned char const Green =
         static_cast<unsigned char>(static_cast<int>(static_cast<double>(Red) * Level));
-    *OutArgb = 0xff000000u | (static_cast<unsigned long>(Green) << 16) |
-               (static_cast<unsigned long>(Green) << 8) | static_cast<unsigned long>(Red);
+    *OutArgb = 0xff000000u | (static_cast<uint32_t>(Green) << 16) |
+               (static_cast<uint32_t>(Green) << 8) | static_cast<uint32_t>(Red);
     return OutArgb;
 }
 
@@ -1248,7 +1249,7 @@ bool HudBuildObjectCaption(CSimple const* Object, FHudWideText* Out, int Mode,
     return HudCaptionFinish(Out);
 }
 
-void HudReputationColor(unsigned long* OutArgb, IObjRW* Player, IObjRW* Other)
+void HudReputationColor(uint32_t* OutArgb, IObjRW* Player, IObjRW* Other)
 {
     // FUN_0045a4e0 (cdecl).
     if (Other == nullptr || Player == nullptr)
@@ -1522,7 +1523,7 @@ void HudTargetBase::HideGroupAndEquipParts()
     while (Equip != nullptr)
     {
         // vt+0x84 CAttachedEquip::GetRootIndex, called on every traversed item.
-        long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
+        int32_t const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
             PartCacheMarkHidden(&PartCache, InstanceFromIndex(Root), true);
@@ -1538,7 +1539,7 @@ namespace
 
     // The part tag both colouring passes build from a colour's four memory bytes (0x004e6e60,
     // 0x004e701a): byte3 << 24 | byte0 << 16 | byte1 << 8 | byte2.
-    unsigned PackPartTag(unsigned long Colour)
+    unsigned PackPartTag(uint32_t Colour)
     {
         unsigned const Byte0 = static_cast<unsigned>(Colour & 0xffu);
         unsigned const Byte1 = static_cast<unsigned>((Colour >> 8) & 0xffu);
@@ -1547,9 +1548,9 @@ namespace
         return (Byte3 << 24) | (Byte0 << 16) | (Byte1 << 8) | Byte2;
     }
 
-    unsigned long ChromeColourArgb()
+    uint32_t ChromeColourArgb()
     {
-        unsigned long Colour = 0;
+        uint32_t Colour = 0;
         memcpy(&Colour, G_HudChromeColorRgba, sizeof(G_HudChromeColorRgba)); // DAT_00679bb4
         return Colour;
     }
@@ -1721,22 +1722,22 @@ void HudTargetBase::ColourGroupParts()
     while (Group != nullptr)
     {
         // The chrome colour, or the damage colour while 1 - relative health > 0 (TEST AH,0x41).
-        unsigned long Colour = ChromeColourArgb();
+        uint32_t Colour = ChromeColourArgb();
         float const Damage = 1.0f - Group->GetRelativeHealth();
         if (Damage > 0.0f)
         {
-            unsigned long Damaged = 0;
+            uint32_t Damaged = 0;
             Colour = *HudDamageColorArgb(&Damaged, Damage);
         }
 
         // 0x004e6d66: each byte * 0.7f, ftol, clamped to 0..255 inline.
-        unsigned long const Dim0 = static_cast<unsigned long>(
+        uint32_t const Dim0 = static_cast<uint32_t>(
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour))));
-        unsigned long const Dim1 = static_cast<unsigned long>(
+        uint32_t const Dim1 = static_cast<uint32_t>(
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour >> 8))));
-        unsigned long const Dim2 = static_cast<unsigned long>(
+        uint32_t const Dim2 = static_cast<uint32_t>(
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour >> 16))));
-        unsigned long const Dim3 = static_cast<unsigned long>(
+        uint32_t const Dim3 = static_cast<uint32_t>(
             ClampByte(DimChromeByte(static_cast<unsigned char>(Colour >> 24))));
         Colour = Dim0 | (Dim1 << 8) | (Dim2 << 16) | (Dim3 << 24);
 
@@ -1744,7 +1745,7 @@ void HudTargetBase::ColourGroupParts()
         // pick (FUN_0045a740).
         if (SubTargetId == Group->GetID() && !HudIsMousePickBlocked())
         {
-            unsigned long Pulsed = 0;
+            uint32_t Pulsed = 0;
             NnUiPulseBlendFromArgb(&Pulsed, Colour);
             Colour = Pulsed;
         }
@@ -1777,11 +1778,11 @@ void HudTargetBase::ColourEquipParts()
     CEquip* Equip = EqObj->EquipManager.Traverse(EquipWalk);
     while (Equip != nullptr)
     {
-        unsigned long Colour = G_NnPaletteArgb_679b98;
+        uint32_t Colour = G_NnPaletteArgb_679b98;
         float const Damage = 1.0f - Equip->GetRelativeHealth();
         if (Damage > 0.0f)
         {
-            unsigned long Damaged = 0;
+            uint32_t Damaged = 0;
             Colour = *HudDamageColorArgb(&Damaged, Damage);
         }
 
@@ -1802,13 +1803,13 @@ void HudTargetBase::ColourEquipParts()
 
         if (SubTargetId == Equip->Id && !HudIsMousePickBlocked())
         {
-            unsigned long Pulsed = 0;
+            uint32_t Pulsed = 0;
             NnUiPulseBlendFromArgb(&Pulsed, Colour);
             Colour = Pulsed;
         }
 
         // vt+0x84 CAttachedEquip::GetRootIndex; re-activated with recursion.
-        long const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
+        int32_t const Root = static_cast<CAttachedEquip*>(Equip)->GetRootIndex();
         if (Root != -1)
         {
             PartCacheActivatePart(&PartCache, InstanceFromIndex(Root), true, PackPartTag(Colour));

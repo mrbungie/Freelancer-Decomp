@@ -29,6 +29,7 @@
 #include "client_tick_profile.h" // Port-only diagnostics, released before fonts
 #include "gameflow.h"
 #include "globals.h"
+#include "fl/platform.h"
 #include "graph_library.h"
 #include "dacom.h"
 #include "DALib.h"
@@ -123,6 +124,12 @@ namespace
     // it. Returns EXCEPTION_EXECUTE_HANDLER unless dw15 says the process may continue.
     LONG WINAPI ClientCrashFilter(EXCEPTION_POINTERS* Info)
     {
+#if !defined(_MSC_VER) || defined(FREELANCER_PORTABLE)
+        // The Dr. Watson (dw15.exe) crash reporting path is Windows-only (SEH, shared-memory
+        // handshake, registry). The portable build lets the process terminate normally.
+        (void)Info;
+        return 1; // EXCEPTION_EXECUTE_HANDLER
+#else
         LONG Result = 1; // local_20
         const DWORD Code = Info->ExceptionRecord->ExceptionCode;
         if (Code == 0x80000003 || Code == 0x80000004)
@@ -285,6 +292,7 @@ namespace
         }
         CloseHandle(Mapping);
         return Result;
+#endif
     }
 
     // FUN_005a5910 (.text:005a5910-005a593c).
@@ -410,6 +418,11 @@ namespace
     // probe (0x005b30bc). False (EBUEula returned 0) makes WinMain return 1.
     bool RunEulaGate()
     {
+#if defined(FREELANCER_PORTABLE)
+        // PORT DEVIATION: EBUEula.dll is a Win32 dialog DLL (native code); it cannot run here. The
+        // gate is treated as accepted. A native EULA prompt can replace this later.
+        return true;
+#else
         // 0x005b2d6c..0x005b2d8e: "..\EBUEula.dll", then "EBUEula.dll"; neither -> fatal box.
         HMODULE Eula = LoadLibraryA("..\\EBUEula.dll");
         if (Eula == nullptr)
@@ -441,6 +454,7 @@ namespace
         // 0x005b2f36..0x005b2f44: FreeLibrary, then SETNZ on the result.
         FreeLibrary(Eula);
         return Result != 0;
+#endif
     }
 
     // FUN_005b0b00 -- the assert callback WinMain hands ErrorHandler::activate. In a fullscreen
@@ -478,7 +492,7 @@ namespace
             {
                 const int Port = MsvcrtAtoi(Token);
                 if (Port != 0)
-                    CDPClient::SetSourcePort(static_cast<unsigned long>(Port));
+                    CDPClient::SetSourcePort(static_cast<uint32_t>(Port));
             }
             else if (Letter == 'S' || Letter == 's')
             {
@@ -774,22 +788,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
         if (G_bFpExceptionTrap)
             SetFpuExceptionTrap(true);
 
-        WNDCLASSA WindowClass;
-        char ClassName[] = "Freelancer";
-        WindowClass.style = CS_DBLCLKS;
-        WindowClass.lpfnWndProc = ClientWndProc;
-        WindowClass.cbClsExtra = 0;
-        WindowClass.cbWndExtra = 0;
-        WindowClass.hInstance = instance;
-        WindowClass.hIcon = LoadIconA(instance, MAKEINTRESOURCEA(0x67));
-        WindowClass.hCursor = LoadCursorA(nullptr, IDC_ARROW);
-        WindowClass.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
-        WindowClass.lpszMenuName = nullptr;
-        WindowClass.lpszClassName = ClassName;
-        RegisterClassA(&WindowClass);
-
-        g_client.window = CreateGameWindow(ClassName, &g_display, "Freelancer");
-        ShowCursor(FALSE);
+        // PORT: no WNDCLASS / RegisterClass -- the front end (fl::IWindowHost) creates the window.
+        g_client.window = CreateGameWindow(&g_display, "Freelancer");
+        fl::GetWindowHost()->SetCursorVisible(false);
 
         if (InitializeEngine(&CommandLine))
         {

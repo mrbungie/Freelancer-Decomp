@@ -6,6 +6,7 @@
 
 // CSolar (retail CSolar.cpp).
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "common_cobject_internal.h" // CmnCobject::GetObjectDbCollisionGroup
 
 #include "common_goods.h"
@@ -571,7 +572,7 @@ void CSolar::update_system_gate(float Dt)
     case 3:
         // .text:062b7c4d..062b7c83: Anim vt+0x44 on the handle; zero keeps waiting, otherwise
         // state 4 first, then Code 3.
-        if (DALib::Anim->FilterObjects((void*)GateAnim.Index) == 0)
+        if (DALib::Anim->FilterObjects((void*)fl::HandleToPtr(GateAnim.Index)) == 0)
             return;
         GateAnimState = 4;
         Code = 3;

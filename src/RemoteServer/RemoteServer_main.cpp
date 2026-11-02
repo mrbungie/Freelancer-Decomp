@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include <windows.h>
+#include "platform/fl_x87.h"
 #define RPCLOCAL_EXPORTS
 #define REMOTESERVER_INSTANCE_DEFINITION
 #include "../include/rpc_iserver.h"
@@ -95,8 +96,8 @@ FRemoteServerImpl Server;
 class FRemoteServerClient final : public CDPClient
 {
 public:
-    void OnReceive(unsigned char* Data, unsigned long Size) override;
-    void OnConnect(long Result) override;
+    void OnReceive(unsigned char* Data, uint32_t Size) override;
+    void OnConnect(int32_t Result) override;
     void OnDisconnect() override;
 };
 
@@ -166,7 +167,7 @@ void FRemoteServerImpl::PushToServer(CDAPacket* Packet)
 }
 
 // LAB_06bd98a0 only accepts a nonnull DirectPlay buffer.
-void FRemoteServerClient::OnReceive(unsigned char* Data, unsigned long Size)
+void FRemoteServerClient::OnReceive(unsigned char* Data, uint32_t Size)
 {
     if (Data != nullptr) {
         extern void RpcDispatchMsgs(IServerImpl*, const unsigned char*, unsigned int);
@@ -182,10 +183,10 @@ void FRemoteServerClient::OnDisconnect()
 }
 
 // LAB_06bd98e0 reports only failed DirectPlay connections to freelancer.exe.
-void FRemoteServerClient::OnConnect(long Result)
+void FRemoteServerClient::OnConnect(int32_t Result)
 {
     if (Result != 0) {
-        typedef void (__cdecl* FHandleConnectError)(long);
+        typedef void (__cdecl* FHandleConnectError)(int32_t);
         FHandleConnectError Handler = reinterpret_cast<FHandleConnectError>(GetProcAddress(GetModuleHandleA(nullptr), "HandleConnectError"));
         Handler(Result);
     }
@@ -367,7 +368,7 @@ void HandlePacket(unsigned int ClientId, CDAPacket* Packet)
                         break;
                     case 0x04:
                         Client->SendCommonPlayerTradeSetTradeMoney(1, Wire->TargetPlayer,
-                            static_cast<unsigned long>(Wire->Money));
+                            static_cast<uint32_t>(Wire->Money));
                         break;
                     case 0x08:
                     {

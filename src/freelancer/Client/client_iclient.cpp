@@ -13,6 +13,7 @@
 // Every slot's retail body is quoted by address.
 
 #include "freelancer_client.h"
+#include "fl/handles.h"
 
 #include "best_path.h"                // objective map slots 71 / 72 / 73 (DAT_0067294c)
 #include "character_select_equip.h"   // player-state setters (FUN_004c3e20 ..)
@@ -371,7 +372,7 @@ void IClientImpl::SendServerGFCompleteNewsBroadcastList(unsigned int /*ClientId*
 
 // LAB_00437b30: `MOV ECX,[DAT_0067ecd0]; MOV EAX,[ECX]; JMP [EAX+0xec]` -- a tail call into the
 // server interface's slot 59 (MissionSaveB) with this slot's own two arguments in place.
-void IClientImpl::SendServerMissionSaveA(unsigned int ClientId, unsigned long MissionId)
+void IClientImpl::SendServerMissionSaveA(unsigned int ClientId, uint32_t MissionId)
 {
     LocalServer()->MissionSaveB(ClientId, MissionId);
 }
@@ -405,7 +406,7 @@ void IClientImpl::SendServerSetReputation(unsigned int /*ClientId*/, const FServ
     }
     // Retail quirk: Vibe::GetRank writes into the stack slot that held the Info pointer, so the
     // rank's initial value (kept when GetRank leaves it alone) is the pointer's own bits.
-    unsigned Rank = static_cast<unsigned>(reinterpret_cast<uintptr_t>(&Info));
+    unsigned Rank = static_cast<unsigned>(fl::PtrToHandle(&Info));
     Reputation::Vibe::GetRank(Info.VibeHandle, Rank);
     Reputation::Vibe::Set(Info.VibeHandle, Info.Field_0x08, Rank, Info.RelationCount,
                           Info.Relations, Info.NameA, Info.NameB, DisplayName);
@@ -586,7 +587,7 @@ void IClientImpl::SendCommonPlayerTradeAcceptTrade(unsigned int /*ClientId*/, un
 // character's own; either way both "accepted" texts drop back to red (FUN_004c2620(0),
 // FUN_004c2690(0)).
 void IClientImpl::SendCommonPlayerTradeSetTradeMoney(unsigned int /*ClientId*/, unsigned int ShipId,
-                                                     unsigned long Money)
+                                                     uint32_t Money)
 {
     if (G_NnTrade == nullptr)
     {
@@ -705,7 +706,7 @@ void IClientImpl::SendServerPlayerListRemove(unsigned int /*ClientId*/, unsigned
 
 // IChatClient slot 0, LAB_005a6250 (RET 0x10) -- ch1 CHATMSG: FUN_0046a150(SenderId, Data,
 // Size), i.e. the channel key, the buffer and its size. TargetId is not read.
-void IClientImpl::SendCommonChatMsg(CHAT_ID /*TargetId*/, CHAT_ID SenderId, unsigned long Size,
+void IClientImpl::SendCommonChatMsg(CHAT_ID /*TargetId*/, CHAT_ID SenderId, uint32_t Size,
                                     const void* Data)
 {
     ChatDispatchIncoming(SenderId, Data, static_cast<unsigned>(Size));

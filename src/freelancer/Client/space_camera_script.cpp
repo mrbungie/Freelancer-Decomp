@@ -202,14 +202,14 @@ GENRESULT DACOM_API FScriptCamSink::QueryInterface(const char* Iid, void** Out)
     return kGrInterfaceUnsupported;
 }
 
-unsigned long DACOM_API FScriptCamSink::AddRef()
+uint32_t DACOM_API FScriptCamSink::AddRef()
 {
     // LAB_0051e8e0: pre-increment, and the NEW value is what comes back.
     ++RefCount;
-    return static_cast<unsigned long>(RefCount);
+    return static_cast<uint32_t>(RefCount);
 }
 
-unsigned long DACOM_API FScriptCamSink::Release()
+uint32_t DACOM_API FScriptCamSink::Release()
 {
     // LAB_0041a800, shared with FRoomBatcherSink::Release (room_control.cpp).
     // 0x0041a807: TEST EAX,EAX / JBE -- an UNSIGNED compare, so only an exact zero skips the
@@ -218,7 +218,7 @@ unsigned long DACOM_API FScriptCamSink::Release()
         --RefCount;
 
     if (RefCount != 0)
-        return static_cast<unsigned long>(RefCount);
+        return static_cast<uint32_t>(RefCount);
 
     // 0x0041a817: the count is put back to 1 before the object is freed, so a re-entrant
     // release during destruction cannot free it twice. Then zero comes back, not the count.
@@ -517,7 +517,7 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     // the callee cannot read past the end.
     struct FScriptAggDesc
     {
-        unsigned long Size;
+        uint32_t Size;
         const char* Name;
         void* Field08;
         void* Field0C;
@@ -575,7 +575,7 @@ bool ScriptCameraActivate(FScriptCamera* Cam, const int* ViewRect4)
     }
 
     // 0x0051e58b .. 0x0051e5e9: walk every entity once and bind the two sinks.
-    const unsigned long EntityCount = ScriptOf(Cam->Script)->Slot6EntityCount();
+    const uint32_t EntityCount = ScriptOf(Cam->Script)->Slot6EntityCount();
 
     for (int Index = 0; Index < static_cast<int>(EntityCount); ++Index)
     {

@@ -72,7 +72,7 @@ struct HardpointInfo
     unsigned Crc;               // +0x00
     Vector Position;            // +0x04
     Matrix Orient;              // +0x10
-    long ParentInstance;        // +0x34
+    int32_t ParentInstance;        // +0x34
     char Pad[0x10];             // +0x38..+0x47
 };
 
@@ -91,15 +91,15 @@ static_assert(offsetof(HardpointInfo, ParentInstance) == 0x34, "parent instance 
 // ---------------------------------------------------------------------------
 
 // 0xae940 -- the same search with the info discarded.
-COMMON_API bool __cdecl FindHardpoint(long Handle, char const* Name, long& OutHandle);
+COMMON_API bool __cdecl FindHardpoint(int32_t Handle, char const* Name, int32_t& OutHandle);
 // 0xaeb70 -- object space: the info comes back exactly as the hardpoint store holds it.
-COMMON_API bool __cdecl FindHardpoint_OS(long Handle, char const* Name, long& OutHandle,
+COMMON_API bool __cdecl FindHardpoint_OS(int32_t Handle, char const* Name, int32_t& OutHandle,
                                          HardpointInfo& OutInfo);
 // 0xae960 -- parent space: as _OS, then walked back up to the handle the caller asked about.
-COMMON_API bool __cdecl FindHardpoint_PS(long Handle, char const* Name, long& OutHandle,
+COMMON_API bool __cdecl FindHardpoint_PS(int32_t Handle, char const* Name, int32_t& OutHandle,
                                          HardpointInfo& OutInfo);
 // 0xaeba0 -- compose the hardpoint's frame with the instance's world transform, in place.
-COMMON_API void __cdecl HardpointToWorld(long Handle, HardpointInfo& Info);
+COMMON_API void __cdecl HardpointToWorld(int32_t Handle, HardpointInfo& Info);
 
 // ---------------------------------------------------------------------------
 // SetpointProperties — sizeof 0x24. Parsed from setpoint name convention
@@ -363,7 +363,7 @@ struct COMMON_API ExhaustNozzleInfo
     unsigned short SubObjId;     // +0x00  SUBOBJ_ID_NONE (0, .rdata:063a4aa4) = no hardpoint bound
     unsigned short Pad02;        // +0x02  never written (retail inserts an uninitialised element)
     int Index;                   // +0x04  N of "HpEngine0<N>" (.text:06295d7a)
-    long ParentInstance;         // +0x08  FindHardpoint_OS out handle (.text:06295d81)
+    int32_t ParentInstance;         // +0x08  FindHardpoint_OS out handle (.text:06295d81)
     Transform Offset;            // +0x0C  hardpoint Orient then Position
 };
 
@@ -383,22 +383,22 @@ public:
 
     void clear();
     void destroy();
-    int analyze_instance(long Instance);
+    int analyze_instance(int32_t Instance);
     void expire_instance();
 
     int get_count() const;
     char const* get_name(int Index) const;
     HardpointInfo const& get_info(int Index) const;
-    long get_instance(int Index) const;
+    int32_t get_instance(int Index) const;
     int find_name(char const* Name) const;
-    long find_name_instance(char const* Name) const;
+    int32_t find_name_instance(char const* Name) const;
     HardpointInfo const* get_info_by_name(char const* Name) const;
 
 private:
-    void count_hardpoints(long Instance);
-    void fill_hardpoints(long Instance);
-    static void __cdecl count_hardpoints_callback(long Instance, void* Context);
-    static void __cdecl fill_hardpoints_callback(long Instance, void* Context);
+    void count_hardpoints(int32_t Instance);
+    void fill_hardpoints(int32_t Instance);
+    static void __cdecl count_hardpoints_callback(int32_t Instance, void* Context);
+    static void __cdecl fill_hardpoints_callback(int32_t Instance, void* Context);
     static void __cdecl hardpoint_callback1(char const* Name, void* Context);
     static void __cdecl hardpoint_callback2(char const* Name, void* Context);
 
@@ -406,12 +406,12 @@ private:
     int Count;                  // +0x04
     char const** Names;         // +0x08  array[Count] of malloc'd strings
     HardpointInfo* Infos;       // +0x0C  array[Count] of HardpointInfo
-    long* Instances;            // +0x10  array[Count] of instance handles
+    int32_t* Instances;            // +0x10  array[Count] of instance handles
     // +0x14/+0x18: scratch of fill_hardpoints()'s walk. fill_hardpoints_callback stores the
     // current instance and its archetype (part) handle; hardpoint_callback2 records the
     // instance in Instances[cursor] and queries the part's hardpoints. Both are -1 whenever
     // no fill is running (ctor / clear / analyze_instance's end).
-    long FillInstance;           // +0x14  formerly FillIndex
+    int32_t FillInstance;           // +0x14  formerly FillIndex
     void* FillPart;              // +0x18  IEngine archetype handle; formerly CachedInstance
     int FillCursor;              // +0x1C  array-fill cursor, 0..Count-1
 };
@@ -519,7 +519,7 @@ public:
     void init(MissionVendorOfferDescription const& Desc);
     void marshal(class MarshalBuffer* Buf) const;
     void unmarshal(class MarshalBuffer* Buf);
-    unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
+    uint32_t get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
     char const* get_icon_texture() const;
 
     // Public since 2026-09-24: Server.dll's BaseDB stamps the handle into Key
@@ -562,7 +562,7 @@ public:
     void unmarshal(class MarshalBuffer* Buf);
     // 0x06261d90 ?get_key@MissionVendorAcceptance@@QBEKXZ: MOV EAX,[ECX] / RET (ICF-shared
     // with AmbientScriptProperties::get_key and other "return the first dword" getters).
-    unsigned long get_key() const;
+    uint32_t get_key() const;
 
     // Public since 2026-09-24: Server.dll's FUN_06d13270 fills a local one
     // field by field (.text:06d1329f .. .text:06d132bc) before marshalling it.
@@ -587,7 +587,7 @@ public:
     void init(NewsBroadcastDescription const& Desc);
     void marshal(class MarshalBuffer* Buf) const;
     void unmarshal(class MarshalBuffer* Buf);
-    unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
+    uint32_t get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
     char const* get_logo_texture() const;
 
     // Public since 2026-09-24 (Server.dll's BaseDB stamps Key, FUN_06d13350
@@ -626,7 +626,7 @@ public:
     void init(CharacterDescription const& Desc);
     void marshal(class MarshalBuffer* Buf) const;
     void unmarshal(class MarshalBuffer* Buf);
-    unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
+    uint32_t get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
 
     // Public since 2026-09-24: Server.dll's BaseDB writes these directly
     // (FUN_06d11ee0 / FUN_06d120b0 / FUN_06d14ac0); retail has no setters.
@@ -703,7 +703,7 @@ public:
     void init(AmbientScriptDescription const& Desc);
     void marshal(class MarshalBuffer* Buf) const;
     void unmarshal(class MarshalBuffer* Buf);
-    unsigned long get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
+    uint32_t get_key() const;  // retail ?get_key@...@@QBEKXZ (K = unsigned long)
 
     // Re-derived from retail's ctor/dtor/clear/operator=/init (Common.dll.c 163560-163710).
     // Key defaults to -1 (never constructed via a description); init() resets it to 0 instead
@@ -833,7 +833,7 @@ struct COMMON_API CBase
     void advise(bool bFlag);
     void cobject(CObject* Obj);
     CObject* cobject() const;
-    long get_index() const;  // retail ?get_index@CBase@@QBEJXZ (J = long)
+    int32_t get_index() const;  // retail ?get_index@CBase@@QBEJXZ (J = long)
     void notify_of_destruction(void* Ptr);
 
     CObject* Object;            // +0x04
@@ -1525,7 +1525,7 @@ COMMON_API bool __cdecl ThornGetUserFloat(IScriptEngine* Engine, int Index, char
                                           float* Out);
 // 0x1bd60. Reads the flag byte at entity +0x42: bit 0 -> 1, bit 1 -> 2 (bit 1 wins), else 0.
 // The second parameter is accepted and ignored, exactly as in retail.
-COMMON_API unsigned long __cdecl ThornGetRenderType(ThornEntity const* Entity, char const* Unused);
+COMMON_API uint32_t __cdecl ThornGetRenderType(ThornEntity const* Entity, char const* Unused);
 // 0x1b8f0. Creates the "IScriptEngine" component through DALib::Dacom, queries
 // "1.11_IScriptEngine" off it, then feeds it the script file opened as a "DOS" filesystem.
 COMMON_API IScriptEngine* __cdecl ThornScriptLoad(char const* Path);
@@ -1565,7 +1565,7 @@ public:
     // NumLightsAlt steps between LightFrames[0] and LightFrames[1]. Called by
     // RoomData::fixup_FlashLight_list (0x06277000) and RoomData::fixup (0x06277ce5). The
     // Instance argument is not read.
-    void fixup(long Instance, HardpointSummary const* HpSum, RoomData const* Room);
+    void fixup(int32_t Instance, HardpointSummary const* HpSum, RoomData const* Room);
 
 private:
     // Private in retail (?add_light_csys@FlashLightSetInfo@@AAEXABVCsys@@@Z). fixup() inlines
@@ -1586,7 +1586,7 @@ public:
     float Param4;   // +0x10  0x3dcccccd = 0.1f
     float Param5;   // +0x14  0x3e4ccccd = 0.2f
     float Param6;   // +0x18  0x3f800000 = 1.0f
-    long  Mode;     // +0x1C  0 -- fixup() branches on this: 1 = copy LightFrames verbatim,
+    int32_t  Mode;     // +0x1C  0 -- fixup() branches on this: 1 = copy LightFrames verbatim,
                     // 2 = interpolate LightFrames[0]/[1] over NumLightsAlt steps
 
     // +0x020/+0x120: 64 parallel malloc'd string slots. HardpointNames[i]/SetpointNames[i]
@@ -1601,9 +1601,9 @@ public:
     // fixup() from HardpointNames/SetpointNames; left at identity until that exists.
     Csys LightFrames[64];            // +0x220
 
-    long NumLights;      // +0xE20 -- count of valid HardpointNames/LightFrames slots
-    long NumLightsAlt;   // +0xE24 -- second count, only consulted by fixup() when Mode == 2
-    long Cursor;         // +0xE28 -- write index into FinalFrames; reset to 0 by unfixup()
+    int32_t NumLights;      // +0xE20 -- count of valid HardpointNames/LightFrames slots
+    int32_t NumLightsAlt;   // +0xE24 -- second count, only consulted by fixup() when Mode == 2
+    int32_t Cursor;         // +0xE28 -- write index into FinalFrames; reset to 0 by unfixup()
 
     // +0xE2C: second bank of 64 Csys, also default-identity. add_light_csys() appends to
     // FinalFrames[Cursor++].
@@ -1651,7 +1651,7 @@ public:
     void init(unsigned NewBaseId, unsigned NewRoomId, char const* NewNickname, char const* NewFile);
     void clear();
     void destroy();
-    void fixup(long Instance);
+    void fixup(int32_t Instance);
     void unfixup();
 
     RoomCameraInfo const* find_camera(char const* Name, char const* ScriptName) const;
@@ -1685,17 +1685,17 @@ private:
     void read_FlashLightSet_block(INI_Reader* Reader);
     void read_FlashLightLine_block(INI_Reader* Reader);
 
-    void add_set_script_light(unsigned long Id, Csys const& Frame,
+    void add_set_script_light(uint32_t Id, Csys const& Frame,
                               ThornLightProperties const* Props, unsigned char Type);
     // The parameters in RoomPropInfo field order (+0x00 .. +0x50).
     void add_set_script_Prop(char const* Template, char const* Name, int Category,
                              Csys const& Frame, bool bVisible, bool bLit, bool bFog,
                              bool bRoomMain, unsigned char LightGroup, signed char Layer,
-                             unsigned long RenderType, char const* Loadout,
-                             unsigned long PriorityId, bool bRunningLights);
-    void add_set_script_Camera(unsigned long Id, Csys const& Frame, char const* Name,
+                             uint32_t RenderType, char const* Loadout,
+                             uint32_t PriorityId, bool bRunningLights);
+    void add_set_script_Camera(uint32_t Id, Csys const& Frame, char const* Name,
                                ThornCameraProperties const* Props);
-    void add_set_script_Setpoint(unsigned long Id, Csys const& Frame, char const* Name,
+    void add_set_script_Setpoint(uint32_t Id, Csys const& Frame, char const* Name,
                                  ThornEntity const* Entity);
 
     // 06275bb0, called from fixup() only.
@@ -1707,7 +1707,7 @@ private:
                                        char const* ScriptName);
     static void __cdecl make_setpoint_name_generic(char const* Name, char* OutGeneric);
 
-    void fixup_FlashLight_list(long Instance, HardpointSummary const* HpSum);
+    void fixup_FlashLight_list(int32_t Instance, HardpointSummary const* HpSum);
     void unfixup_FlashLight_list();
 
 public:

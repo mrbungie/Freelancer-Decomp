@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_component.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "common_goods.h"   // HardpointSummary
@@ -19,31 +20,14 @@ namespace
 {
     char const* const GScriptBaseFile = "E:\\FL\\Scratch\\Source\\Client\\Gf\\ScriptBase.cpp";
 
-    // The QueryInterface table at 0x005cca20: {IID, facet offset}, null-terminated. An offset
-    // with the high bit set would name a field holding the facet pointer (LAB_004500d0
-    // 0x00450141 JNS); none of retail's nine entries uses it.
-    struct FThornFacetEntry
+    int32_t InstanceHandle(void* Instance)
     {
-        char const* Iid;
-        unsigned long Offset;
-    };
-
-    FThornFacetEntry const G_ThornFacetTable[] = {
-        {Iids::CompoundControl, 0x00},     {Iids::SoundControl, 0x04},
-        {Iids::IKControl, 0x08},           {Iids::GeoTransformControl, 0x0c},
-        {Iids::CameraControl, 0x10},       {Iids::D3DLightControl, 0x14},
-        {Iids::PSysControl, 0x18},         {Iids::FogControl, 0x1c},
-        {Iids::ReverbControl, 0x20},       {nullptr, 0},
-    };
-
-    long InstanceHandle(void* Instance)
-    {
-        return static_cast<long>(reinterpret_cast<intptr_t>(Instance));
+        return static_cast<int32_t>(fl::PtrToHandle(Instance));
     }
 
-    void* InstancePointer(long Instance)
+    void* InstancePointer(int32_t Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Instance)));
     }
 }
 
@@ -71,29 +55,33 @@ FThornComponent::~FThornComponent()
 // LAB_004500d0 (RET 0xc).
 GENRESULT DACOM_API FThornComponent::QueryInterface(const char* Iid, void** Out)
 {
-    unsigned char* Base = reinterpret_cast<unsigned char*>(static_cast<ICompoundControl*>(this));
-    int Index = 0;
-    for (; G_ThornFacetTable[Index].Iid != nullptr; ++Index)
+    // PORT: retail added the facet offsets of the table at 0x005cca20 ({CompoundControl 0, SoundControl 4,
+    // IKControl 8, GeoTransformControl 0xc, CameraControl 0x10, D3DLightControl 0x14, PSysControl 0x18,
+    // FogControl 0x1c, ReverbControl 0x20}) to the object pointer. Those offsets are 4-byte vptr steps; the
+    // facets are named by type here.
+    IDAComponent* Facet = nullptr;
+    auto Is = [&](char const* Name) { return std::strcmp(Iid, Name) == 0; };
+    if (Is(Iids::CompoundControl)) Facet = static_cast<ICompoundControl*>(this);
+    else if (Is(Iids::SoundControl)) Facet = static_cast<ISoundControl*>(this);
+    else if (Is(Iids::IKControl)) Facet = static_cast<IIKControl*>(this);
+    else if (Is(Iids::GeoTransformControl)) Facet = static_cast<IGeoTransformControl*>(this);
+    else if (Is(Iids::CameraControl)) Facet = static_cast<ICameraControl*>(this);
+    else if (Is(Iids::D3DLightControl)) Facet = static_cast<ID3DLightControl*>(this);
+    else if (Is(Iids::PSysControl)) Facet = static_cast<IPSysControl*>(this);
+    else if (Is(Iids::FogControl)) Facet = static_cast<IFogControl*>(this);
+    else if (Is(Iids::ReverbControl)) Facet = static_cast<IReverbControl*>(this);
+    if (Facet == nullptr)
     {
-        if (std::strcmp(G_ThornFacetTable[Index].Iid, Iid) != 0)
-            continue;
-
-        unsigned long const Offset = G_ThornFacetTable[Index].Offset;
-        IDAComponent* Facet = nullptr;
-        if ((Offset & 0x80000000u) != 0)
-            Facet = *reinterpret_cast<IDAComponent**>(Base + (Offset & 0x7fffffffu));
-        else
-            Facet = reinterpret_cast<IDAComponent*>(Base + Offset);
-        Facet->AddRef();
-        *Out = Facet;
-        return GR_OK;
+        *Out = nullptr;
+        return GR_INTERFACE_UNSUPPORTED;
     }
-    *Out = nullptr;
-    return GR_INTERFACE_UNSUPPORTED;
+    Facet->AddRef();
+    *Out = Facet;
+    return GR_OK;
 }
 
 // LAB_00450180.
-unsigned long DACOM_API FThornComponent::AddRef()
+uint32_t DACOM_API FThornComponent::AddRef()
 {
     ++RefCount;
     return RefCount;
@@ -103,7 +91,7 @@ unsigned long DACOM_API FThornComponent::AddRef()
 // count goes back to 1 and FUN_005b7e1d (operator delete) frees the block: the destructor does
 // NOT run, so the name copy (and a derived class's resources) is never released on this path.
 // The scalar deleting destructor (slot 13) is the path that does run it.
-unsigned long DACOM_API FThornComponent::Release()
+uint32_t DACOM_API FThornComponent::Release()
 {
     if (RefCount > 0)
         --RefCount;
@@ -249,8 +237,8 @@ void FThornComponent::ConnectEntityHardpoints(int IndexA, char const* HpA, int I
     KeyB.Name = HpB;
     KeyB.Crc = DACOM_CRC::GetCRC32(HpB);
 
-    long const InstanceA = SummaryA.find_name_instance(HpA);
-    long const InstanceB = SummaryB.find_name_instance(HpB);
+    int32_t const InstanceA = SummaryA.find_name_instance(HpA);
+    int32_t const InstanceB = SummaryB.find_name_instance(HpB);
     if (DALib::Hardpoint->ConnectHardpoints(InstancePointer(InstanceB), &KeyB,
                                             InstancePointer(InstanceA), &KeyA) != 0)
     {
@@ -279,8 +267,8 @@ void FThornComponent::DisconnectEntityHardpoints(int IndexA, char const* HpA, in
     SummaryA.analyze_instance(InstanceHandle(EntityA->GetEngineInstance()));
     SummaryB.analyze_instance(InstanceHandle(EntityB->GetEngineInstance()));
 
-    long const InstanceA = SummaryA.find_name_instance(HpA);
-    long const InstanceB = SummaryB.find_name_instance(HpB);
+    int32_t const InstanceA = SummaryA.find_name_instance(HpA);
+    int32_t const InstanceB = SummaryB.find_name_instance(HpB);
     if (DALib::Engine->DestroyJoint(InstancePointer(InstanceB), InstancePointer(InstanceA)) != 1)
     {
         FDUMP(0x100001,

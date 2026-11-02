@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_archetype.h"
+#include "fl/handles.h"
 #include "common_archetype_internal.h"
 
 #include "common_cobject.h" // CollisionGroupDesc (get_undamaged_collision_group_list)
@@ -412,7 +413,7 @@ namespace Archetype
         Companion->Inherit(Donor);
     }
 
-    unsigned long CliObjLoad(ICliObj* Companion, int LoadMode)
+    uint32_t CliObjLoad(ICliObj* Companion, int LoadMode)
     {
         if (Companion == nullptr)
             return 0;
@@ -622,7 +623,7 @@ namespace Archetype
         return *this;
     }
 
-    bool __cdecl Load(IFileSystem* Filesys, long* EngineIndex, int* AnimIndex)
+    bool __cdecl Load(IFileSystem* Filesys, int32_t* EngineIndex, int* AnimIndex)
     {
         // Retail 0x062efd80. No test of Filesys or of DALib::Engine; DALib::Anim and both out
         // pointers are tested.
@@ -630,7 +631,7 @@ namespace Archetype
         if (Anim != nullptr && AnimIndex != nullptr && *AnimIndex == -1)
         {
             // .text:062efdab..062efdb2: IAnimation2 slot 3 (+0x0c) OpenScript(Filesys).
-            *AnimIndex = (int)(ptrdiff_t)Anim->OpenScript(Filesys);
+            *AnimIndex = (int)fl::PtrToHandle(Anim->OpenScript(Filesys));
         }
 
         if (EngineIndex != nullptr)
@@ -642,20 +643,20 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = PathBuf;
             Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-            *EngineIndex = (long)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = (int32_t)fl::PtrToHandle(DALib::Engine->FindArchetype(&Name));
             if (*EngineIndex == -1)
             {
                 // .text:062efe07..062efe31: the CRC taken again, slot 12 (+0x30)
                 // CreateArchetypeHandle(&name, Filesys).
                 Name.Text = PathBuf;
                 Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-                *EngineIndex = (long)DALib::Engine->CreateArchetypeHandle(&Name, Filesys);
+                *EngineIndex = (int32_t)fl::PtrToHandle(DALib::Engine->CreateArchetypeHandle(&Name, Filesys));
             }
         }
         return true;
     }
 
-    bool __cdecl Load(char const* Path, long* EngineIndex, int* AnimIndex)
+    bool __cdecl Load(char const* Path, int32_t* EngineIndex, int* AnimIndex)
     {
         // Retail 0x062efe40. No test of Path.
         if (EngineIndex != nullptr && AnimIndex == nullptr)
@@ -665,7 +666,7 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = Path;
             Name.Crc = DACOM_CRC::GetCRC32(Path);
-            *EngineIndex = (long)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = (int32_t)fl::PtrToHandle(DALib::Engine->FindArchetype(&Name));
             if (*EngineIndex != -1)
                 return true;
         }
@@ -795,13 +796,13 @@ namespace Archetype
         return &It->second;
     }
 
-    long Root::create_instance(IEngineInstance* EngineInstance) const
+    int32_t Root::create_instance(IEngineInstance* EngineInstance) const
     {
         // 062f05d0. Loaded -> IEngine slot 23 (+0x5C, CreateInstance)(EngineIndex, instance),
         // its result returned as is; no engine or handle test.
         if (EngineIndex != -1)
         {
-            return (long)DALib::Engine->CreateInstance((void*)EngineIndex, EngineInstance);
+            return (int32_t)fl::PtrToHandle(DALib::Engine->CreateInstance((void*)fl::HandleToPtr(EngineIndex), EngineInstance));
         }
 
         // The CacheString always holds a pointer (clear() hands out the pool's empty string);
@@ -847,14 +848,14 @@ namespace Archetype
         // (+0x10, CloseScript) and the index reset; DALib::Anim itself is not tested.
         if (AnimIndex != -1)
         {
-            DALib::Anim->CloseScript((void*)(ptrdiff_t)AnimIndex);
+            DALib::Anim->CloseScript((void*)fl::HandleToPtr((uint32_t)(AnimIndex)));
             AnimIndex = -1;
         }
 
         // .text:062f0b13..062f0b27: a loaded mesh is released through DALib::Engine slot 15
         // (+0x3c, ReleaseHandle).
         if (EngineIndex != -1)
-            DALib::Engine->ReleaseHandle((void*)EngineIndex);
+            DALib::Engine->ReleaseHandle((void*)fl::HandleToPtr(EngineIndex));
 
         // .text:062f0b2a..062f0bb6: the surfaces map at +0x48 emptied (the inline erase(begin,
         // end) / clear of the VC6 tree).

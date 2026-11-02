@@ -26,19 +26,19 @@
 // Retail DALib::OpenData AGGDESC size 0x34 @ 0x1610 — ReadFile DOS FileSystem factory.
 struct FFileSystemAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* ComponentName;
     const char* BackendName;
     const char* DataPath;
-    unsigned long Field10;
-    unsigned long Field14;
-    unsigned long Field18;
-    unsigned long Field1C;
-    unsigned long Field20;
-    unsigned long Field24;
-    unsigned long Field28;
-    unsigned long Field2C;
-    unsigned long Field30;
+    uint32_t Field10;
+    uint32_t Field14;
+    void* Field18;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    uint32_t Field1C;
+    uint32_t Field20;
+    void* Field24;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    void* Field28;   // pointer slot in ReadFile's FFileSystemDesc (Security/TemplateFile/Parent): layouts must agree
+    uint32_t Field2C;
+    uint32_t Field30;
 };
 
 using FatalErrorFnType = void(__cdecl*)(unsigned int, const char*);

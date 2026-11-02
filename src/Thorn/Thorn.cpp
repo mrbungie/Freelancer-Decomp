@@ -268,9 +268,9 @@ namespace
             return Outer_->QueryInterface(Iid, Out);
         }
 
-        unsigned long DACOM_API AddRef() override { return Outer_->AddRef(); }
+        uint32_t DACOM_API AddRef() override { return Outer_->AddRef(); }
 
-        unsigned long DACOM_API Release() override { return Outer_->Release(); }
+        uint32_t DACOM_API Release() override { return Outer_->Release(); }
 
         // LAB_06f3f690 (inner unknown slot 0): the retail IScriptEngine table
         // walk (.rdata:06f5b010 = {IID, facet offset} triples) is a plain
@@ -351,7 +351,7 @@ namespace
                 int CameraCount = 0;
                 int MonitorIndex = 0;
                 int CameraIndex = 0;
-                for (unsigned long Index = 0; Index < Scene_.EntityCount(); ++Index)
+                for (uint32_t Index = 0; Index < Scene_.EntityCount(); ++Index)
                 {
                     const int Handle = static_cast<int>(reinterpret_cast<std::intptr_t>(
                         Slot7EntityHandle(static_cast<int>(Index))));
@@ -412,7 +412,7 @@ namespace
             return Hr;
         }
 
-        unsigned long DACOM_API Slot6EntityCount() override { return Scene_.LiveEntityCount(); }
+        uint32_t DACOM_API Slot6EntityCount() override { return Scene_.LiveEntityCount(); }
 
         void* DACOM_API Slot7EntityHandle(int Index) override { return Scene_.EntityHandle(Index); }
 
@@ -448,7 +448,7 @@ namespace
             return Scene_.Detach(Index);
         }
 
-        unsigned long DACOM_API Slot14EventCount() override { return Scene_.EventCount(); }
+        uint32_t DACOM_API Slot14EventCount() override { return Scene_.EventCount(); }
 
         void* DACOM_API Slot15EventByIndex(int Index) override
         {
@@ -523,7 +523,7 @@ namespace
             return GR_GENERIC;
         }
 
-        unsigned long DACOM_API Slot31(int Index) override
+        uint32_t DACOM_API Slot31(int Index) override
         {
             // LAB_06f38ca0: lookup entity; return inner+0x80 (_Mysize of string userprops).
             return Scene_.UserPropCount(Index);
@@ -792,13 +792,13 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount_; }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount_ > 0)
                 --RefCount_;
-            const unsigned long Next = RefCount_;
+            const uint32_t Next = RefCount_;
             if (Next == 0)
             {
                 RefCount_ = 1;
@@ -888,7 +888,7 @@ namespace
         }
 
     private:
-        unsigned long RefCount_;
+        uint32_t RefCount_;
         const char* Name_;
         EThornFactoryKind Kind_;
         bool bDeadSecondLinear_;

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "commodity_by_base.h"
+#include "fl/handles.h"
 
 #include "character_select_equip.h" // GetPlayerVisitFlagsRetail (FUN_004c4da0)
 #include "globals.h"                // IsClientServerTickPaused (FUN_0042d730)
@@ -390,7 +391,7 @@ void NnCommodityByBase::Close()
 bool NnCommodityByBase::Create(Win3D* /*NewParent*/, void* Data)
 {
     // FUN_0046ef80 (RET 8). 0046ef9d..0046efa9: the archetype, first row 0, no sort column.
-    ArchId = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Data));
+    ArchId = static_cast<unsigned>(fl::PtrToHandle(Data));
     FirstRow = 0;
     SortColumn = 0;
 
@@ -719,14 +720,14 @@ void NnCommodityByBase::Update()
         WinControl* const Title = Titles[Column];
         if (Title == nullptr || (Title->Flags & kWin3DVisible) == 0)
             continue;
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        uint32_t Color = G_NnPaletteArgb_679bb0;
         if (SortColumn == Column)
         {
             Color = G_NnPaletteArgb_679ba4;
         }
         else if (Title->HitTest(Ray))
         {
-            unsigned long Pulse = 0;
+            uint32_t Pulse = 0;
             NnUiPulseBlendArgb(&Pulse);
             Color = Pulse;
         }
@@ -740,11 +741,11 @@ void NnCommodityByBase::Update()
         FCommodityByBaseRowControls const& Controls = Rows[Line];
         if (Controls.Base == nullptr || (Controls.Base->Flags & kWin3DVisible) == 0)
             continue;
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        uint32_t Color = G_NnPaletteArgb_679bb0;
         if (Controls.Base->HitTest(Ray) || Controls.BuySell->HitTest(Ray) ||
             Controls.Price->HitTest(Ray) || Controls.System->HitTest(Ray))
         {
-            unsigned long Pulse = 0;
+            uint32_t Pulse = 0;
             NnUiPulseBlendArgb(&Pulse);
             Color = Pulse;
         }

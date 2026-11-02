@@ -17,7 +17,7 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
 
 // 0x06ac8910. RET 0x14. Subtract RightCount limbs, then the borrow through Left.
 // Returns the borrow. Same arity as AddLimbs.
-long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
 
 // 0x06ac8a40. RET 0x14. Sum of two limb vectors. The return value counts the carry limb.
 unsigned int __stdcall Movie_AddLimbsLength(unsigned int* Left, unsigned int LeftCount, unsigned int* Right, unsigned int RightCount, int Dest);

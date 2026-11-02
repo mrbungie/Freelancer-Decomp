@@ -51,6 +51,7 @@
 #include "render_ex.h"            // RenderEx::Startup (port-only Direct3D 9 extensions)
 #endif
 #include "render/IRenderPipeline.h"
+#include "fl/platform.h"
 
 #include <float.h>
 #include <stdarg.h>
@@ -215,7 +216,7 @@ namespace
         {
             // 0x00424e2e. Local.width/height/color_bpp stay unset: every rung below writes them.
             Local.fullscreen = bFullscreen;
-            unsigned long VideoMemory = 0;
+            uint32_t VideoMemory = 0;
             DALib::Pipeline->QueryDeviceAbility(3, &VideoMemory);
             Width = 0x320;
             Height = 0x258;
@@ -223,7 +224,7 @@ namespace
             VideoMemory >>= 20;
             if (VideoMemory >= 0x11)
             {
-                unsigned long Ability4 = 0;
+                uint32_t Ability4 = 0;
                 DALib::Pipeline->QueryDeviceAbility(4, &Ability4);
                 Format = 0x20;
                 if (Ability4 != 0)
@@ -281,7 +282,7 @@ namespace
 
         using FnSetApproach = void(__cdecl*)(int);
         using FnStartup = void(__cdecl*)();
-        using FnPlayMovie = long(__cdecl*)(HWND, bool, const char*);
+        using FnPlayMovie = int32_t(__cdecl*)(HWND, bool, const char*);
         using FnUpdateMovie = bool(__cdecl*)();
         using FnStopMovie = void(__cdecl*)();
         using FnShutdown = void(__cdecl*)();
@@ -373,10 +374,11 @@ namespace
     {
         // 0x005b022a..0x005b0247: GlobalMemoryStatus on a local whose dwLength is not set;
         // total physical and available virtual memory in MB (SHR 0x14).
-        MEMORYSTATUS Status;
-        GlobalMemoryStatus(&Status);
-        int const TotalPhysMb = static_cast<int>(Status.dwTotalPhys >> 20);
-        int const AvailVirtualMb = static_cast<int>(Status.dwAvailVirtual >> 20);
+        // PORT: fl::ISystemInfo::MemoryStatus (64-bit sizes; retail's DWORDs saturate at 4 GB).
+        unsigned long long TotalPhys = 0, AvailVirtual = 0;
+        fl::GetPlatform().system->MemoryStatus(&TotalPhys, &AvailVirtual);
+        int const TotalPhysMb = static_cast<int>(TotalPhys >> 20);
+        int const AvailVirtualMb = static_cast<int>(AvailVirtual >> 20);
 
         if (TotalPhysMb < 0x78)
         {
@@ -396,7 +398,7 @@ namespace
         if (GetSkipMachineWarnings())
             goto Done;
         {
-            unsigned long Level = 0;
+            uint32_t Level = 0;
             DALib::Pipeline->QueryDeviceAbility(0xf, &Level);
             if (Level != 0)
             {
@@ -548,11 +550,11 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
         // 0x00424a12: windowed -- adapter format and depth, and never larger than the desktop.
         Local.color_bpp = -1;
         Local.depth_bpp = -1;
-        RECT Desktop;
-        GetWindowRect(GetDesktopWindow(), &Desktop);
-        const unsigned DesktopRight = static_cast<unsigned>(Desktop.right);
+        int DesktopW = 0, DesktopH = 0;
+        fl::GetWindowHost()->DesktopSize(&DesktopW, &DesktopH);
+        const unsigned DesktopRight = static_cast<unsigned>(DesktopW);
         if (DesktopRight < static_cast<unsigned>(Local.width) ||
-            static_cast<unsigned>(Desktop.bottom) < static_cast<unsigned>(Local.height))
+            static_cast<unsigned>(DesktopH) < static_cast<unsigned>(Local.height))
         {
             Local.width = static_cast<int>(DesktopRight);
             Local.height = static_cast<int>((DesktopRight * 3) >> 2);
@@ -966,7 +968,7 @@ I3DMathEngine* __cdecl Acquire3DMathEngine()
 {
     struct FMathEngineDesc
     {
-        unsigned long Size;
+        uint32_t Size;
         const char* Name;
         void* Implementation;
     };

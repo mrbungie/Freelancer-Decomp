@@ -110,7 +110,7 @@ void LoadStartupConfig(DisplaySettings* Options, const FClientCommandLine* Comma
 // layout): applies "+B/-B", "+F/-F", "+W", "+M<size>". True if any of those letters was seen.
 bool ApplyDisplayCmdlineOverrides(DisplaySettings* Mode, const FClientCommandLine* CommandLine);
 
-HWND CreateGameWindow(const char* class_name, DisplaySettings* display, const char* title);
+HWND CreateGameWindow(DisplaySettings* display, const char* title);
 // FUN_00424870 -- record the surface size/mode and restyle + resize the window for it.
 void ApplyGameWindowLayout(HWND Hwnd, bool bFullscreen, unsigned Width, unsigned Height);
 
@@ -155,7 +155,8 @@ bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySetti
 // 32/24/16, then the options object itself, then a 640x480 window. Callers: InitializeEngine
 // (engine_init.cpp) and NN_Preferences::TryApplyVideoMode 0x004b1ce4.
 bool SetRenderModeWithFallback(HWND Hwnd, const DisplaySettings* Mode);
-LRESULT CALLBACK ClientWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+namespace fl { class IWindowEvents; }
+fl::IWindowEvents* ClientWindowEvents(); // replaces the Win32 WndProc (window.cpp)
 
 // DAT_00615ba8 — WinMain only presents a frame while this is set (0x5b0fe8). WM_ACTIVATEAPP
 // clears it when a fullscreen single-player session loses focus.
@@ -182,7 +183,7 @@ double GetClientFrameTimeCapped();      // FUN_0042d680 — 0.0 while paused
 double GetClientFrameTimeRaw();         // FUN_0042d6a0 — 0.0 while paused
 double GetClientElapsedTime();          // FUN_0042d660 — not pause-gated
 unsigned GetClientFrameCount();         // FUN_0042d6e0
-unsigned long GetClientFrameTimestampMs(); // FUN_0042d670
+uint32_t GetClientFrameTimestampMs(); // FUN_0042d670
 void PushClientTimingPause();           // FUN_0042d6c0
 void PopClientTimingPause();            // FUN_0042d6d0
 void SetClientServerTickPause(bool bPause); // FUN_0042d6f0 — DAT_00667d54

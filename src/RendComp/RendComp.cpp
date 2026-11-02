@@ -91,25 +91,25 @@ int FileOpenNode(void* File, const char* Name)
 // ReadFile's handle 0 names the current file, and an open never returns it.
 int FileClose(void* File, int Handle)
 {
-    return AsFileSystem(File)->CloseFile((unsigned long)Handle); // +0x10
+    return AsFileSystem(File)->CloseFile((uint32_t)Handle); // +0x10
 }
 
-int FileRead(void* File, int Handle, void* Buffer, unsigned long Size, unsigned long* ReadOut)
+int FileRead(void* File, int Handle, void* Buffer, uint32_t Size, uint32_t* ReadOut)
 {
     if (File == nullptr)
         return -1;
-    return AsFileSystem(File)->Read((unsigned long)Handle, Buffer, Size,
+    return AsFileSystem(File)->Read((uint32_t)Handle, Buffer, Size,
                                     ReadOut, 0); // +0x14
 }
 
-unsigned long FileGetSize(void* File, int Handle)
+uint32_t FileGetSize(void* File, int Handle)
 {
     if (File == nullptr)
         return 0;
-    return AsFileSystem(File)->GetSize((unsigned long)Handle, 0); // +0x28
+    return AsFileSystem(File)->GetSize((uint32_t)Handle, 0); // +0x28
 }
 
-int FileGetCurrentPath(void* File, char* Out, unsigned long MaxChars)
+int FileGetCurrentPath(void* File, char* Out, uint32_t MaxChars)
 {
     if (File == nullptr || Out == nullptr || MaxChars == 0)
         return 0;
@@ -123,19 +123,19 @@ int FileOpenByName(void* File, const char* ChildName)
         return -1;
     struct FOpenDesc
     {
-        unsigned long Size;
+        uint32_t Size;
         const char* ComponentName;
         const char* BackendName;
         const char* DataPath;
-        unsigned long Field10;
-        unsigned long Field14;
-        unsigned long Field18;
-        unsigned long Field1C;
-        unsigned long Field20;
-        unsigned long Field24;
-        unsigned long Field28;
-        unsigned long Field2C;
-        unsigned long Field30;
+        uint32_t Field10;
+        uint32_t Field14;
+        uint32_t Field18;
+        uint32_t Field1C;
+        uint32_t Field20;
+        uint32_t Field24;
+        uint32_t Field28;
+        uint32_t Field2C;
+        uint32_t Field30;
     };
     FOpenDesc Desc;
     std::memset(&Desc, 0, sizeof(Desc));
@@ -304,7 +304,7 @@ GENRESULT DACOM_API FDacomFactory::QueryInterface(const char* Iid, void** Out)
 }
 
 // LAB_06c306b0: ++[this+4], return it.
-unsigned long DACOM_API FDacomFactory::AddRef()
+uint32_t DACOM_API FDacomFactory::AddRef()
 {
     RefCount += 1;
     return RefCount;
@@ -312,7 +312,7 @@ unsigned long DACOM_API FDacomFactory::AddRef()
 
 // FUN_06c2a3a0: decrement when above 0; still non-zero -> return it; zero -> pin the count
 // at 1, operator delete (FUN_06c34ea0), return 0.
-unsigned long DACOM_API FDacomFactory::Release()
+uint32_t DACOM_API FDacomFactory::Release()
 {
     if (RefCount > 0)
         RefCount -= 1;

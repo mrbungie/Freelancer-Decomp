@@ -7,6 +7,7 @@
 #pragma once
 
 #include "rpc_packet_codec.h"
+#include "platform/fl_x87.h"
 #include "common_misc.h"
 #include <cstring>
 #include <iostream>

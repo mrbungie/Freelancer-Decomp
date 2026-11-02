@@ -12,9 +12,9 @@
 
 #pragma comment(lib, "dacom.lib")
 
-unsigned long G_VisibleCounterA = 0;
-unsigned long G_VisibleCounterB = 0;
-unsigned long G_VisibleCounterC = 0;
+uint32_t G_VisibleCounterA = 0;
+uint32_t G_VisibleCounterB = 0;
+uint32_t G_VisibleCounterC = 0;
 
 void FlmVisibleCounterReset()
 {
@@ -23,7 +23,7 @@ void FlmVisibleCounterReset()
     G_VisibleCounterC = 0;
 }
 
-void FlmVisibleCounterCopy(unsigned long* Out3)
+void FlmVisibleCounterCopy(uint32_t* Out3)
 {
     Out3[0] = G_VisibleCounterA;
     Out3[1] = G_VisibleCounterB;
@@ -100,18 +100,18 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount_ += 1;
             return RefCount_;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             // FUN_066f4500: saturation at zero, reset before freeing the factory.
             if (RefCount_ != 0)
                 --RefCount_;
-            const unsigned long Remaining = RefCount_;
+            const uint32_t Remaining = RefCount_;
             if (Remaining == 0)
             {
                 RefCount_ = 1;
@@ -158,7 +158,7 @@ namespace
         const char* Name() const { return Spec_.Name; }
 
     private:
-        unsigned long RefCount_;
+        uint32_t RefCount_;
         FMaterialSpec Spec_;
     };
 
@@ -179,18 +179,18 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override
+        uint32_t DACOM_API AddRef() override
         {
             RefCount_ += 1;
             return RefCount_;
         }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             // The same ICF-folded factory Release body, FUN_066f4500.
             if (RefCount_ != 0)
                 --RefCount_;
-            const unsigned long Remaining = RefCount_;
+            const uint32_t Remaining = RefCount_;
             if (Remaining == 0)
             {
                 RefCount_ = 1;
@@ -217,7 +217,7 @@ namespace
         }
 
     private:
-        unsigned long RefCount_;
+        uint32_t RefCount_;
     };
 
     bool RegisterMaterialComponent(const FMaterialSpec& Spec)

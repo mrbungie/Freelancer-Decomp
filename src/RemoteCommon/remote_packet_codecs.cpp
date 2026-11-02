@@ -6,6 +6,10 @@
 
 #include "portable_rpc_quantization.h"
 #include "rpc_packet_codec.h"
+#include "wire_wchar.h"
+#include "fl/handles.h"
+#include "platform/fl_x87.h"
+#include <cmath>
 #include "common_misc.h" // SinglePlayer selects retail's two FIREWEAPON formats.
 #include "common_net.h" // PLAYER_TRADE counts its trailer by IsMPServer direction.
 #include "common_text.h" // Canonical FmtStr::Val size calculation.
@@ -181,7 +185,7 @@ unsigned int FRpcMissionResponsePacket::Decode(const unsigned char* Buffer,
     unsigned int First;
     if (!Stream.Get(&First, 4u)) return MarshalError;
     Field_0x00 = First;
-    unsigned long Second;
+    uint32_t Second;
     if (!Stream.Get(&Second, 4u)) return MarshalError;
     MissionId = Second;
     if (!Stream.Get(&bAccepted, 1u)) return MarshalError;
@@ -955,7 +959,7 @@ static unsigned int RpcEncodeWideString(FPacketBase& Packet, const wchar_t* Valu
     Destination += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return 0x16u;
     std::memcpy(Destination, Value, ByteCount);
-    Packet.MarshalPtr = reinterpret_cast<unsigned int>(Destination + ByteCount);
+    Packet.MarshalPtr = fl::PtrToHandle(Destination + ByteCount);
     return 0;
 }
 
@@ -976,7 +980,7 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
         // the packet name and the moving input pointer completely untouched.
         std::memcpy(*Value, Source, ByteCount);
         (*Value)[Length] = L'\0';
-        Packet.MarshalPtr = reinterpret_cast<unsigned int>(Source + ByteCount);
+        Packet.MarshalPtr = fl::PtrToHandle(Source + ByteCount);
     }
     return 0;
 }
@@ -1504,7 +1508,7 @@ unsigned int FRpcClientLoginPacket::Encode(unsigned char** BufferHolder,
     if (AccountLength != 0) {
         // This mutation precedes the account-buffer capacity check in retail.
         _wcslwr(AccountName);
-        if (!Stream.PutBlock(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return 0x16u;
+        if (!Stream.PutBlock(FlWire16Out(AccountName, static_cast<unsigned int>(AccountLength)), static_cast<unsigned int>(AccountLength) * 2u)) return 0x16u;
     }
     if (SecondLength != 0) {
         if (!Stream.PutBlock(Field_0x220, static_cast<unsigned int>(SecondLength) * 2u)) return 0x16u;
@@ -1526,7 +1530,7 @@ unsigned int FRpcClientLoginPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&AccountLength, 1u)) return MarshalError;
     if (!Stream.Get(&SecondLength, 1u)) return MarshalError;
     if (AccountLength != 0) {
-        if (!Stream.Get(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return MarshalError;
+        if (!Stream.Get(FlWire16In(AccountName, static_cast<unsigned int>(AccountLength)), static_cast<unsigned int>(AccountLength) * 2u)) return MarshalError;
         AccountName[AccountLength] = L'\0';
     }
     if (SecondLength != 0) {

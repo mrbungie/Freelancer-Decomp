@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "nn_static_control.h"
+#include "fl/handles.h"
 #include "hud_widescreen.h"   // port-only (FREELANCER_WIDESCREEN_SUPPORT)
 
 #include "engine_light.h"         // EngineLightClearRegisteredList (FUN_004101e0)
@@ -64,7 +65,7 @@ namespace
     {
         // The `CMP [ESI+0x84],-1` every slot below inlines.
         return Control->MeshHolder.EngineInstance !=
-               reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+               static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     // FUN_004215b0 on a 3x4 local with its position cleared: identity orientation, origin.

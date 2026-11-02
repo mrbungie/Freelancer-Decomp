@@ -15,8 +15,8 @@
 
 // SoundManager.dll internals. The ABI other modules see is src/include/soundmanager.h.
 
-static const unsigned long kAggDescSize = 0x14;
-static const unsigned long kRegisterPriority = 0x40000000;
+static const uint32_t kAggDescSize = 0x14;
+static const uint32_t kRegisterPriority = 0x40000000;
 
 static const char kComponentName[] = "SoundManager";
 
@@ -58,7 +58,7 @@ static const GUID kDsPropSetEax20Buffer = {
 // AGGDESC 0x14 for this factory (same layout as SystemContainer children).
 struct FSoundAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -78,42 +78,42 @@ public:
     ~FSoundArchetype();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API GetFormat(void* Out) override;
     GENRESULT DACOM_API GetSamples(void* Out) override;
-    unsigned long DACOM_API GetNumFrames() override;
+    uint32_t DACOM_API GetNumFrames() override;
     float DACOM_API GetGain() override;
-    unsigned long DACOM_API GetChannelCount() override;
-    unsigned long DACOM_API GetDurationMs() override;
+    uint32_t DACOM_API GetChannelCount() override;
+    uint32_t DACOM_API GetDurationMs() override;
     GENRESULT DACOM_API SetSamples(void* A, void* B) override;
     GENRESULT DACOM_API SetGain(float InGain) override;
-    unsigned long DACOM_API IsReady() override;
-    GENRESULT DACOM_API GetLoopRange(unsigned long* Start, unsigned long* End) override;
+    uint32_t DACOM_API IsReady() override;
+    GENRESULT DACOM_API GetLoopRange(uint32_t* Start, uint32_t* End) override;
 
-    GENRESULT FillFromPcm(const unsigned short* Fmt8, unsigned long ByteCount,
-                          unsigned long LoopStart, unsigned long LoopEnd, const void* Samples,
-                          IDirectSound* DirectSound, unsigned long InFlags);
+    GENRESULT FillFromPcm(const unsigned short* Fmt8, uint32_t ByteCount,
+                          uint32_t LoopStart, uint32_t LoopEnd, const void* Samples,
+                          IDirectSound* DirectSound, uint32_t InFlags);
     // Retail FUN_06ee1240: the caller opens the file as an IFileSystem and this reads the
     // RIFF straight out of its mapping (WavLib FUN_06ee8960). No path is involved.
     GENRESULT FillFromWav(IDAComponent* FileSystem, IDirectSound* DirectSound,
-                          unsigned long InFlags);
+                          uint32_t InFlags);
     GENRESULT DuplicateBuffer(IDirectSound* DirectSound, IDirectSoundBuffer** Out) const;
 
     unsigned short nChannels;      // +0x04
     unsigned short Field06;        // +0x06
     unsigned short nSamplesPerSec; // +0x08
     unsigned short nBlockAlign;    // +0x0A
-    unsigned long LoopStart;       // +0x0C
-    unsigned long LoopEnd;         // +0x10
-    unsigned long NumFrames;       // +0x14
+    uint32_t LoopStart;       // +0x0C
+    uint32_t LoopEnd;         // +0x10
+    uint32_t NumFrames;       // +0x14
     float Gain;                    // +0x18
-    unsigned long DurationMs;      // +0x1C
-    unsigned long Flags;           // +0x20
+    uint32_t DurationMs;      // +0x1C
+    uint32_t Flags;           // +0x20
     IDirectSoundBuffer* Buffer;    // +0x24
     unsigned char bSamplesReady;   // +0x28
     unsigned char Pad29[3];
-    unsigned long RefCount;        // +0x2C
+    uint32_t RefCount;        // +0x2C
 };
 
 struct FArchMapEntry
@@ -131,11 +131,11 @@ struct FSoundInstanceNode
     IDirectSoundBuffer* Buffer;    // +0x0C
     IDirectSound3DBuffer* Buffer3d;// +0x10
     HANDLE NotifyEvent;            // +0x14 payload+0x0C (FUN_06ee1a40)
-    unsigned long Pad18;           // +0x18 payload+0x10
-    unsigned long FeatureFlags;    // +0x1C payload+0x14 notify offset / loop-end bytes
-    unsigned long CapsFlags;       // +0x20 → Status +8 via node+0x28
-    unsigned long StatusFlags;     // +0x24
-    unsigned long DsCapsFlags;     // +0x28
+    uint32_t Pad18;           // +0x18 payload+0x10
+    uint32_t FeatureFlags;    // +0x1C payload+0x14 notify offset / loop-end bytes
+    uint32_t CapsFlags;       // +0x20 → Status +8 via node+0x28
+    uint32_t StatusFlags;     // +0x24
+    uint32_t DsCapsFlags;     // +0x28
     float DistSq;                  // +0x2C payload +0x24
     float MaxDistance;             // +0x30
     float MaxDistSq;               // +0x34
@@ -145,7 +145,7 @@ struct FSoundInstanceNode
     FVec3 Direction;               // +0x4C listener→source (payload +0x44)
     unsigned char bIs3dCache;      // +0x58 payload+0x50
     unsigned char Pad59[3];
-    unsigned long LastStartTick;   // +0x5C payload+0x54
+    uint32_t LastStartTick;   // +0x5C payload+0x54
 };
 
 struct FAttachedNode
@@ -163,10 +163,10 @@ public:
     FSoundInner();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FSoundManager* Self;
 };
 
@@ -176,11 +176,11 @@ public:
     FSoundManagerFactory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -193,20 +193,20 @@ public:
     ~FSoundManager();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API SetPcmFormat(unsigned short* Fmt) override;
     GENRESULT DACOM_API GetPcmFormat(unsigned short* Fmt) override;
     GENRESULT DACOM_API SetMasterGain(float Gain) override;
-    GENRESULT DACOM_API SetMaxChannels(unsigned long Count) override;
-    GENRESULT DACOM_API SetSpeakerConfig(unsigned long Index) override;
+    GENRESULT DACOM_API SetMaxChannels(uint32_t Count) override;
+    GENRESULT DACOM_API SetSpeakerConfig(uint32_t Index) override;
     float DACOM_API GetMasterGain() override;
-    unsigned long DACOM_API GetMaxChannels() override;
-    unsigned long DACOM_API GetSpeakerConfig() override;
+    uint32_t DACOM_API GetMaxChannels() override;
+    uint32_t DACOM_API GetSpeakerConfig() override;
     GENRESULT DACOM_API SetEaxPreview(int Env, float Vol, float Decay, float Damp) override;
-    GENRESULT DACOM_API GetEaxPreview(unsigned long* Env, unsigned long* Vol, unsigned long* Decay,
-                                      unsigned long* Damp) override;
+    GENRESULT DACOM_API GetEaxPreview(uint32_t* Env, uint32_t* Vol, uint32_t* Decay,
+                                      uint32_t* Damp) override;
     GENRESULT DACOM_API SetOrientation(FVec3* Front, FVec3* Up) override;
     GENRESULT DACOM_API SetOrientationFromMatrix(float* Matrix) override;
     GENRESULT DACOM_API SetListenerPosition(FVec3* Pos) override;
@@ -221,41 +221,41 @@ public:
     float DACOM_API GetDistanceFactor() override;
     float DACOM_API GetDopplerFactor() override;
     float DACOM_API GetRolloffFactor() override;
-    GENRESULT DACOM_API EaxGetInstance(void* Id, GUID* Set, unsigned long Prop, void* Buf,
-                                       unsigned long Cb, unsigned long* Pcb) override;
-    GENRESULT DACOM_API EaxSetInstance(void* Id, GUID* Set, unsigned long Prop, void* Data,
-                                       unsigned long Cb) override;
-    GENRESULT DACOM_API EaxGetPrimary(GUID* Set, unsigned long Prop, void* Buf, unsigned long Cb,
-                                      unsigned long* Pcb) override;
-    GENRESULT DACOM_API EaxSetPrimary(GUID* Set, unsigned long Prop, void* Data,
-                                      unsigned long Cb) override;
-    int DACOM_API CreateArchetypePcm(void* Fmt, unsigned long ByteCount, unsigned long LoopStart,
-                                     unsigned long LoopEnd, void* Samples,
-                                     unsigned long ArchFlags) override;
-    int DACOM_API CreateArchetypeFromSource(void* Source, unsigned long ArchFlags) override;
-    int DACOM_API CreateArchetypeFromWav(IDAComponent* FileSystem, unsigned long ArchFlags) override;
+    GENRESULT DACOM_API EaxGetInstance(void* Id, GUID* Set, uint32_t Prop, void* Buf,
+                                       uint32_t Cb, uint32_t* Pcb) override;
+    GENRESULT DACOM_API EaxSetInstance(void* Id, GUID* Set, uint32_t Prop, void* Data,
+                                       uint32_t Cb) override;
+    GENRESULT DACOM_API EaxGetPrimary(GUID* Set, uint32_t Prop, void* Buf, uint32_t Cb,
+                                      uint32_t* Pcb) override;
+    GENRESULT DACOM_API EaxSetPrimary(GUID* Set, uint32_t Prop, void* Data,
+                                      uint32_t Cb) override;
+    int DACOM_API CreateArchetypePcm(void* Fmt, uint32_t ByteCount, uint32_t LoopStart,
+                                     uint32_t LoopEnd, void* Samples,
+                                     uint32_t ArchFlags) override;
+    int DACOM_API CreateArchetypeFromSource(void* Source, uint32_t ArchFlags) override;
+    int DACOM_API CreateArchetypeFromWav(IDAComponent* FileSystem, uint32_t ArchFlags) override;
     GENRESULT DACOM_API DestroyArchetype(int Id) override;
     GENRESULT DACOM_API QueryArchetype(int Id, void** Out) override;
-    GENRESULT DACOM_API AttachPlayKey(ISoundSource* PlayKey, unsigned long Index) override;
+    GENRESULT DACOM_API AttachPlayKey(ISoundSource* PlayKey, uint32_t Index) override;
     GENRESULT DACOM_API DetachPlayKey(ISoundSource* PlayKey) override;
-    GENRESULT DACOM_API ReplaceAttachedList(void** Keys, unsigned long Count) override;
-    unsigned long DACOM_API GetAttachedCount() override;
-    unsigned long DACOM_API GetPlayingCount() override;
-    GENRESULT DACOM_API StartupDevice(HWND Hwnd, unsigned long Flags) override;
+    GENRESULT DACOM_API ReplaceAttachedList(void** Keys, uint32_t Count) override;
+    uint32_t DACOM_API GetAttachedCount() override;
+    uint32_t DACOM_API GetPlayingCount() override;
+    GENRESULT DACOM_API StartupDevice(HWND Hwnd, uint32_t Flags) override;
     GENRESULT DACOM_API ShutdownDevice() override;
     GENRESULT DACOM_API GetDirectSound(IDirectSound** Out) override;
-    unsigned long DACOM_API GetTickCountSlot() override;
+    uint32_t DACOM_API GetTickCountSlot() override;
     GENRESULT GetDeviceSnapshot(void* Out) override;
     GENRESULT DACOM_API MixerTick(ISoundListenerPose* ListenerPose) override;
     GENRESULT DACOM_API StopInstanceBuffer(ISoundSource* PlayKey) override;
     GENRESULT DACOM_API PlayInstanceBuffer(ISoundSource* PlayKey) override;
     GENRESULT DACOM_API GetArchetypeFormat(void* Id, void* Out) override;
     GENRESULT DACOM_API GetArchetypeSamples(void* Id, void* Out) override;
-    unsigned long DACOM_API GetArchetypeFrames(void* Id) override;
+    uint32_t DACOM_API GetArchetypeFrames(void* Id) override;
     float DACOM_API GetArchetypeGain(void* Id) override;
-    unsigned long DACOM_API GetArchetypeChannels(void* Id) override;
+    uint32_t DACOM_API GetArchetypeChannels(void* Id) override;
     GENRESULT DACOM_API SetArchetypeSamples(void* A, void* B, void* C) override;
-    unsigned long DACOM_API GetArchetypeReady(void* Id) override;
+    uint32_t DACOM_API GetArchetypeReady(void* Id) override;
 
     GENRESULT DACOM_API GetInstanceStatus(int Index, void* Out) override;
     GENRESULT DACOM_API BindParser() override;
@@ -289,32 +289,32 @@ public:
     char DeviceIdString[0x28];      // +0x0D
     GUID DeviceGuid;                // +0x38
     float MasterGain;               // +0x48
-    unsigned long Field4C;
-    unsigned long Field50;
-    unsigned long MaxChannels;      // +0x54
+    uint32_t Field4C;
+    uint32_t Field50;
+    uint32_t MaxChannels;      // +0x54
     int EaxEnv;                     // +0x58
     float EaxVol;                   // +0x5C
     float EaxDecay;                 // +0x60
     float EaxDamp;                  // +0x64
-    unsigned long Field68;
-    unsigned long Field6C;
-    unsigned long Field70;
-    unsigned long Field74;
+    uint32_t Field68;
+    uint32_t Field6C;
+    uint32_t Field70;
+    uint32_t Field74;
     float ReverbMix;                // +0x78
-    unsigned long Field7C;          // +0x7C DS3DALG GUID dword0 (ctor DAT_06ee95e4 = 0)
-    unsigned long Field80;          // +0x80 DAT_06ee95e8
-    unsigned long Field84;          // +0x84 DAT_06ee95ec
-    unsigned long Field88;          // +0x88 DAT_06ee95f0
-    unsigned long Flags;            // +0x8C
-    unsigned long CapsFlags;        // +0x90
-    unsigned long Field94;
-    unsigned long SampleRate;       // +0x98
-    unsigned long Channels;         // +0x9C
-    unsigned long BitsPerSample;    // +0xA0
+    uint32_t Field7C;          // +0x7C DS3DALG GUID dword0 (ctor DAT_06ee95e4 = 0)
+    uint32_t Field80;          // +0x80 DAT_06ee95e8
+    uint32_t Field84;          // +0x84 DAT_06ee95ec
+    uint32_t Field88;          // +0x88 DAT_06ee95f0
+    uint32_t Flags;            // +0x8C
+    uint32_t CapsFlags;        // +0x90
+    uint32_t Field94;
+    uint32_t SampleRate;       // +0x98
+    uint32_t Channels;         // +0x9C
+    uint32_t BitsPerSample;    // +0xA0
     int CoordScale;                 // +0xA4
     FVec3 Front;                    // +0xA8
     FVec3 Up;                       // +0xB4
-    unsigned long PadC0[3];         // +0xC0 ctor zeros
+    uint32_t PadC0[3];         // +0xC0 ctor zeros
     FVec3 Position;                 // +0xCC
     FVec3 Velocity;                 // +0xD8
     float DistanceFactor;           // +0xE4
@@ -323,18 +323,18 @@ public:
     float Max3dPan;                 // +0xF0
     HWND Window;                    // +0xF4 not written by FUN_06ee1b40
     FArchMapEntry* ArchEntries;     // +0xF8 retail FUN_06ee7620 std::map
-    unsigned long ArchCount;        // +0xFC
-    unsigned long ArchCap;          // +0x100
+    uint32_t ArchCount;        // +0xFC
+    uint32_t ArchCap;          // +0x100
     unsigned char bArchEmpty;       // +0x104
     unsigned char Pad105[3];
-    unsigned long Pad108;
+    uint32_t Pad108;
     FAttachedNode* AttachedUnused;  // +0x10C list this (FUN_06ee7d80 size 0xC)
     FAttachedNode* AttachedSentinel;// +0x110
-    unsigned long AttachedCount;    // +0x114
+    uint32_t AttachedCount;    // +0x114
     FSoundInstanceNode* InstanceUnused;   // +0x118 list this (FUN_06ee7d50 size 0x60)
     FSoundInstanceNode* InstanceSentinel; // +0x11C
-    unsigned long InstanceEmbeddedCount;  // +0x120 (play count is DAT_06eeaf08)
-    unsigned long NextArchId;       // +0x124
+    uint32_t InstanceEmbeddedCount;  // +0x120 (play count is DAT_06eeaf08)
+    uint32_t NextArchId;       // +0x124
     IDirectSound3DListener* Listener; // +0x128
     IDirectSound* DirectSound;      // +0x12C
     IDirectSoundBuffer* Primary;    // +0x130

@@ -33,7 +33,7 @@ namespace AlchemyImpl
     __declspec(noinline) double ComputeAlchemyFpuCosineAndClear(const double& Angle, float& ZeroOut)
     {
         const double Result = std::cos(Angle);
-        volatile unsigned long* const ZeroBits = reinterpret_cast<volatile unsigned long*>(&ZeroOut);
+        volatile uint32_t* const ZeroBits = reinterpret_cast<volatile uint32_t*>(&ZeroOut);
         *ZeroBits = 0;
         return Result;
     }
@@ -58,6 +58,7 @@ namespace AlchemyImpl
     // __ftol2 alone inherits the old RC on its unmasked exception path.
     __declspec(noinline) std::int64_t ConvertAlchemyFpuInteger(const double& Value)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         unsigned int SavedControl;
         unsigned int CurrentControl;
         __control87_2(0, 0, &SavedControl, nullptr);
@@ -65,5 +66,8 @@ namespace AlchemyImpl
         const std::int64_t Converted = static_cast<std::int64_t>(Value);
         __control87_2(SavedControl, _MCW_RC, &CurrentControl, nullptr);
         return Converted;
+#else
+        return static_cast<std::int64_t>(Value);
+#endif
     }
 }

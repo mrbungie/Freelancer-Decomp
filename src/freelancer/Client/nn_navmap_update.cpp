@@ -8,6 +8,7 @@
 // nn_navmap.h. Retail Client\Interface\NeuroNet\NavMap.cpp.
 
 #include "nn_navmap.h"
+#include "fl/handles.h"
 #include "best_path.h"              // BestPath* (FUN_004c4fb0 / 4ff0 / 5530 / 52d0 / 58e0)
 #include "cargo_bar_control.h"      // ToolTipHoverInit / SetCaption
 #include "character_select_equip.h" // GetPlayerStarSystemIdRetail / BaseId / LastPosition
@@ -109,7 +110,7 @@ namespace
 
     // The universe / system / waypoint markers' tint (FUN_00496e50 0x00496eed..0x00496f4f):
     // the palette colour's four bytes scaled by DAT_005c7f68 into the holder's user floats.
-    void NavMapTintFromPalette(FNavMapItem* Item, unsigned long Rgba)
+    void NavMapTintFromPalette(FNavMapItem* Item, uint32_t Rgba)
     {
         unsigned char const* const Bytes = reinterpret_cast<unsigned char const*>(&Rgba);
         Item->Mesh.UserFloats[0] = NavMapByteToUnit(Bytes[0]);
@@ -1336,13 +1337,13 @@ namespace
     // labels, then -- from a second copy of the same colour -- on the sixteen grid labels.
     void NavMapTintTexts(NeuroNetNavMap* Map, unsigned char Alpha, uintptr_t bFlag)
     {
-        unsigned long Colour = G_NnPaletteArgb_679bb0;
+        uint32_t Colour = G_NnPaletteArgb_679bb0;
         reinterpret_cast<unsigned char*>(&Colour)[3] = Alpha;
         Map->SystemNameText->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour), bFlag);
         for (int Index = 0; Index < 4; ++Index)
             Map->FactionLabels[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&Colour),
                                                    bFlag);
-        unsigned long GridColour = G_NnPaletteArgb_679bb0;
+        uint32_t GridColour = G_NnPaletteArgb_679bb0;
         reinterpret_cast<unsigned char*>(&GridColour)[3] = Alpha;
         for (int Index = 0; Index < 8; ++Index)
             Map->GridLetters[Index]->SetProperty(0x33, reinterpret_cast<uintptr_t>(&GridColour),
@@ -1540,7 +1541,7 @@ void NeuroNetNavMap::Update()
                     // 00494ffa..004951c1: the item's name, keyed by the item; fed only with a
                     // name.
                     Record.IdsAlt = Item->StridName;
-                    Record.Ids = static_cast<int>(reinterpret_cast<intptr_t>(Item));
+                    Record.Ids = static_cast<int>(fl::PtrToHandle(Item));
                     NavMapPlaceHoverAtCursor(&Record);
                     if (Record.IdsAlt != 0)
                         NavMapSubmitHover(&Record);
@@ -1601,7 +1602,7 @@ void NeuroNetNavMap::Update()
                         FToolTipHoverInfo Record;
                         ToolTipHoverInit(&Record);
                         Record.IdsAlt = Zone->GetName(); // IZone +0x84
-                        Record.Ids = static_cast<int>(reinterpret_cast<intptr_t>(Zone));
+                        Record.Ids = static_cast<int>(fl::PtrToHandle(Zone));
                         NavMapPlaceHoverAtCursor(&Record);
                         if (Record.IdsAlt != 0)
                             NavMapSubmitHover(&Record);

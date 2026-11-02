@@ -21,7 +21,11 @@ struct _D3DXIMAGE_INFO;
 // declared in dacom.h, so nothing here is shared with render/shading.h any more.
 
 
+// Retail's RP8.dll registered the pipeline under "DirectX8". That is only the DACOM registry key
+// the engine looks up ([System] list in DACOM.INI), not a Direct3D dependency; the port's
+// backends (src/platform/render) register under a neutral name instead.
 static const char kRp8ComponentName[] = "DirectX8";
+static const char kRenderPipelineComponentName[] = "GfxPipeline";
 static const char kRp8DefaultSection[] = "RenderPipeline";
 // RP9.dll: the Direct3D 9 mirror of RP8 (same IIDs, same default section). See docs/re/rp9.md.
 static const char kRp9ComponentName[] = "DirectX9";
@@ -48,7 +52,7 @@ struct IRenderPipeline : IDAComponent
     // slot 7 FUN_06d082d1
     virtual GENRESULT DACOM_API GetDeviceInfo(void* Out520) = 0;
     // slot 8 FUN_06d083d2
-    virtual GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, unsigned long* Out) = 0;
+    virtual GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, uint32_t* Out) = 0;
     // slot 9 FUN_06d08461
     virtual GENRESULT DACOM_API GetDisplayModeCount(unsigned int* Out) = 0;
     // slot 10 FUN_06d084f2
@@ -62,7 +66,7 @@ struct IRenderPipeline : IDAComponent
     // slot 14 FUN_06d09982
     virtual GENRESULT DACOM_API DestroyGpuResources() = 0;
     // slot 15 FUN_06d09b4c RET 0xC
-    virtual GENRESULT DACOM_API ClearBuffers(unsigned long Flags, const void* Rects) = 0;
+    virtual GENRESULT DACOM_API ClearBuffers(uint32_t Flags, const void* Rects) = 0;
     // slot 16 FUN_06d09d28
     virtual GENRESULT DACOM_API SwapBuffers() = 0;
     // slot 17 FUN_06d09f96 RET 0x8
@@ -201,30 +205,30 @@ struct IRenderPipeline : IDAComponent
     // slot 68 FUN_06d10322
     virtual GENRESULT DACOM_API VerifyState() = 0;
     // slot 69 FUN_06d1067f RET 0x18
-    virtual GENRESULT DACOM_API DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
+    virtual GENRESULT DACOM_API DrawPrimitive(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                               unsigned int Count, void* Unused) = 0;
     // slot 70 FUN_06d1097d RET 0x20 -- eight dwords, so this plus SEVEN arguments, the last
     // one unread by the callee just like slot 72's. Freelancer.exe 0x004217b6 and 0x00421973
     // both push eight: PUSH EBX (the trailing dword), index count, indices, vertex count,
     // vertices, PUSH 0x142 (an FVF: XYZ|DIFFUSE|TEX1), PUSH 2 or 4 (the primitive type), this.
-    virtual GENRESULT DACOM_API DrawIndexedPrimitiveUp(unsigned long Prim, unsigned int Fvf,
+    virtual GENRESULT DACOM_API DrawIndexedPrimitiveUp(uint32_t Prim, unsigned int Fvf,
                                                        const void* Verts, unsigned int VertCount,
                                                        const void* Indices,
                                                        unsigned int IndexCount,
-                                                       unsigned long Unused) = 0;
+                                                       uint32_t Unused) = 0;
     // slot 71 FUN_06d10c89 RET 0x18
-    virtual GENRESULT DACOM_API DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
+    virtual GENRESULT DACOM_API DrawPrimitiveVb(uint32_t Prim, void* Vb, unsigned int StartVertex,
                                                 unsigned int Count, void* Unused) = 0;
     // slot 72 FUN_06d10e4b RET 0x20 -- eight dwords, so this plus SEVEN arguments. Ghidra
     // lists only param_1..param_7 because the last one is never read, but the callee pops it
     // all the same and every retail caller pushes it: shading.dll 0x06eb328a, 0x06eb3c0f,
     // 0x06eb5915 and 0x06eba8ff each open with PUSH 0x0 and push eight dwords in total.
     // Declaring six here made ShadingInternal.h's PipeDrawIndexedVb underfill the stack.
-    virtual GENRESULT DACOM_API DrawIndexedPrimitiveVb(unsigned long Prim, void* Vb,
+    virtual GENRESULT DACOM_API DrawIndexedPrimitiveVb(uint32_t Prim, void* Vb,
                                                        unsigned int BaseVertex, unsigned int NumVerts,
                                                        const void* Indices,
                                                        unsigned int IndexCount,
-                                                       unsigned long Unused) = 0;
+                                                       uint32_t Unused) = 0;
     // slot 73 FUN_06d0ccb2
     virtual GENRESULT DACOM_API AddLight(void* Handle) = 0;
     // slot 74 FUN_06d0cd32
@@ -260,7 +264,7 @@ struct FRpVertexStream
     const unsigned char* Base;       // +0x00
     unsigned int ByteSize;           // +0x04  bytes of the element (0xc position, 4 colour, ...)
     unsigned int Stride;             // +0x08  bytes between two vertices of this stream
-    const unsigned long* IndexArray; // +0x0c  one DWORD per vertex when Flags & 4 (indexed)
+    const uint32_t* IndexArray; // +0x0c  one DWORD per vertex when Flags & 4 (indexed)
     unsigned int Count;              // +0x10  vertices in the stream
 };
 
@@ -286,8 +290,8 @@ static_assert(offsetof(FRpVertexSrcDesc, SrcFvf) == 0x68, "FRpVertexSrcDesc +0x6
 struct FVbListing
 {
     void* VertexBuffer;
-    unsigned long Fvf;
-    unsigned long BaseVertex;
+    uint32_t Fvf;
+    uint32_t BaseVertex;
 };
 
 // RP8 writes the listing and locked memory; materials borrow the listing prefix.
@@ -322,7 +326,7 @@ struct IVertexBufferManager : IDAComponent
 struct IRPDraw : IDAComponent
 {
     // slot 3 FUN_06d111e1 RET 0x18
-    virtual GENRESULT DACOM_API DrawIndexedPrimitive(unsigned long Prim, unsigned int MinIndex,
+    virtual GENRESULT DACOM_API DrawIndexedPrimitive(uint32_t Prim, unsigned int MinIndex,
                                                      unsigned int NumVertices,
                                                      unsigned int StartIndex,
                                                      unsigned int Count) = 0;

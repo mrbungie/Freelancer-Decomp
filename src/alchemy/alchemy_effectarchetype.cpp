@@ -27,7 +27,7 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FFxEffectArchetype::Release()
+    uint32_t DACOM_API FFxEffectArchetype::Release()
     {
         // FUN_06222900 (alchemy.dll.txt:71344-71367): retail guards the
         // decrement against underflow (`if (refcount != 0) refcount--;`
@@ -74,13 +74,13 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::AddRec16(const FAleRec16* Rec, unsigned long* OutId,
-                                                      unsigned long Flag)
+    GENRESULT DACOM_API FFxEffectArchetype::AddRec16(const FAleRec16* Rec, uint32_t* OutId,
+                                                      uint32_t Flag)
     {
-        unsigned long Assigned = Flag;
+        uint32_t Assigned = Flag;
         if (Flag != 0)
         {
-            for (unsigned long Index = 0; Index < Rec16Count_; ++Index)
+            for (uint32_t Index = 0; Index < Rec16Count_; ++Index)
             {
                 const FAleRec16* Stored = &Rec16_[Index];
                 if (Rec->D == Stored->B && Rec->B == Stored->D && Rec->C == Stored->A &&
@@ -102,17 +102,17 @@ namespace AlchemyImpl
         }
         Rec16_[Rec16Count_ - 1].B = Assigned;
 
-        if (static_cast<long>(NextId_) <= static_cast<long>(Assigned))
+        if (static_cast<int32_t>(NextId_) <= static_cast<int32_t>(Assigned))
             NextId_ = Assigned;
         if (OutId != nullptr)
             *OutId = Assigned;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::RemoveRec16(unsigned long Id)
+    GENRESULT DACOM_API FFxEffectArchetype::RemoveRec16(uint32_t Id)
     {
-        unsigned long Found = Rec16Count_;
-        for (unsigned long Index = 0; Index < Rec16Count_; ++Index)
+        uint32_t Found = Rec16Count_;
+        for (uint32_t Index = 0; Index < Rec16Count_; ++Index)
         {
             if (Rec16_[Index].B == Id)
             {
@@ -123,11 +123,11 @@ namespace AlchemyImpl
         if (Found == Rec16Count_)
             return GR_GENERIC;
 
-        for (unsigned long Index = Found + 1; Index < Rec16Count_; ++Index)
+        for (uint32_t Index = Found + 1; Index < Rec16Count_; ++Index)
             Rec16_[Index - 1] = Rec16_[Index];
         Rec16Count_ -= 1;
 
-        for (unsigned long Index = 0; Index < Rec8Count_;)
+        for (uint32_t Index = 0; Index < Rec8Count_;)
         {
             if (Rec8_[Index].A != Id && Rec8_[Index].B != Id)
             {
@@ -135,7 +135,7 @@ namespace AlchemyImpl
             }
             else
             {
-                for (unsigned long ShiftIndex = Index + 1; ShiftIndex < Rec8Count_; ++ShiftIndex)
+                for (uint32_t ShiftIndex = Index + 1; ShiftIndex < Rec8Count_; ++ShiftIndex)
                     Rec8_[ShiftIndex - 1] = Rec8_[ShiftIndex];
                 --Rec8Count_;
             }
@@ -143,9 +143,9 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::Slot8(unsigned long Id, unsigned long Value)
+    GENRESULT DACOM_API FFxEffectArchetype::Slot8(uint32_t Id, uint32_t Value)
     {
-        for (unsigned long Index = 0; Index < Rec16Count_; ++Index)
+        for (uint32_t Index = 0; Index < Rec16Count_; ++Index)
         {
             if (Rec16_[Index].B == Id)
             {
@@ -158,7 +158,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectArchetype::AddRec8(const FAleRec8* Rec)
     {
-        for (unsigned long Index = 0; Index < Rec8Count_; ++Index)
+        for (uint32_t Index = 0; Index < Rec8Count_; ++Index)
         {
             if (Rec8_[Index].A == Rec->A && Rec8_[Index].B == Rec->B)
                 return GR_GENERIC;
@@ -172,8 +172,8 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectArchetype::RemoveRec8(const FAleRec8* Rec)
     {
-        unsigned long Found = Rec8Count_;
-        for (unsigned long Index = 0; Index < Rec8Count_; ++Index)
+        uint32_t Found = Rec8Count_;
+        for (uint32_t Index = 0; Index < Rec8Count_; ++Index)
         {
             if (Rec8_[Index].A == Rec->A && Rec8_[Index].B == Rec->B)
             {
@@ -183,13 +183,13 @@ namespace AlchemyImpl
         }
         if (Found == Rec8Count_)
             return GR_GENERIC;
-        for (unsigned long Index = Found + 1; Index < Rec8Count_; ++Index)
+        for (uint32_t Index = Found + 1; Index < Rec8Count_; ++Index)
             Rec8_[Index - 1] = Rec8_[Index];
         Rec8Count_ -= 1;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::GetRec16(unsigned long Index, FAleRec16* Out)
+    GENRESULT DACOM_API FFxEffectArchetype::GetRec16(uint32_t Index, FAleRec16* Out)
     {
         const FAleRec16* Stored = &Rec16_[Index];
         Out->D = Stored->B;
@@ -199,14 +199,14 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::GetRec8(unsigned long Index, FAleRec8* Out)
+    GENRESULT DACOM_API FFxEffectArchetype::GetRec8(uint32_t Index, FAleRec8* Out)
     {
         Out->A = Rec8_[Index].A;
         Out->B = Rec8_[Index].B;
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::GetRec16ById(unsigned long Id, FAleRec16* Out)
+    GENRESULT DACOM_API FFxEffectArchetype::GetRec16ById(uint32_t Id, FAleRec16* Out)
     {
         const FAleRec16* Stored = Rec16_;
         const FAleRec16* const End = Rec16Count_ == 0 ? Stored : Stored + Rec16Count_;
@@ -225,9 +225,9 @@ namespace AlchemyImpl
     }
 
     GENRESULT DACOM_API FFxEffectArchetype::FindRec8Index(const FAleRec8* Rec,
-                                                           unsigned long* OutIndex)
+                                                           uint32_t* OutIndex)
     {
-        for (unsigned long Index = 0; Index < Rec8Count_; ++Index)
+        for (uint32_t Index = 0; Index < Rec8Count_; ++Index)
         {
             if (Rec8_[Index].A != Rec->A || Rec8_[Index].B != Rec->B)
                 continue;
@@ -238,10 +238,10 @@ namespace AlchemyImpl
         return GR_GENERIC;
     }
 
-    GENRESULT DACOM_API FFxEffectArchetype::RemapRec16FieldD(unsigned long OldId,
-                                                              unsigned long NewId)
+    GENRESULT DACOM_API FFxEffectArchetype::RemapRec16FieldD(uint32_t OldId,
+                                                              uint32_t NewId)
     {
-        for (unsigned long Index = 0; Index < Rec16Count_; ++Index)
+        for (uint32_t Index = 0; Index < Rec16Count_; ++Index)
         {
             if (Rec16_[Index].D == OldId)
                 Rec16_[Index].D = NewId;
@@ -251,9 +251,9 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectArchetype::GetHeader16(unsigned char* Out16)
     {
-        for (unsigned long Index = 0; Index < 16; Index += 4)
+        for (uint32_t Index = 0; Index < 16; Index += 4)
         {
-            unsigned long Word;
+            uint32_t Word;
             std::memcpy(&Word, Header16_ + Index, sizeof(Word));
             std::memcpy(Out16 + Index, &Word, sizeof(Word));
         }
@@ -262,9 +262,9 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectArchetype::SetHeader16(const unsigned char* Header16)
     {
-        for (unsigned long Index = 0; Index < 16; Index += 4)
+        for (uint32_t Index = 0; Index < 16; Index += 4)
         {
-            unsigned long Word;
+            uint32_t Word;
             std::memcpy(&Word, Header16 + Index, sizeof(Word));
             std::memcpy(Header16_ + Index, &Word, sizeof(Word));
         }
@@ -273,21 +273,21 @@ namespace AlchemyImpl
 
     void FFxEffectArchetype::AppendRec16(const FAleRec16& Record)
     {
-        const unsigned long Position = Rec16Count_;
+        const uint32_t Position = Rec16Count_;
         if (Rec16Capacity_ - Rec16Count_ < 1)
         {
-            const unsigned long Growth = Rec16Count_ > 1 ? Rec16Count_ : 1;
-            const unsigned long Capacity = Rec16Count_ + Growth;
-            const unsigned long AllocationCount = static_cast<long>(Capacity) < 0 ? 0 : Capacity;
+            const uint32_t Growth = Rec16Count_ > 1 ? Rec16Count_ : 1;
+            const uint32_t Capacity = Rec16Count_ + Growth;
+            const uint32_t AllocationCount = static_cast<int32_t>(Capacity) < 0 ? 0 : Capacity;
             FAleRec16* Next = new FAleRec16[AllocationCount];
-            for (unsigned long Index = 0; Index < Position; ++Index)
+            for (uint32_t Index = 0; Index < Position; ++Index)
                 Next[Index] = Rec16_[Index];
             Next[Position] = Record;
-            for (unsigned long Index = Position; Index < Rec16Count_; ++Index)
+            for (uint32_t Index = Position; Index < Rec16Count_; ++Index)
                 Next[Index + 1] = Rec16_[Index];
             delete[] Rec16_;
             Rec16Capacity_ = Capacity;
-            const unsigned long CurrentCount = Rec16_ != nullptr ? Rec16Count_ : 0;
+            const uint32_t CurrentCount = Rec16_ != nullptr ? Rec16Count_ : 0;
             Rec16_ = Next;
             Rec16Count_ = CurrentCount + 1;
             return;
@@ -298,21 +298,21 @@ namespace AlchemyImpl
 
     void FFxEffectArchetype::AppendRec8(const FAleRec8& Record)
     {
-        const unsigned long Position = Rec8Count_;
+        const uint32_t Position = Rec8Count_;
         if (Rec8Capacity_ - Rec8Count_ < 1)
         {
-            const unsigned long Growth = Rec8Count_ > 1 ? Rec8Count_ : 1;
-            const unsigned long Capacity = Rec8Count_ + Growth;
-            const unsigned long AllocationCount = static_cast<long>(Capacity) < 0 ? 0 : Capacity;
+            const uint32_t Growth = Rec8Count_ > 1 ? Rec8Count_ : 1;
+            const uint32_t Capacity = Rec8Count_ + Growth;
+            const uint32_t AllocationCount = static_cast<int32_t>(Capacity) < 0 ? 0 : Capacity;
             FAleRec8* Next = new FAleRec8[AllocationCount];
-            for (unsigned long Index = 0; Index < Position; ++Index)
+            for (uint32_t Index = 0; Index < Position; ++Index)
                 Next[Index] = Rec8_[Index];
             Next[Position] = Record;
-            for (unsigned long Index = Position; Index < Rec8Count_; ++Index)
+            for (uint32_t Index = Position; Index < Rec8Count_; ++Index)
                 Next[Index + 1] = Rec8_[Index];
             delete[] Rec8_;
             Rec8Capacity_ = Capacity;
-            const unsigned long CurrentCount = Rec8_ != nullptr ? Rec8Count_ : 0;
+            const uint32_t CurrentCount = Rec8_ != nullptr ? Rec8Count_ : 0;
             Rec8_ = Next;
             Rec8Count_ = CurrentCount + 1;
             return;

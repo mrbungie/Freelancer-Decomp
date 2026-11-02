@@ -49,8 +49,8 @@ IFont* ClientConfirmPlayerFont();
 
 // DAT_0067a480 / DAT_0067a484 -- the CRCs of "IMEbkground" / "IMEtext" (static initializers
 // LAB_00563ad0 / LAB_00563ab0).
-unsigned long ClientImeBackgroundKey();
-unsigned long ClientImeTextKey();
+uint32_t ClientImeBackgroundKey();
+uint32_t ClientImeTextKey();
 
 // FUN_00417790 -- swap the font atlas material key; the previous one goes to OutPrev.
 void ClientImeSwapFontMaterialKey(unsigned* OutPrev, unsigned NewKey);

@@ -15,7 +15,7 @@
 struct FMaterialParamValue
 {
     int Type;                // +0x00
-    unsigned long Value[4];  // +0x04
+    uint32_t Value[4];  // +0x04
 
     // FUN_065ffc20 per cell / the inline pattern at 065fe373: Type = 0, Value[0] = 0 (the other
     // three dwords are left as they were).
@@ -39,7 +39,7 @@ struct FMaterialParamValue
     void SwapCom(IDAComponent* NewCom);
     // FUN_065ffab0 (thiscall RET 8: Type, Arg). Arg is the value itself for 1/8/9/10, a pointer
     // to the value for 2/3/4, the string for 5/7 and the object for 6.
-    void Set(int InType, unsigned long Arg);
+    void Set(int InType, uint32_t Arg);
 };
 
 static_assert(sizeof(FMaterialParamValue) == 0x14, "material parameter cell is 0x14 bytes");
@@ -48,7 +48,7 @@ static_assert(sizeof(FMaterialParamValue) == 0x14, "material parameter cell is 0
 // 17/18/19 and kMaterialParamDescSize).
 struct FMaterialParamDesc
 {
-    unsigned long Flags;      // +0x00 bit0 = skipped by Load/SaveProperties; 0x20000 / 0x40000
+    uint32_t Flags;      // +0x00 bit0 = skipped by Load/SaveProperties; 0x20000 / 0x40000
                               //       pick the U / V bit pair of an address-mode dword (type 9)
     const char* Key;          // +0x04 file key ("Dc", "Dt_name", ...)
     const char* Name;         // +0x08 display name
@@ -65,9 +65,9 @@ struct FMaterialParamDesc
     FMaterialParamDesc(const FMaterialParamDesc&) = delete;
     FMaterialParamDesc& operator=(const FMaterialParamDesc&) = delete;
 
-    void Init(int Type, unsigned long InFlags, const char* InKey, const char* InName,
-              const char* InDescription, unsigned long Default, unsigned long InMin,
-              unsigned long InMax);
+    void Init(int Type, uint32_t InFlags, const char* InKey, const char* InName,
+              const char* InDescription, uint32_t Default, uint32_t InMin,
+              uint32_t InMax);
 };
 
 static_assert(sizeof(FMaterialParamDesc) == 0x4C, "material parameter descriptor is 0x4C bytes");
@@ -80,12 +80,12 @@ struct FMaterialTextureRow
 {
     char* Name;                 // +0x00 owned char[] from StoreParameterValue
     int Handle;                 // +0x04 ITextureLibrary2 playback group id, -1 = none
-    unsigned long Frame;        // +0x08 current stage handle (+0x70 GetFrame)
+    uint32_t Frame;        // +0x08 current stage handle (+0x70 GetFrame)
     unsigned char Field0C[0x10]; // +0x0C TODO: never read or written by this module (the
                                  //       ctor at 065fe2c0 skips it)
-    unsigned long WrapMode;     // +0x1C "Texture Wrap Mode", default 4
-    unsigned long AddressU;     // +0x20 "Texture U Address Mode"
-    unsigned long AddressV;     // +0x24 "Texture V Address Mode"
+    uint32_t WrapMode;     // +0x1C "Texture Wrap Mode", default 4
+    uint32_t AddressU;     // +0x20 "Texture U Address Mode"
+    uint32_t AddressV;     // +0x24 "Texture V Address Mode"
     unsigned char bSingleFrame; // +0x28 Setup: GetFrameCount == 1
     unsigned char Pad29[3];
 
@@ -135,27 +135,27 @@ public:
     GENRESULT DACOM_API ResolveTextures(float Delta) override;                  // LAB_065fe9a0
     GENRESULT DACOM_API Bind(void* Context) override;                         // FUN_06600af0
     GENRESULT DACOM_API Teardown(void* Context) override;                     // LAB_06600b40
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
-                               unsigned long Count, unsigned long IbStart,
-                               unsigned long IndexSpan, unsigned long Flags) override; // LAB_065fea00
+    GENRESULT DACOM_API Submit(void* Context, uint32_t PrimType, uint32_t Start,
+                               uint32_t Count, uint32_t IbStart,
+                               uint32_t IndexSpan, uint32_t Flags) override; // LAB_065fea00
     GENRESULT DACOM_API SetName(const char* InName) override;                 // LAB_065fec10
-    GENRESULT DACOM_API GetName(char* Out, unsigned long Size) override;      // LAB_065fec80
-    GENRESULT DACOM_API CopyClassName(char* Out, unsigned long Size) override; // FUN_065fecc0
+    GENRESULT DACOM_API GetName(char* Out, uint32_t Size) override;      // LAB_065fec80
+    GENRESULT DACOM_API CopyClassName(char* Out, uint32_t Size) override; // FUN_065fecc0
     GENRESULT DACOM_API GetPassCount(int* Out) override;                            // LAB_065fed00
-    GENRESULT DACOM_API GetParameterCount(unsigned long* OutCount) override;  // LAB_065fed10
-    GENRESULT DACOM_API GetParameterDescriptor(unsigned long Index, void* OutDesc) override; // LAB_065fed30
-    GENRESULT DACOM_API GetParameterValue(unsigned long Index, void* InOutDesc) override;    // FUN_065ff060
-    GENRESULT DACOM_API SetParameterValue(unsigned long Index, void* Value) override;        // LAB_065ff1f0
+    GENRESULT DACOM_API GetParameterCount(uint32_t* OutCount) override;  // LAB_065fed10
+    GENRESULT DACOM_API GetParameterDescriptor(uint32_t Index, void* OutDesc) override; // LAB_065fed30
+    GENRESULT DACOM_API GetParameterValue(uint32_t Index, void* InOutDesc) override;    // FUN_065ff060
+    GENRESULT DACOM_API SetParameterValue(uint32_t Index, void* Value) override;        // LAB_065ff1f0
     void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override; // FUN_06600a30
     GENRESULT __thiscall InitializeFromDescriptor(void* Arg) override;                           // FUN_06600ba0
     GENRESULT __thiscall ApplyInitialRenderStates(void* Arg) override;                           // FUN_06600ba0
     GENRESULT __thiscall Setup() override;                                     // LAB_065ff250
-    bool __thiscall ValueWithinDeclaredRange(unsigned long Index, void* Entry,
+    bool __thiscall ValueWithinDeclaredRange(uint32_t Index, void* Entry,
                                              void* Value) override;          // LAB_065ff470
-    GENRESULT __thiscall StoreParameterValue(unsigned long Index, void* Entry,
+    GENRESULT __thiscall StoreParameterValue(uint32_t Index, void* Entry,
                                              void* Value) override;          // FUN_065ff550
-    unsigned long __thiscall GetParameterTable(void** OutBase) override;      // LAB_06600b80
-    void* __thiscall GetParameterAddress(unsigned long Index) override;       // FUN_06600ba0
+    uint32_t __thiscall GetParameterTable(void** OutBase) override;      // LAB_06600b80
+    void* __thiscall GetParameterAddress(uint32_t Index) override;       // FUN_06600ba0
 
     IRenderPipeline* Pipeline;          // +0x04
     ITextureLibrary2* TextureLib;         // +0x08
@@ -163,7 +163,7 @@ public:
     IRPDraw* Draw;                        // +0x10
     char* Name;                           // +0x14
     FMaterialTextureRow* TextureRows;     // +0x18 new[] block (count cookie at -4)
-    unsigned long TextureRowCount;        // +0x1C
+    uint32_t TextureRowCount;        // +0x1C
     FMaterialColors Colors;               // +0x20
     unsigned char bTranslucent;           // +0x64 GetRenderFlags: 0xA : 8
     unsigned char bOneBitAlpha;           // +0x65 texture format has 1 alpha bit
@@ -181,12 +181,12 @@ class FEyeMaterial;
 
 struct FEyeMaterialInner : IDAComponent
 {
-    unsigned long RefCount;  // +0x04 (object +0x70) = 1 at construction
+    uint32_t RefCount;  // +0x04 (object +0x70) = 1 at construction
     FEyeMaterial* Owner;     // +0x08 (object +0x74)
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 };
 
 static_assert(sizeof(FEyeMaterialInner) == 0xC, "EyeMaterial inner unknown is 0xC bytes");
@@ -198,17 +198,17 @@ public:
     FEyeMaterial();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override; // LAB_06600a00
-    unsigned long DACOM_API AddRef() override;                                // LAB_06600a10
-    unsigned long DACOM_API Release() override;                               // LAB_06600a20
+    uint32_t DACOM_API AddRef() override;                                // LAB_06600a10
+    uint32_t DACOM_API Release() override;                               // LAB_06600a20
     GENRESULT DACOM_API Bind(void* Context) override;                         // LAB_065fff20
     GENRESULT DACOM_API Teardown(void* Context) override;                     // LAB_06600270
-    GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;          // LAB_065ffef0
+    GENRESULT DACOM_API GetRenderFlags(uint32_t* Out) override;          // LAB_065ffef0
     const char* __thiscall ClassName() override;                              // LAB_065fff10
-    unsigned long __thiscall GetParameterTable(void** OutBase) override;      // LAB_065ff750
-    void* __thiscall GetParameterAddress(unsigned long Index) override;       // LAB_065ffe60
+    uint32_t __thiscall GetParameterTable(void** OutBase) override;      // LAB_065ff750
+    void* __thiscall GetParameterAddress(uint32_t Index) override;       // LAB_065ffe60
     GENRESULT DACOM_API InnerQueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API InnerAddRef() override;
-    unsigned long DACOM_API InnerRelease() override;
+    uint32_t DACOM_API InnerAddRef() override;
+    uint32_t DACOM_API InnerRelease() override;
 
     IDAComponent* Controlling;  // +0x68 desc+8, or &Inner when that is null
     FEyeMaterialInner Inner;    // +0x6C

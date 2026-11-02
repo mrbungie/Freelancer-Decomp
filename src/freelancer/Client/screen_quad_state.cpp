@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "screen_quad_state.h"
+#include "fl/handles.h"
 #ifdef FREELANCER_WALK_MODE
 #include "base_walk.h"
 #endif
@@ -30,7 +31,7 @@
 // DAT_006101d8 -- the default texture frame {no texture, u0 0, v0 0, u1 1, v1 1} (.data, never
 // written). Copied into a new container's key by FUN_00402f40 and FUN_00403ea0, and handed to
 // FUN_00402e30 by the core bars (0x004d54a2) and the IME background (0x00563f91).
-unsigned long const G_ScreenQuadDefaultFrame[5] = {0u, 0u, 0u, 0x3f800000u, 0x3f800000u};
+uint32_t const G_ScreenQuadDefaultFrame[5] = {0u, 0u, 0u, 0x3f800000u, 0x3f800000u};
 
 namespace
 {
@@ -101,9 +102,9 @@ namespace
     FScreenQuadBatchContainer* G_ActiveContainer = nullptr;
 
     // DAT_00616474 — FUN_00402d30 material-list key; change nulls DAT_00616498.
-    unsigned long G_MaterialListKey = 0;
+    uint32_t G_MaterialListKey = 0;
     // DAT_00616490 — default key restored by FUN_00402d50 / FUN_00403ea0 epilogue.
-    unsigned long G_MaterialListKeyDefault = 0;
+    uint32_t G_MaterialListKeyDefault = 0;
 
     // DAT_00616494 — lazy 3DMathEngine (FUN_005b73e0 CreateInstance "3DMathEngine").
     I3DMathEngine* G_ScreenQuadMath = nullptr;
@@ -146,20 +147,6 @@ namespace
     void ClearCache(FCachedIntPair* Table, int Capacity)
     {
         memset(Table, 0, static_cast<size_t>(Capacity) * sizeof(FCachedIntPair));
-    }
-
-    float PackColorAsFloatBits(unsigned Packed)
-    {
-        float Bits = 0.0f;
-        memcpy(&Bits, &Packed, sizeof(Bits));
-        return Bits;
-    }
-
-    unsigned UnpackColorBits(float Bits)
-    {
-        unsigned Packed = 0;
-        memcpy(&Packed, &Bits, sizeof(Packed));
-        return Packed;
     }
 
     I3DMathEngine* AcquireScreenQuadMath()
@@ -206,7 +193,7 @@ namespace
         FScreenQuadBatchNode* Node = Pool->FreeHead;
         if (Node == nullptr)
         {
-            Node = static_cast<FScreenQuadBatchNode*>(operator new(0x28u, std::nothrow));
+            Node = static_cast<FScreenQuadBatchNode*>(operator new(sizeof(FScreenQuadBatchNode) > 0x28u ? sizeof(FScreenQuadBatchNode) : 0x28u, std::nothrow));
             if (Node == nullptr)
                 return nullptr;
             InitBatchNode(Node);
@@ -359,7 +346,7 @@ namespace
     // DAT_00616478 -- std::map<material-list key, container> (head DAT_0061647c, size
     // DAT_00616488). Static init LAB_00402c10 (FUN_00404dd0 + atexit LAB_00402c40, which
     // destroys every node through FUN_00405820): the map's own constructor / destructor.
-    std::map<unsigned long, FScreenQuadBatchEntry> G_BatchMap;
+    std::map<uint32_t, FScreenQuadBatchEntry> G_BatchMap;
 
 
     // FUN_00404d50 as the insert paths use it (the live list at container+0xc, before node 0):
@@ -383,12 +370,12 @@ namespace
     // dropped (bFind 0) or replaced by the first live node that matches (bFind 1); with none, a
     // node from FUN_00402ed0 goes to the live tail with the texture, the blend and empty counts.
     FScreenQuadBatchNode* ContainerBeginBatch(FScreenQuadBatchContainer* C,
-                                              unsigned long const* Frame, int BlendMode,
+                                              uint32_t const* Frame, int BlendMode,
                                               bool bFind)
     {
         for (int Index = 0; Index < 5; ++Index)
             C->MatKey[Index] = static_cast<unsigned>(Frame[Index]);
-        void* const Texture = reinterpret_cast<void*>(static_cast<uintptr_t>(C->MatKey[0]));
+        void* const Texture = fl::HandleToPtr(static_cast<uint32_t>(C->MatKey[0]));
         if (C->Current != nullptr && C->Current->TextureHandle != Texture)
         {
             if (!bFind)
@@ -425,7 +412,7 @@ namespace
         // 0x00402f6b..0x00403086: the pair {DAT_00616474, empty container} inserted
         // (FUN_00404f20); an existing entry for the key is left untouched. The temporaries are
         // destroyed empty. DAT_00616498 = the entry's container (node + 0x10).
-        std::pair<std::map<unsigned long, FScreenQuadBatchEntry>::iterator, bool> const Inserted =
+        std::pair<std::map<uint32_t, FScreenQuadBatchEntry>::iterator, bool> const Inserted =
             G_BatchMap.try_emplace(G_MaterialListKey);
         FScreenQuadBatchContainer* const C = &Inserted.first->second.Container;
         G_ActiveContainer = C;
@@ -435,7 +422,7 @@ namespace
         // 0x00403091..0x004030ab: a new entry takes the default frame as its key.
         for (int Index = 0; Index < 5; ++Index)
             C->MatKey[Index] = static_cast<unsigned>(G_ScreenQuadDefaultFrame[Index]);
-        void* const Texture = reinterpret_cast<void*>(static_cast<uintptr_t>(C->MatKey[0]));
+        void* const Texture = fl::HandleToPtr(static_cast<uint32_t>(C->MatKey[0]));
 
         // 0x004030ad..0x004030cf: a current node of another texture is replaced by the first
         // live node of this one (a new entry has neither).
@@ -520,7 +507,7 @@ namespace
         Out->Y = Y;
         Out->Z = Rec.DepthA;
         Out->Rhw = Rec.DepthB;
-        Out->Color = UnpackColorBits(Rec.ColorBits);
+        Out->Color = Rec.ColorBits;
         Out->Specular = 0;
         Out->U = U;
         Out->V = V;
@@ -532,6 +519,7 @@ namespace
                        IVertexBufferManager* Vbm, IRPIndexBuffer* Ib, IRPDraw* Draw)
     {
         // 0x004042c7..0x004042d6: slot 66 (+0x108) with the node's texture, unconditionally.
+        if (getenv("FL_TRACE_FONT")) { static int n = 0; if (n++ < 20) fprintf(stderr, "[fl] quads: flush node tex=%p records=%d blend=%d\n", Node->TextureHandle, (int)Node->RecordCount, (int)Node->BlendMode); }
         Pipe->SetTextureStageTexture(0, Node->TextureHandle);
 
         // 0x004042dc..0x00404318: blend 1 -> SRCBLEND / DESTBLEND 2 / 2, blend 2 -> 5 / 6,
@@ -599,7 +587,7 @@ namespace
                 // index buffer's scratch (-1) through slot 7 (+0x1c); offset and pointer start 0.
                 unsigned int const QuadCount = VertexCount >> 2;
                 unsigned int const IndexCount = QuadCount * 6u;
-                void* const ScratchIb = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+                void* const ScratchIb = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
                 unsigned int IndexOffset = 0;
                 void* Indices = nullptr;
                 if (Ib->LockIb(ScratchIb, &IndexOffset, &Indices, IndexCount) >= 0)
@@ -775,7 +763,7 @@ void ApplyScreenQuadRenderStates(IRenderPipeline* Pipe)
     ScreenQuadSetTextureStageState(Pipe, 1, 1, 1);
 }
 
-void ScreenQuadSetMaterialKey(unsigned long Key)
+void ScreenQuadSetMaterialKey(uint32_t Key)
 {
     // FUN_00402d30 (0x00402d30..0x00402d4b): a different key is stored and DAT_00616498
     // nulled -- nothing else. The previous key's container keeps its queued nodes in the map
@@ -855,7 +843,7 @@ namespace
         Rec.V0 = V0;
         Rec.U1 = U1;
         Rec.V1 = V1;
-        Rec.ColorBits = PackColorAsFloatBits(Packed);
+        Rec.ColorBits = Packed;
         AppendRecordToNode(C->Current, Rec);
     }
 }
@@ -941,7 +929,7 @@ unsigned char ScreenQuadEnqueueFlare(ICamera* Cam, float const* Position, float 
     return 1;
 }
 
-void ScreenQuadBeginBatchFrame(unsigned long const* Frame, int BlendMode, bool bFind)
+void ScreenQuadBeginBatchFrame(uint32_t const* Frame, int BlendMode, bool bFind)
 {
     // FUN_00402e30 = FUN_00402f40 (0x00402e34), then the body FUN_004045d0 has as a container
     // method (0x00402e39..0x00402ebd: key copy, current-node keep / drop / find, new node at
@@ -955,7 +943,7 @@ void ScreenQuadAppendRecord(FScreenQuadRecord const& Record)
     AppendRecordToNode(EnsureBatchContainer()->Current, Record);
 }
 
-void ScreenQuadEnqueueIcon(ICamera* Cam, float const* Position, unsigned long Argb, float Size,
+void ScreenQuadEnqueueIcon(ICamera* Cam, float const* Position, uint32_t Argb, float Size,
                            float Angle, int /*Unused*/)
 {
     // FUN_004034a0. 0x004034ab..0x004034d9: the projected centre and half extents (FUN_00403350
@@ -1024,8 +1012,7 @@ void ScreenQuadEnqueueIcon(ICamera* Cam, float const* Position, unsigned long Ar
         Rec.V0 = ClipV0;
         Rec.U1 = ClipU1;
         Rec.V1 = ClipV1;
-        unsigned const ColorBits = static_cast<unsigned>(Argb);
-        memcpy(&Rec.ColorBits, &ColorBits, sizeof(ColorBits));
+        Rec.ColorBits = Argb;
         return;
     }
 
@@ -1103,10 +1090,10 @@ void ScreenQuadEnqueueIcon(ICamera* Cam, float const* Position, unsigned long Ar
 
 // DAT_0061648c -- the static initializer LAB_00402c00 stores -1 (XREFs: 00402c00 W, 00404045 R,
 // 00404b80 R -- never written again).
-unsigned long G_ScreenQuadCurrentListKey = 0xffffffffu;
+uint32_t G_ScreenQuadCurrentListKey = 0xffffffffu;
 
 // FUN_00403ea0 (cdecl: pipeline, list key), listing-traced 0x00403ea0..0x004042bf.
-void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
+void ScreenQuadFlush(IRenderPipeline* Pipe, uint32_t Key)
 {
     // 0x00403ec6..0x00403f69: three savers on the caller's pipeline (slot 61 read, slot 60
     // write): 0x88 -> 0, 0x8b -> -1, 0x16 -> 1. They restore in reverse order at the end
@@ -1151,7 +1138,7 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
         // through FUN_004045d0(DAT_006101d8, 0, 1).
         if (G_ActiveContainer == nullptr)
         {
-            std::pair<std::map<unsigned long, FScreenQuadBatchEntry>::iterator, bool> const
+            std::pair<std::map<uint32_t, FScreenQuadBatchEntry>::iterator, bool> const
                 Inserted = G_BatchMap.try_emplace(G_MaterialListKey);
             G_ActiveContainer = &Inserted.first->second.Container;
             if (Inserted.second)
@@ -1163,7 +1150,7 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
     else
     {
         // 0x0040415f..0x00404200: FUN_00432240 (find); the end node -> nothing drawn.
-        std::map<unsigned long, FScreenQuadBatchEntry>::iterator const Found =
+        std::map<uint32_t, FScreenQuadBatchEntry>::iterator const Found =
             G_BatchMap.find(Key);
         if (Found != G_BatchMap.end())
             FlushContainer(&Found->second.Container);
@@ -1193,7 +1180,7 @@ void ScreenQuadFlush(IRenderPipeline* Pipe, unsigned long Key)
 // (0x11) forced to 1 (point).
 unsigned char G_BigImageTilePointFilter = 1;
 
-void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long PackedColor,
+void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, uint32_t PackedColor,
                                         float* DestXy, float* UvQuad)
 {
     // FUN_00404720 (cdecl, RET), listing-traced 0x00404720..0x00404cdb. No argument is checked.
@@ -1258,12 +1245,12 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long Packe
 
     // 0x00404a2a..0x00404a53: the frame {handle, UvQuad[0], UvQuad[7], UvQuad[6], UvQuad[1]}
     // (u0, v0, u1, v1), copied as dwords.
-    unsigned long Frame[5];
-    Frame[0] = static_cast<unsigned long>(reinterpret_cast<uintptr_t>(TextureHandle));
-    memcpy(&Frame[1], &UvQuad[0], sizeof(unsigned long));
-    memcpy(&Frame[2], &UvQuad[7], sizeof(unsigned long));
-    memcpy(&Frame[3], &UvQuad[6], sizeof(unsigned long));
-    memcpy(&Frame[4], &UvQuad[1], sizeof(unsigned long));
+    uint32_t Frame[5];
+    Frame[0] = static_cast<uint32_t>(fl::PtrToHandle(TextureHandle));
+    memcpy(&Frame[1], &UvQuad[0], sizeof(uint32_t));
+    memcpy(&Frame[2], &UvQuad[7], sizeof(uint32_t));
+    memcpy(&Frame[3], &UvQuad[6], sizeof(uint32_t));
+    memcpy(&Frame[4], &UvQuad[1], sizeof(uint32_t));
 
     // 0x00404a57..0x00404a73: FUN_00402f40, then FUN_004045d0(frame, blend 2, bFind 0) -> ESI.
     FScreenQuadBatchNode* const Node =
@@ -1307,7 +1294,7 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, unsigned long Packe
             Rec.V0 = V0;
             Rec.U1 = U1;
             Rec.V1 = V1;
-            Rec.ColorBits = PackColorAsFloatBits(static_cast<unsigned>(PackedColor));
+            Rec.ColorBits = PackedColor;
             AppendRecordToNode(Node, Rec);
 
             // 0x00404b80..0x00404b94: FUN_00403ea0(DALib::Pipeline, DAT_0061648c).

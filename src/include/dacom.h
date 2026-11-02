@@ -14,7 +14,7 @@
 
 #include "dacom_iids.h"  // every "1.11_*" interface id, in one place
 
-typedef long GENRESULT;
+typedef int32_t GENRESULT;   // retail: 32-bit (long); a 64-bit long would make (GENRESULT)0xFFFFFFFD positive
 
 // Shared DACOM result codes; module-specific failures remain with their modules.
 static const GENRESULT GR_OK = 0;
@@ -28,8 +28,8 @@ static const GENRESULT GR_OUT_OF_MEMORY = (GENRESULT)0xFFFFFFFC;
 struct IDAComponent
 {
     virtual GENRESULT DACOM_API QueryInterface(const char* iid, void** out) = 0;
-    virtual unsigned long DACOM_API AddRef() = 0;
-    virtual unsigned long DACOM_API Release() = 0;
+    virtual uint32_t DACOM_API AddRef() = 0;
+    virtual uint32_t DACOM_API Release() = 0;
 };
 
 // Aggregate initialization is defined by the concrete component.
@@ -40,18 +40,18 @@ struct IAggregateComponent : IDAComponent
 
 struct AGGDESC
 {
-    unsigned long size;
+    uint32_t size;
     const char* interface_name;
 };
 
 // Aggregated factory descriptor: OuterUnknown controls identity; InnerUnknown receives ownership.
 struct FAGGDESC14
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     IDAComponent* OuterUnknown;
     IDAComponent** InnerUnknown;
-    unsigned long Reserved10;
+    uint32_t Reserved10;
 };
 
 // ICOManager::EnumerateComponents callback. Retail 065b24e0 calls it cdecl as
@@ -99,15 +99,15 @@ struct IRegExp : IDAComponent
 namespace DACOM_CRC
 {
     // Retail dacom.dll — CRC32 over lowercased name; keys FUN_065b21e0 / FUN_065b2100 tree.
-    unsigned long __cdecl GetCRC32(const char* str);
+    uint32_t __cdecl GetCRC32(const char* str);
     // Retail FUN_065b60b0 (export ordinal 3, ?GetCRC32@DACOM_CRC@@YAKPBD0@Z). begin == end
     // returns 0; any other range never terminates (retail has no exit test). No importer.
-    unsigned long __cdecl GetCRC32(const char* begin, const char* end);
+    uint32_t __cdecl GetCRC32(const char* begin, const char* end);
     // Retail FUN_065b6140 — continues a prior GetCRC32/GetContinuedCRC32 result over another
     // string (null str -> initial_crc unchanged; GetContinuedCRC32(0, s) == GetCRC32(s)).
-    unsigned long __cdecl GetContinuedCRC32(unsigned long initial_crc, const char* str);
+    uint32_t __cdecl GetContinuedCRC32(uint32_t initial_crc, const char* str);
     // Retail FUN_065b6190 — single-character overload, one CRC table step over ch (case-folded).
-    unsigned long __cdecl GetContinuedCRC32(unsigned long initial_crc, char ch);
+    uint32_t __cdecl GetContinuedCRC32(uint32_t initial_crc, char ch);
     int __cdecl CompareStringsI(const char* a, const char* b);
 }
 
@@ -115,7 +115,7 @@ namespace LogStream
 {
     // ?LogEvent@LogStream@@YAXPBDMK@Z (dacom.dll export, dacom.def). freelancer.exe imports it
     // through .rdata:005c6d1c (sole caller 0x0052fcc5, "Timing_cu.collide.num_bullets").
-    void __cdecl LogEvent(const char* Name, float Value, unsigned long Flags);
+    void __cdecl LogEvent(const char* Name, float Value, uint32_t Flags);
 }
 
 #ifdef DACOM_EXPORTS

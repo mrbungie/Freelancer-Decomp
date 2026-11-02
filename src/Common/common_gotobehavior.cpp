@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_gotobehavior.h"
+#include "fl/handles.h"
 #include "common_iface.h"   // IObjInspect / IObjRW, ObjInspectOf, ObjRwFromWatchable
 #include "common_csys.h"          // Transform, Matrix, Acquire3DMathEngine
 #include "common_systemmanager.h" // SystemManager: CachedPhysicalCenter/Radius, Flags1578, ExternalIface
@@ -1053,7 +1054,7 @@ EvaluateResult GotoBehavior::evaluate(unsigned int Context)
 // when their object's get_id() (+0x20) equals the argument.
 void GotoBehavior::Slot21(void* Arg)
 {
-    unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
+    unsigned int const LeftId = static_cast<unsigned int>(fl::PtrToHandle(Arg));
     IObjRW* const Dest = ObjRwFromWatchable(const_cast<Watchable*>(Watcher310.target()));
     if (Dest != nullptr && Dest->get_id() == LeftId)
         Watcher310.set(nullptr);

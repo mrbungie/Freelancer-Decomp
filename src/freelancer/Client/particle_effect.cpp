@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "particle_effect.h"
+#include "fl/handles.h"
 
 #include "alchemy_float_forward.h"
 
@@ -195,7 +196,7 @@ unsigned char ParticleEffectCreateAlchemyNodes(FParticleEffect* This)
 
     // 0x004f83ea..0x004f8403: FxEffectLibrary vt+0x18 CreateEffect(FxNode, effect_crc,
     // &+0x6c) -- the out pointer is the member itself.
-    unsigned long const Key = This->Vis->EffectCrc;
+    uint32_t const Key = This->Vis->EffectCrc;
     GENRESULT const Hr = DALib::FxEffectLibrary->CreateEffect(
         This->FxNode, reinterpret_cast<void*>(Key), &This->FxEffect);
     if (Hr != GR_OK)
@@ -444,7 +445,7 @@ unsigned char FParticleEffect::UpdateVisibility(float Dt, FSpaceCamera* Cam)
             else
             {
                 // 0x004f8798: inside another field than the camera's.
-                if (DrawStateA != static_cast<unsigned>(reinterpret_cast<uintptr_t>(Field)))
+                if (DrawStateA != static_cast<unsigned>(fl::PtrToHandle(Field)))
                     return 0;
 
                 // 0x004f87ae..0x004f8827: the world transform (FUN_004f7ef0 inlined; the

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "ui_fast_table.h"
+#include "fl/handles.h"
 
 #include "font_string.h"
 #include "ids_rdl.h"
@@ -44,9 +45,9 @@ namespace
 
     // .data DAT_00615550 / DAT_00615554 / DAT_00615558, read only by the constructor
     // (0x0058c83e..0x0058c861), each copied as one dword.
-    unsigned long const kUiFastTableFrameRgba = 0xff00ff00ul;
-    unsigned long const kUiFastTableSelectedRgba = 0xa00000a0ul;
-    unsigned long const kUiFastTableHoveredRgba = 0x80808080ul;
+    uint32_t const kUiFastTableFrameRgba = 0xff00ff00ul;
+    uint32_t const kUiFastTableSelectedRgba = 0xa00000a0ul;
+    uint32_t const kUiFastTableHoveredRgba = 0x80808080ul;
 
     // The seven render states both halves of Draw set (0x0058eb41..0x0058ebd3 and
     // 0x0058edf0..0x0058ee83): pipeline slot +0xf0.
@@ -603,7 +604,7 @@ bool UiFastTable::SelectRow(unsigned Row)
     SelectedRow = Row;
     bSelected = 1;
     if (Parent != nullptr && bChanged)
-        Parent->Slot23(0x300du, static_cast<unsigned>(reinterpret_cast<uintptr_t>(this)), Row);
+        Parent->Slot23(0x300du, static_cast<unsigned>(fl::PtrToHandle(this)), Row);
     return true;
 }
 
@@ -616,7 +617,7 @@ bool UiFastTable::GetSelectedRow(unsigned* OutRow)
     return true;
 }
 
-void UiFastTable::SetFrameColor(unsigned long const* Rgba)
+void UiFastTable::SetFrameColor(uint32_t const* Rgba)
 {
     // FUN_0058d560
     FrameRgba = *Rgba;
@@ -685,7 +686,7 @@ void UiFastTable::SetTipMode(int Mode)
     }
 
     // 0x0058d896..0x0058d8c8: every record reset, keyed this + 1 + index, IdsAlt 0.
-    int Key = static_cast<int>(reinterpret_cast<intptr_t>(this)) + 1;
+    int Key = static_cast<int>(fl::PtrToHandle(this)) + 1;
     for (std::vector<FUiFastTableTip>::iterator It = Tips.begin(); It != Tips.end(); ++It)
     {
         ToolTipHoverReset(&It->Info); // FUN_004963a0
@@ -1111,7 +1112,7 @@ void UiFastTable::Update()
     MouseSetCursor("Arrow", false); // FUN_0041dde0("Arrow", 0)
 }
 
-void UiFastTable::DrawRowQuad(unsigned long const* Rgba, unsigned Row) const
+void UiFastTable::DrawRowQuad(uint32_t const* Rgba, unsigned Row) const
 {
     Win3DColor4ubv(reinterpret_cast<unsigned char const*>(Rgba));
     Win3DBegin(kWin3DQuads);
@@ -1214,7 +1215,7 @@ void UiFastTable::Draw()
         while (!RowEdges.empty() && Last + 1 < RowEdges.size() && Rows[Last + 1].GroupId == Group)
             ++Last;
     }
-    unsigned long Color = 0;
+    uint32_t Color = 0;
     NnUiPulseBlendFromArgb(&Color, G_NnPaletteArgb_679ba4);   // FUN_00561f20(&c, DAT_00679ba4)
     Win3DColor4ubv(reinterpret_cast<unsigned char const*>(&Color));
     Win3DBegin(kWin3DLineLoop);
@@ -1257,7 +1258,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
                 bool const bChanged = !(bSelected != 0 && SelectedRow == Row);
                 SelectedRow = Row;
                 bSelected = 1;
-                unsigned const Self = static_cast<unsigned>(reinterpret_cast<uintptr_t>(this));
+                unsigned const Self = static_cast<unsigned>(fl::PtrToHandle(this));
                 if (Parent != nullptr && bChanged)
                     Parent->Slot23(0x300du, Self, Row);
                 if (Parent != nullptr)
@@ -1269,7 +1270,7 @@ bool UiFastTable::MouseEvent(FWin3DMouseEvent const* Event)
 
     if (Event->Field1 == 2)
     {
-        unsigned const Self = static_cast<unsigned>(reinterpret_cast<uintptr_t>(this));
+        unsigned const Self = static_cast<unsigned>(fl::PtrToHandle(this));
         if (bHovered != 0)
         {
             unsigned const Row = HoveredRow;
@@ -1414,7 +1415,7 @@ bool UiScrollTable::Slot23(unsigned Msg, unsigned A, unsigned B)
     // horizontal bar (+0x3f4) is swallowed; anything else is BaseRichTextWin's (FUN_0057afd0).
     if (Msg == 0xf005u)
     {
-        if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBar)))
+        if (A == static_cast<unsigned>(fl::PtrToHandle(ScrollBar)))
         {
             if (Callback != nullptr)
             {
@@ -1424,7 +1425,7 @@ bool UiScrollTable::Slot23(unsigned Msg, unsigned A, unsigned B)
             }
             return true;
         }
-        if (A == static_cast<unsigned>(reinterpret_cast<uintptr_t>(ScrollBarH)))
+        if (A == static_cast<unsigned>(fl::PtrToHandle(ScrollBarH)))
             return true;
     }
     return BaseRichTextWin::Slot23(Msg, A, B);

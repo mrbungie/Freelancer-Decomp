@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "MissionObject.h"
+#include "fl/handles.h"
 
 // TU38 static IDs 06f0e000..06f0e1e0, then "default" 06f0e200.
 #include "ContentStaticIds.h"
@@ -3224,7 +3225,7 @@ bool FMissionObject::SpawnMissionSolarRecord(FMissionSolar* Solar)
     // PosSelectionType 3 into the same dword (06f16b4a). FUN_06f4f7c0 overwrites it only when the
     // faction has voices, so otherwise FUN_06f4f430 compares this leftover (a heap pointer or 3)
     // with the costume genders (0/1/2) and never matches.
-    int GenderSlot = static_cast<int>(reinterpret_cast<uintptr_t>(System));
+    int GenderSlot = static_cast<int>(fl::PtrToHandle(System));
     Vector Position = Solar->Position;
     if (PlayerSystem != nullptr && Solar->Radius > 0.0f)
     {

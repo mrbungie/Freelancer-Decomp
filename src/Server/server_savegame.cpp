@@ -26,6 +26,7 @@
 //    is PlayerData_LoadSelectedCharacter below.
 
 #include "../include/common_pub.h"
+#include "fl/handles.h"
 #include "../include/common_server.h"          // Players (PlayerDB::operator[])
 #include "../include/common_server_playerdb.h"
 #include "../include/server_savegame.h"
@@ -177,7 +178,7 @@ FmtStr ReadMissionLogEntry(INI_Reader& Reader, unsigned int& Index) {
         int const Data = Reader.get_value_int(Index++);
         int const Tag = Reader.get_value_int(Index++);
         unsigned char const Flags = static_cast<unsigned char>(Reader.get_value_int(Index++));
-        void* DataPointer = reinterpret_cast<void*>(static_cast<intptr_t>(Data));
+        void* DataPointer = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Data)));
         if (static_cast<short>(Tag) == 0x21) {
             // operator new(0x18) then this same function into it (.text:06d4cb5f /
             // .text:06d4cb7b). The Val below owns it (FmtStr::Val::~Val deletes a

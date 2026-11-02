@@ -127,7 +127,9 @@ unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
     unsigned int Count = static_cast<unsigned int>(DestChars - 1);
     if (!(Count < Length))
         Count = Length;
-    wcsncpy(Dest, reinterpret_cast<wchar_t const*>(Cursor + 1), Count);
+    // The resource holds UTF-16 code units (retail wchar_t is 2 bytes); widen them.
+    for (unsigned int Index = 0; Index < Count; ++Index)
+        Dest[Index] = static_cast<wchar_t>(Cursor[1 + Index]);
     Dest[Count] = L'\0';
     return Count;
 }

@@ -35,6 +35,15 @@ extern "C"
 
 namespace
 {
+    // x87 FISTP with round-toward-zero as used by retail's chop control word.
+    // Out-of-range/NaN inputs produce the x86 "integer indefinite" value.
+    inline long long PortableChopToInt64(double Value)
+    {
+        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
+            return static_cast<long long>(0x8000000000000000ULL);
+        return static_cast<long long>(Value);
+    }
+
     const int kFdumpError = 0x100001;
     const char* const kLuaParserCpp = "LuaScriptParser.cpp";
 
@@ -1373,7 +1382,7 @@ namespace
                 Common.EventFlags = LuaNumberToRetailInt(EventFlags);
             const lua_Object Curve = GetFieldOrNil(Props, "param_curve");
             if (lua_isnil(Curve) == 0 && lua_istable(Curve) != 0)
-                CreateCurveFromLua(&Common.ParamCurve, Curve);
+                { IParamCurve* NewCurve = nullptr; CreateCurveFromLua(&NewCurve, Curve); Common.ParamCurve = NewCurve; }
             const lua_Object Period = GetFieldOrNil(Props, "pcurve_period");
             if (lua_isnil(Period) == 0)
                 Common.Field28 = LuaNumberToRetailInt(Period);
@@ -1896,28 +1905,28 @@ namespace
         lua_endblock();
     }
 
-    unsigned long IfsAddRef(void* FileSystem)
+    uint32_t IfsAddRef(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->AddRef();
     }
 
-    unsigned long IfsRelease(void* FileSystem)
+    uint32_t IfsRelease(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->Release();
     }
 
-    unsigned long IfsGetSize(void* FileSystem)
+    uint32_t IfsGetSize(void* FileSystem)
     {
         if (FileSystem == nullptr)
             return 0;
         return static_cast<IFileSystem*>(FileSystem)->GetSize(0, 0); // +0x28
     }
 
-    int IfsRead(void* FileSystem, void* Buffer, unsigned long Size, unsigned long* BytesRead)
+    int IfsRead(void* FileSystem, void* Buffer, uint32_t Size, uint32_t* BytesRead)
     {
         if (BytesRead != nullptr)
             *BytesRead = 0;
@@ -1926,7 +1935,7 @@ namespace
         return static_cast<IFileSystem*>(FileSystem)->Read(0, Buffer, Size, BytesRead, 0); // +0x14
     }
 
-    void IfsGetFileSysPath(void* FileSystem, char* Out, unsigned long MaxChars)
+    void IfsGetFileSysPath(void* FileSystem, char* Out, uint32_t MaxChars)
     {
         if (Out == nullptr || MaxChars == 0)
             return;
@@ -2013,14 +2022,14 @@ namespace
             return GR_OK;
         FileSystem->AddRef();
         std::unique_ptr<IFileSystem, FParserFileSystemRelease> Reference(FileSystem);
-        const unsigned long Size = FileSystem->GetSize(0, 0);
+        const uint32_t Size = FileSystem->GetSize(0, 0);
         if (Size < 1)
         {
             FdumpLuaError(0x481, "LUA unable to read file \n");
             return static_cast<GENRESULT>(-1);
         }
         char* Buffer = new char[Size + 1];
-        unsigned long BytesRead = 0;
+        uint32_t BytesRead = 0;
         FileSystem->Read(0, Buffer, Size, &BytesRead, 0);
         if (BytesRead != Size)
         {

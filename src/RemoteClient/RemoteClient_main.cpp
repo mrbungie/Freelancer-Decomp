@@ -5,6 +5,8 @@
 // Author: Giperion.
 
 #include <windows.h>
+#include <cstring>
+#include "platform/fl_x87.h"
 #include "ClientImpl.h"
 #include "rpc_packet.h"
 #include "rpc_packet_codec.h"
@@ -135,7 +137,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                 Server->TerminateTrade(ClientId, Wire->Reason);
                 break;
             case 0x04:
-                Server->SetTradeMoney(ClientId, static_cast<unsigned long>(Wire->Money));
+                Server->SetTradeMoney(ClientId, static_cast<uint32_t>(Wire->Money));
                 break;
             case 0x08:
             {
@@ -596,7 +598,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             const FRpcRequestEventPacket* Wire = static_cast<const FRpcRequestEventPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             const int Tail = static_cast<signed char>(Wire->Field_0x10);
             Server->RequestEvent(static_cast<int>(Wire->EventType), Wire->Arg1, Wire->Arg2, Wire->Arg3,
-                                 static_cast<unsigned long>(Tail), ClientId);
+                                 static_cast<uint32_t>(Tail), ClientId);
             break;
         }
         case 0x32: // FLPACKET_CLIENT_REQUEST_CANCEL
@@ -604,7 +606,7 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
             const FRpcRequestCancelPacket* Wire = static_cast<const FRpcRequestCancelPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
             const int Tail = static_cast<signed char>(Wire->Field_0x0c);
             Server->RequestCancel(static_cast<int>(Wire->EventType), Wire->Arg1, Wire->Arg2,
-                                  static_cast<unsigned long>(Tail), ClientId);
+                                  static_cast<uint32_t>(Tail), ClientId);
             break;
         }
         case 0x35: // FLPACKET_CLIENT_INTERFACEITEMUSED

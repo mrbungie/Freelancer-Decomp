@@ -495,7 +495,7 @@ public:
     FThornEventDesc SetCameraDesc; // actual type-2 common-only owner (44e60).
     FThornFloorEventDesc FloorDesc; // actual type-18 live 56-byte owner (49570).
     FThornPathEventDesc PathDesc; // actual type-6 live 76-byte owner (450a0).
-    IParamCurve*& ParamCurve;
+    fl::Slot32<IParamCurve>& ParamCurve;
     FThornEventDesc& Desc;
     int& PcurvePeriod;
     float TargetPos[3];
@@ -545,8 +545,8 @@ public:
     void AdoptConnectStringStorage();
     void ReleaseConnectStringStorage();
     char* EndEffector;
-    const char* LegacyTargetPart;
-    const char*& TargetPart;
+    fl::Slot32<const char> LegacyTargetPart;
+    fl::Slot32<const char>& TargetPart;
     FThornConnectString IkEndEffectorStorage;
     FThornConnectString IkTargetPartStorage;
     bool bIkStorageActive = false;
@@ -653,12 +653,12 @@ public:
     FThornEntity* EntityAt(int Index);
     const FThornEntity* EntityAt(int Index) const;
 
-    unsigned long EntityCount() const;
-    unsigned long LiveEntityCount() const;
+    uint32_t EntityCount() const;
+    uint32_t LiveEntityCount() const;
     void* EntityHandle(int Index);
     FThornEntitySnap* EntitySnap(int Index);
     FThornEntitySnap* EntitySnapInorder(int Index);
-    unsigned long UserPropCount(int Index) const;
+    uint32_t UserPropCount(int Index) const;
     const char* UserPropKey(int Index, int N) const;
     GENRESULT GetEntityPos(int Index, float* OutVec3);
     GENRESULT GetEntityOrient(int Index, float* OutMat9);
@@ -675,7 +675,7 @@ public:
     GENRESULT SaveToFileSystem(void* FileSystem, IThornComContext* ComContext,
                                unsigned int SavedDurationMs);
 
-    unsigned long EventCount() const { return static_cast<unsigned long>(MasterCount_); }
+    uint32_t EventCount() const { return static_cast<uint32_t>(MasterCount_); }
     void* EventDescByIndex(int Index);
     void* EventDescById(int Id);
     bool HasEventType(int Type) const;

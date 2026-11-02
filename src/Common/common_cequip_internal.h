@@ -16,6 +16,7 @@
 // added guards retail does not have and were removed (cmn-s2-eqa, 2026-10-14).
 
 #include "common_cequip.h"
+#include "fl/handles.h"
 #include "common_cobject.h"   // CEqObj
 #include "common_goods.h"     // BaseWatcher (WatchedTarget)
 #include "DALib.h"            // DALib::Engine, G_EngineJointPayloadDwords (FJointRelative)
@@ -27,7 +28,7 @@ namespace CmnCequip
 {
     const char kCAttachedEquipSource[] = "E:\\FL\\Scratch\\Source\\Common\\CAttachedEquip.cpp";
     const unsigned kAttachedEquipMask = 0x1fe0u;
-    const long kInvalidEngineInstance = -1;
+    const int32_t kInvalidEngineInstance = -1;
 
     void* WatchedTarget(BaseWatcher const& Watcher);
 
@@ -37,7 +38,7 @@ namespace CmnCequip
     // (joint at ESP+0x30, the next local at ESP+0x8c), and from CEGun's readers.
     struct FJointRelative
     {
-        unsigned long Type;   // +0x00  2 = revolute
+        uint32_t Type;   // +0x00  2 = revolute
         Vector ParentPos;     // +0x04  the parent hardpoint position
         Vector ChildPos;      // +0x10  the child hardpoint position
         Matrix Orient;        // +0x1c  parent * child hardpoint orientation
@@ -46,15 +47,15 @@ namespace CmnCequip
         float Max;            // +0x50
         // TODO: +0x54/+0x58 are never written by FUN_062940c0 (stack garbage in retail); a
         // revolute joint does not use them.
-        unsigned long Field_0x54;
-        unsigned long Field_0x58;
+        uint32_t Field_0x54;
+        uint32_t Field_0x58;
     };
-    static_assert(sizeof(FJointRelative) == G_EngineJointPayloadDwords * sizeof(unsigned long),
+    static_assert(sizeof(FJointRelative) == G_EngineJointPayloadDwords * sizeof(uint32_t),
                   "FJointRelative is the whole IEngine joint block");
 
     // IEngine+0xc4 for an instance id (retail never tests the result for null where it reads it).
-    inline FJointRelative const* InstanceRelative(long Instance)
+    inline FJointRelative const* InstanceRelative(int32_t Instance)
     {
-        return (FJointRelative const*)DALib::Engine->GetInstanceRelative((void*)Instance);
+        return (FJointRelative const*)DALib::Engine->GetInstanceRelative((void*)fl::HandleToPtr(Instance));
     }
 }

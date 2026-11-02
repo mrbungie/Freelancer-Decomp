@@ -40,7 +40,7 @@ namespace
     // 06300d3d, 06300e8c): atol(Name), CreateID(Name) when that is 0. No null test.
     unsigned NicknameToCreateId(char const* Name)
     {
-        long Parsed = MsvcrtAtoi(Name);
+        int32_t Parsed = MsvcrtAtoi(Name);
         if (Parsed == 0)
             return CreateID(Name);
         return (unsigned)Parsed;
@@ -124,7 +124,7 @@ void bodypart::init(char const* Nickname, char const* InMesh, int InSex,
 {
     // 0x062ff060: Id = atol(nickname), CreateID(nickname) when that is 0; Mesh = InMesh;
     // [+0x14] = InSex, [+0x1c] = InPetalAnimations, [+0x18] = InSwitch. No null checks.
-    Id = (unsigned long)MsvcrtAtoi(Nickname);
+    Id = (uint32_t)MsvcrtAtoi(Nickname);
     if (Id == 0)
         Id = CreateID(Nickname);
     Mesh = InMesh;
@@ -133,7 +133,7 @@ void bodypart::init(char const* Nickname, char const* InMesh, int InSex,
     Switch = InSwitch;
 }
 
-unsigned long bodypart::get_name_crc() const
+uint32_t bodypart::get_name_crc() const
 {
     // 0x06261d90: MOV EAX,[ECX]
     return Id;
@@ -181,7 +181,7 @@ void accessory::init(char const* Nickname, char const* InMesh, char const* InAcc
 {
     // 0x062ff2f0: Id as bodypart::init; the three strings assigned in order; the list
     // assigned only when it is not this accessory's own (062ff3f4 compares the addresses).
-    Id = (unsigned long)MsvcrtAtoi(Nickname);
+    Id = (uint32_t)MsvcrtAtoi(Nickname);
     if (Id == 0)
         Id = CreateID(Nickname);
     Mesh = InMesh;
@@ -191,7 +191,7 @@ void accessory::init(char const* Nickname, char const* InMesh, char const* InAcc
         Materials = InMaterials;
 }
 
-unsigned long accessory::get_name_crc() const
+uint32_t accessory::get_name_crc() const
 {
     // 0x06261d90: MOV EAX,[ECX]
     return Id;
@@ -605,7 +605,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
             {
                 // 06300d35-06300d97: find_accessory(atol / CreateID of the value).
                 char const* AccName = Reader.get_value_string();
-                accessory const* Acc = find_accessory((unsigned long)NicknameToCreateId(AccName));
+                accessory const* Acc = find_accessory((uint32_t)NicknameToCreateId(AccName));
                 if (Acc != nullptr)
                 {
                     // 06300d61-06300d69: Accessories[Count++] = Acc with no bound. Retail UB: a
@@ -641,7 +641,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
                 // fills Parts[type] and the first non-zero part sex becomes the gender.
                 char const* PartName = Reader.get_value_string();
                 bodypart const* Part =
-                    find_bodypart(TypeId, (unsigned long)NicknameToCreateId(PartName));
+                    find_bodypart(TypeId, (uint32_t)NicknameToCreateId(PartName));
                 if (Part != nullptr)
                 {
                     Scratch.Parts[TypeId] = Part;
@@ -667,7 +667,7 @@ void CostumeDescriptions::load_costumes(char const* Path)
     Reader.close();
 }
 
-bodypart const* CostumeDescriptions::find_bodypart(int TypeId, unsigned long NicknameId) const
+bodypart const* CostumeDescriptions::find_bodypart(int TypeId, uint32_t NicknameId) const
 {
     // 0x062ff7d0: Bodyparts[TypeId] with no range check on TypeId; returns node+0x10, the
     // address of the mapped bodypart, or null at the end sentinel.
@@ -683,7 +683,7 @@ bodypart const* CostumeDescriptions::find_bodypart(int TypeId, char const* Name)
     return find_bodypart(TypeId, NicknameToCreateId(Name));
 }
 
-accessory const* CostumeDescriptions::find_accessory(unsigned long NicknameId) const
+accessory const* CostumeDescriptions::find_accessory(uint32_t NicknameId) const
 {
     // 0x062ff8b0: returns the address of the mapped accessory (node+0x10), or null.
     std::map<unsigned, accessory>::const_iterator It =
@@ -698,7 +698,7 @@ accessory const* CostumeDescriptions::find_accessory(char const* Name) const
     return find_accessory(NicknameToCreateId(Name));
 }
 
-costume const* CostumeDescriptions::find_costume(unsigned long NicknameId) const
+costume const* CostumeDescriptions::find_costume(uint32_t NicknameId) const
 {
     // 0x062ff990: returns the address of the mapped costume (node+0x10), or null.
     std::map<unsigned, costume>::const_iterator It =
@@ -713,7 +713,7 @@ costume const* CostumeDescriptions::find_costume(char const* Name) const
     return find_costume(NicknameToCreateId(Name));
 }
 
-unsigned long CostumeDescriptions::find_costume_id(char const* Name) const
+uint32_t CostumeDescriptions::find_costume_id(char const* Name) const
 {
     costume const* Desc = find_costume(Name);
     if (Desc == nullptr)
@@ -721,7 +721,7 @@ unsigned long CostumeDescriptions::find_costume_id(char const* Name) const
     return Desc->Id;
 }
 
-unsigned long CostumeDescriptions::find_part_id(int TypeId, char const* Name) const
+uint32_t CostumeDescriptions::find_part_id(int TypeId, char const* Name) const
 {
     bodypart const* Part = find_bodypart(TypeId, Name);
     if (Part == nullptr)
@@ -729,7 +729,7 @@ unsigned long CostumeDescriptions::find_part_id(int TypeId, char const* Name) co
     return Part->Id;
 }
 
-char const* CostumeDescriptions::get_part_name(int TypeId, unsigned long NicknameId) const
+char const* CostumeDescriptions::get_part_name(int TypeId, uint32_t NicknameId) const
 {
     bodypart const* Part = find_bodypart(TypeId, NicknameId);
     if (Part == nullptr)
@@ -746,7 +746,7 @@ char const* CostumeDescriptions::get_part_name(int TypeId, unsigned long Nicknam
     return Part->get_name();
 }
 
-char const* CostumeDescriptions::get_part_mesh(int TypeId, unsigned long NicknameId) const
+char const* CostumeDescriptions::get_part_mesh(int TypeId, uint32_t NicknameId) const
 {
     bodypart const* Part = find_bodypart(TypeId, NicknameId);
     if (Part == nullptr)
@@ -754,7 +754,7 @@ char const* CostumeDescriptions::get_part_mesh(int TypeId, unsigned long Nicknam
     return Part->get_mesh();
 }
 
-unsigned long CostumeDescriptions::find_accessory_id(char const* Name) const
+uint32_t CostumeDescriptions::find_accessory_id(char const* Name) const
 {
     accessory const* Acc = find_accessory(Name);
     if (Acc == nullptr)
@@ -769,7 +769,7 @@ void CostumeDescriptions::get_costume(char const* Name, Costume& Out) const
 
 void CostumeDescriptions::get_costume(int NicknameId, Costume& Out) const
 {
-    costume const* Desc = find_costume((unsigned long)NicknameId);
+    costume const* Desc = find_costume((uint32_t)NicknameId);
     if (Desc == nullptr)
     {
         FDUMP(0x100001, "%s(%d) : *** ERROR: Costume id %x does not exist\n",
@@ -816,7 +816,7 @@ int CostumeDescriptions::get_costume_gender(Costume const& Cost) const
     return Gender;
 }
 
-int CostumeDescriptions::get_costume_gender(unsigned long NicknameId) const
+int CostumeDescriptions::get_costume_gender(uint32_t NicknameId) const
 {
     costume const* Desc = find_costume(NicknameId);
     if (Desc == nullptr)

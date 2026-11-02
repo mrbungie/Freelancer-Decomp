@@ -215,10 +215,10 @@ void TRANode::Execute(TextRenderContext& Ctx, bool)
     //   merged &= Mask   -- Mask selects which bits this node actually applies at all.
     //   ctx.CurrentAttrs.Packed = merged | (ctx.CurrentAttrs.Packed & ~Mask)   -- bits
     //            outside Mask are left untouched in the context.
-    unsigned long CurrentSrc = Ctx.get_default_attributes().Packed;
-    unsigned long Merged = (Attrs.Packed & ~DefaultMask) | (CurrentSrc & DefaultMask);
+    uint32_t CurrentSrc = Ctx.get_default_attributes().Packed;
+    uint32_t Merged = (Attrs.Packed & ~DefaultMask) | (CurrentSrc & DefaultMask);
     Merged &= Mask;
-    unsigned long PrevCurrent = Ctx.get_current_attributes().Packed;
+    uint32_t PrevCurrent = Ctx.get_current_attributes().Packed;
     TextRenderAttributes NewAttrs;
     NewAttrs.Packed = Merged | (PrevCurrent & ~Mask);
     Ctx.set_current_attributes(NewAttrs);

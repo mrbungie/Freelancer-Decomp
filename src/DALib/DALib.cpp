@@ -38,7 +38,7 @@ namespace
     // SystemContainer uses the extended descriptor; other factories consume its prefix.
     struct FNamedAggDesc
     {
-        unsigned long Size;
+        uint32_t Size;
         const char* Name;
         void* Outer;
         void* InnerOut;
@@ -46,7 +46,7 @@ namespace
     };
 
     // Kept across calls for Shutdown's trailing-reference checks.
-    unsigned long GLastReleaseCount = 0;
+    uint32_t GLastReleaseCount = 0;
 }
 
 // Retail .data:065ca2ac -- DALib's own module handle, stored by DllMain (.text:065c5d4c) and
@@ -217,7 +217,15 @@ bool __cdecl DALib::Startup(HWND Hwnd, const char* IniPath)
 
         // .text:065c148c-14a0: the host's verdict becomes Startup's return value.
         if (bAudioFailed)
+        {
+#if defined(FREELANCER_PORTABLE)
+            // PORT: there is no audio backend yet (DirectSound/ACM); run silent instead of raising the
+            // retail "audio failed" dialog, which also tears down the render manager.
+            fprintf(stderr, "[fl] audio device unavailable; continuing without sound\n");
+#else
             bResult = CriticalWarningFn(0xd3, nullptr);
+#endif
+        }
     }
 
     // .text:065c14a4-1553: CreateInstance writes DALib::Engine itself; on success the engine

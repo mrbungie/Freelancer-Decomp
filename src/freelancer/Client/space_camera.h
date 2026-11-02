@@ -47,8 +47,8 @@ enum ESpaceCameraSlot
 struct FSpaceCamera : ICamera
 {
     GENRESULT DACOM_API QueryInterface(char const* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     float const* DACOM_API GetPosition() override;
     float const* DACOM_API GetOrientation() override;
     int const* DACOM_API GetViewport() override;

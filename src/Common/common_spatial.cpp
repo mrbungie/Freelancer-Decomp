@@ -746,9 +746,9 @@ struct LinearPartition : public ISpatialPartition
     virtual int QueryRay(FSpatialRay const*, FSpatialQueryResult*) override { return 0; }
 
     // FUN_0632edf0: zero six dwords.
-    virtual void Slot24(unsigned long Out[6]) override
+    virtual void Slot24(uint32_t Out[6]) override
     {
-        memset(Out, 0, 6 * sizeof(unsigned long));
+        memset(Out, 0, 6 * sizeof(uint32_t));
     }
 };
 
@@ -784,9 +784,9 @@ struct BspPartition : public ISpatialPartition
     virtual int QueryRay(FSpatialRay const* Ray, FSpatialQueryResult* Result) override; // LAB_06330e70
 
     // FUN_0632edf0 (shared with LinearPartition).
-    virtual void Slot24(unsigned long Out[6]) override
+    virtual void Slot24(uint32_t Out[6]) override
     {
-        memset(Out, 0, 6 * sizeof(unsigned long));
+        memset(Out, 0, 6 * sizeof(uint32_t));
     }
 
 private:

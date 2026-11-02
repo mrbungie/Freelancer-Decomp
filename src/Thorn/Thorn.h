@@ -18,10 +18,10 @@
 static const char* const G_NameScriptEngine = "IScriptEngine";
 static const char* const G_Name3DMathEngine = "3DMathEngine";
 
-static const unsigned long G_ThornRegisterPriority = 0x40000000;
-static const unsigned long G_FactoryIidCompareBytes = 0x17; // "1.11_IComponentFactory" + NUL
-static const unsigned long G_AggDescSizeThorn = 0x14;
-static const unsigned long G_AggDescSizeMath = 0xC;
+static const uint32_t G_ThornRegisterPriority = 0x40000000;
+static const uint32_t G_FactoryIidCompareBytes = 0x17; // "1.11_IComponentFactory" + NUL
+static const uint32_t G_AggDescSizeThorn = 0x14;
+static const uint32_t G_AggDescSizeMath = 0xC;
 
 // x86math.h's FVector, which Thorn and SoundManager each used to redeclare.
 typedef FVector FVec3;
@@ -37,7 +37,7 @@ struct FQuat
 // Retail FUN_06f57de0 stack desc (size + name + unused +8).
 struct FAggDescC
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     void* Field8;
 };
@@ -45,7 +45,7 @@ struct FAggDescC
 // Thorn factories: size 0x14, +4 name, +8 outer, +0xC inner-out (not FAGGDESC14 IID layout).
 struct FThornAggDesc14
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* NameAt4;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -89,9 +89,9 @@ public:
         return Query_(Owner_, Iid, Out);
     }
 
-    unsigned long DACOM_API AddRef() override { return ++RefCount_; }
+    uint32_t DACOM_API AddRef() override { return ++RefCount_; }
 
-    unsigned long DACOM_API Release() override
+    uint32_t DACOM_API Release() override
     {
         // LAB_06f37890: `if (count) --count; if (count) return count;`
         if (RefCount_ != 0)
@@ -108,10 +108,10 @@ public:
         return 0;
     }
 
-    unsigned long RefCount() const { return RefCount_; }
+    uint32_t RefCount() const { return RefCount_; }
 
 private:
-    unsigned long RefCount_;
+    uint32_t RefCount_;
     void* Owner_;
     FThornInnerQueryFn Query_;
     FThornInnerDestroyFn Destroy_;
@@ -160,8 +160,8 @@ struct ICRSpline : IDAComponent
     // Retail outer wrappers validate an index against the inner spline and
     // forward these two-argument operations (this, index, output).
     virtual GENRESULT DACOM_API Slot3(unsigned int Index, float* OutPoint) = 0;
-    virtual GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, unsigned long Count) = 0;
-    virtual unsigned long DACOM_API Slot5() = 0;
+    virtual GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, uint32_t Count) = 0;
+    virtual uint32_t DACOM_API Slot5() = 0;
     virtual GENRESULT DACOM_API Slot6(unsigned int Index, float* OutPoint) = 0;
     virtual GENRESULT DACOM_API Slot7(unsigned int Index, float* OutValue) = 0;
     virtual GENRESULT DACOM_API Slot8(unsigned char bClosed) = 0;

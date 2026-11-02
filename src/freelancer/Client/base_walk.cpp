@@ -8,6 +8,7 @@
 #ifdef FREELANCER_WALK_MODE
 
 #include "base_walk.h"
+#include "fl/handles.h"
 #include "base_walk_math.h"
 
 #include "DALib.h"
@@ -212,7 +213,7 @@ namespace
         // Animation playback uses the resource's original spelling, unlike CreateID lookup.
         char const* const Name = It->second.Name.c_str();
         void* const Script = GetCharacterInfoDb()->AcquireScriptByName(Name);
-        if (Script == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+        if (Script == static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         {
             G_BaseWalk.MotionKind = Kind;
             return;
@@ -256,7 +257,7 @@ namespace
     bool AcquirePlayer(FRoomRuntime* Room, FCharacterObject* Player)
     {
         void* const Instance = Player->GetEngineInstance();
-        if (Instance == reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+        if (Instance == static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
             return false;
         FRoomCamera* const Camera = GetRoomRuntimeRoomCamera(Room);
         if (Camera == nullptr)
@@ -634,7 +635,7 @@ float BaseWalkGetInterfaceDrawOpacity()
     return G_BaseWalkInterfaceDrawOpacity;
 }
 
-unsigned long BaseWalkFadeInterfaceColor(unsigned long Argb, bool bAdditive)
+uint32_t BaseWalkFadeInterfaceColor(uint32_t Argb, bool bAdditive)
 {
     return FBaseWalkInterfaceFade::FadeColor(Argb, G_BaseWalkInterfaceDrawOpacity, bAdditive);
 }

@@ -17,6 +17,7 @@
 #include "../ivp_collision/ivp_listmanager_topology.h" // FUN_0635a1e0 / FUN_06358c50 / FUN_06355c10
 #include <cmath>
 #include <cstdint>
+#include "../ivp_utility/ivp_signed_byte.h" // IVP_SignedLowByte
 
 // The impact system, cmn-ivp3e 2026-10-08. Every function below was traced
 // against Common.dll.txt instruction by instruction; the x87 convention of the
@@ -183,7 +184,7 @@ void IVP_Mindist_Do_Impact(IVP_Ledge_Mindist* Mindist, IVP_Real_Object* ObjA, IV
     IVP_Core* const CoreB = ObjB->core;
     IVP_Core* const CoreA = ObjA->core;
     IVP_Simulation_Unit* const SimUnitNotDestroy =
-        (static_cast<int32_t>(ObjA->flags << 24) < 0x08000000) ? CoreB->OwningSimUnit : CoreA->OwningSimUnit;
+        (IVP_SignedLowByte(ObjA->flags) < 8) ? CoreB->OwningSimUnit : CoreA->OwningSimUnit;
 
     IVP_ListManager* Fs;
     int32_t HavingNewDist;
@@ -357,7 +358,7 @@ void IVP_Impact_System::recalc_pair_dists_except(IVP_ListManager_CorePairEntry* 
 // ---------------------------------------------------------------------------
 void IVP_Impact_System::synchronize_core_if_simulated(IVP_Core* Core)
 {
-    if (static_cast<int32_t>(Core->MovementState << 24) < 0x08000000)
+    if (IVP_SignedLowByte(Core->MovementState) < 8)
     {
         Core->recalc_interpolated_frame(); // FUN_06347240 (Ipion synchronize_with_rot_z)
     }

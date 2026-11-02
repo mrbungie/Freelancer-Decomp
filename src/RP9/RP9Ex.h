@@ -43,9 +43,9 @@ struct FRPExTexture
     // Render targets: the creation request (Width/Height 0 = BackBufferScale of the back buffer).
     FRPExRenderTargetDesc TargetDesc;
     // The current size (render targets: after the last re-creation).
-    unsigned long Width;
-    unsigned long Height;
-    unsigned long Depth;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Depth;
     // IDirect3DTexture9 (render target, scene depth) or IDirect3DVolumeTexture9.
     IDirect3DBaseTexture9* Texture;
     // Level 0 of a render target / the scene depth surface; null for volumes.
@@ -66,8 +66,8 @@ struct FRp9ExState
     // A plain depth surface made when the INTZ texture could not be created after the device
     // was already made without an auto depth-stencil.
     IDirect3DSurface9* FallbackDepth;
-    unsigned long BackBufferWidth;
-    unsigned long BackBufferHeight;
+    uint32_t BackBufferWidth;
+    uint32_t BackBufferHeight;
 
     // The open pass (BeginExPass .. EndExPass).
     bool bInPass;
@@ -77,17 +77,17 @@ struct FRp9ExState
     D3DVIEWPORT9 SavedViewport;
     unsigned char bSavedViewportRectValid;
     unsigned char bSavedDepthRangeValid;
-    unsigned long SavedPending[FRp9RenderStateCache::StateCount];
+    uint32_t SavedPending[FRp9RenderStateCache::StateCount];
     // Bit per sampler 0..15 the pass bound a texture on; stages 0..7 also saved their cache.
-    unsigned long TouchedSamplers;
+    uint32_t TouchedSamplers;
     FRp9ExStageSave SavedStages[FRp9DeviceStateCaches::StageCount];
     // Bit per sampler that holds the scene depth.
-    unsigned long SceneDepthSamplers;
+    uint32_t SceneDepthSamplers;
     // What the pass bound on each sampler (not AddRef'd; Get* is unavailable on a pure device).
     IDirect3DBaseTexture9* BoundTextures[16];
     FRPExProgram* BoundProgram;
     // The pass's colour target (null = the back buffer) and its size.
     FRPExTexture* CurrentTarget;
-    unsigned long TargetWidth;
-    unsigned long TargetHeight;
+    uint32_t TargetWidth;
+    uint32_t TargetHeight;
 };

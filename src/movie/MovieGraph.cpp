@@ -18,24 +18,24 @@
 void __cdecl Movie_InitForProcessor();
 void* __cdecl MovieOperatorNew(unsigned int Size);
 void __cdecl MovieOperatorDelete(void* Block);
-long __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus);
-long __stdcall Movie_CommitFieldPair(unsigned int* Left, unsigned int* Right, unsigned int* FieldWords, unsigned int* Record);
-long __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder);
-long __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowCount, void* Table, void* FieldHolder);
+int32_t __stdcall Movie_ReduceModulo(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Modulus);
+int32_t __stdcall Movie_CommitFieldPair(unsigned int* Left, unsigned int* Right, unsigned int* FieldWords, unsigned int* Record);
+int32_t __stdcall MultiplyByFieldFactors(unsigned int* Value, int* FieldHolder);
+int32_t __stdcall CollectSquaredRows(unsigned int* Value, int SquareSteps, int RowCount, void* Table, void* FieldHolder);
 void __stdcall StoreLeadingReciprocal(int Limbs, unsigned int Count, unsigned int* Reciprocal);
 // 0x06ac5610. Defined in MovieExp.cpp. RET 0x1C.
-long __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Extra, void* FieldHolder);
+int32_t __stdcall ExponentiateSlidingWindow(void* Base, int Window, int Span, void* Exponent, int ExponentCount, void* Extra, void* FieldHolder);
 void __stdcall Movie_FillRandomBelow(int Source, void* Dest, unsigned int Count);
-long __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int Sign, unsigned int* FieldHolder);
+int32_t __stdcall Movie_AddFieldElements(unsigned int* Left, unsigned int* Right, unsigned int* Dest, int Sign, unsigned int* FieldHolder);
 unsigned int __stdcall Movie_CopyOrReduceField(unsigned int* Source, unsigned int* Dest, unsigned int* Modulus);
 void __stdcall Movie_AddModulo(unsigned int* Left, unsigned int* Right, unsigned int* Sum, unsigned int* Modulus);
 void __stdcall Movie_MultiplyModulo(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* Modulus, unsigned int* Scratch);
 void __stdcall Movie_NegateModulo(unsigned int* Source, unsigned int* Dest, unsigned int* Modulus);
 void __stdcall Movie_SubtractModulo(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* Modulus);
-long __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigned int* Coefficient, unsigned int* Result);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
-long __stdcall ReduceLimbsShiftXor(unsigned int* Left, unsigned int LeftBits, unsigned int* Right, unsigned int RightBits, unsigned int* Coefficient, unsigned int* Remainder);
-long __stdcall MultiplyLimbsShiftXor(int Left, int Right, unsigned int* Product, int Modulus, unsigned int ModulusBits);
+int32_t __stdcall BinaryGcdLimbs(unsigned int* Left, unsigned int* Context, unsigned int* Coefficient, unsigned int* Result);
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+int32_t __stdcall ReduceLimbsShiftXor(unsigned int* Left, unsigned int LeftBits, unsigned int* Right, unsigned int RightBits, unsigned int* Coefficient, unsigned int* Remainder);
+int32_t __stdcall MultiplyLimbsShiftXor(int Left, int Right, unsigned int* Product, int Modulus, unsigned int ModulusBits);
 unsigned int __stdcall SquareLimbByKind(unsigned int* Input, unsigned int* Output, unsigned int* Context);
 void __stdcall ShiftLimbsByBits(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, unsigned int Count);
 unsigned int __stdcall ShiftLimbs(unsigned int* Source, unsigned int BitCount, unsigned int* Dest, int Count);
@@ -44,8 +44,8 @@ unsigned int* __stdcall FindWindowSlot(unsigned int LimbCount);
 unsigned int __stdcall Movie_AddScaledLimbs(int Source, unsigned int Scale, unsigned int* Buffer, int Count);
 void __stdcall Movie_SplitLimbs(unsigned int* Source, unsigned int Count, unsigned int* Dest, unsigned int* Bound);
 int __stdcall Movie_DivideLimbs(unsigned int* Dividend, unsigned int DividendCount, unsigned int* Divisor, int DivisorCount, unsigned int* Reciprocal, unsigned int Quotient, unsigned int* Remainder);
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
+int32_t __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
 void __stdcall Movie_FreeBlock(void* Block);
 
 CRITICAL_SECTION GMovieGraphLock;
@@ -62,10 +62,10 @@ static const unsigned int GLimbs7d8[5] = { 0x109FA120u, 0xBA38DAF0u, 0x3510C07Du
 static const unsigned int GLimbs7ec[5] = { 0xA379936Fu, 0xD4ED7ACDu, 0x8C3C5856u, 0x1075522Du, 0x44574491u };
 
 // NEG / SBB / AND 0x7fffbffb / ADD 0x80004005. Nonzero -> 0, zero -> 0x80004005.
-static long Movie_CodeFromFlag(unsigned int Flag)
+static int32_t Movie_CodeFromFlag(unsigned int Flag)
 {
     unsigned int Mask = (Flag != 0u) ? 0x7fffbffbu : 0u;
-    return (long)(Mask + 0x80004005u);
+    return (int32_t)(Mask + 0x80004005u);
 }
 
 // REP MOVSD + REP MOVSB. ByteCount from `SHL count,2` makes the MOVSB trip count 0.
@@ -112,7 +112,7 @@ static unsigned int Movie_GroupBytes(const int* Field, int Groups)
     return (Field[0] * (unsigned int)Groups) << 2;
 }
 
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field)
+int32_t __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field)
 {
     unsigned int Dwords = Movie_GroupBytes(Field, Groups) >> 2;
     unsigned int Index;
@@ -123,7 +123,7 @@ long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field)
     return 1;
 }
 
-long __stdcall Movie_CopyFieldGroups(unsigned int* Source, unsigned int* Dest, int Groups, int* Field)
+int32_t __stdcall Movie_CopyFieldGroups(unsigned int* Source, unsigned int* Dest, int Groups, int* Field)
 {
     unsigned int Dwords = Movie_GroupBytes(Field, Groups) >> 2;
     unsigned int Index;
@@ -154,13 +154,13 @@ static unsigned int Movie_Shr(unsigned int Value, unsigned int Count)
     return Value >> (Count & 31u);
 }
 
-long __stdcall Movie_SearchFieldWitness(unsigned int* Seed, unsigned int* Element, unsigned int* FieldBlock)
+int32_t __stdcall Movie_SearchFieldWitness(unsigned int* Seed, unsigned int* Element, unsigned int* FieldBlock)
 {
     unsigned int* Field = (unsigned int*)FieldBlock[0];
     unsigned int Block[5];
     unsigned int Work[64];
     unsigned int* Past = Element + Field[0];
-    long Ok = 1;
+    int32_t Ok = 1;
     unsigned int Found = 0;
     int Round;
     int Kind = (int)Field[2];
@@ -175,7 +175,7 @@ long __stdcall Movie_SearchFieldWitness(unsigned int* Seed, unsigned int* Elemen
     }
     for (Round = 0; Round < 100; Round = Round + 1)
     {
-        long Step;
+        int32_t Step;
         if (Ok == 0)
         {
             return Ok;
@@ -226,7 +226,7 @@ long __stdcall Movie_SearchFieldWitness(unsigned int* Seed, unsigned int* Elemen
     return 0;
 }
 
-long __stdcall Movie_CopyAndReduceLimbs(unsigned int* Src, unsigned int Count, unsigned int* Dst, unsigned int* Modulus)
+int32_t __stdcall Movie_CopyAndReduceLimbs(unsigned int* Src, unsigned int Count, unsigned int* Dst, unsigned int* Modulus)
 {
     unsigned int Local[5];
     unsigned int Index;
@@ -242,14 +242,14 @@ long __stdcall Movie_CopyAndReduceLimbs(unsigned int* Src, unsigned int Count, u
     return 1;
 }
 
-long  Movie_HresultIfNonZero(int* Value)
+int32_t  Movie_HresultIfNonZero(int* Value)
 {
     return Movie_CodeFromFlag((unsigned int)(*Value != 0));
 }
 
-long  Movie_HresultIfNonZeroLocked(int* Value)
+int32_t  Movie_HresultIfNonZeroLocked(int* Value)
 {
-    long Result;
+    int32_t Result;
     EnterCriticalSection(&GMovieGraphLock);
     Result = Movie_HresultIfNonZero(Value);
     LeaveCriticalSection(&GMovieGraphLock);
@@ -264,7 +264,7 @@ void  Movie_AllocateFieldContext(void** Holder)
     *Holder = Object;
     if (Object != 0)
     {
-        long Status = Movie_BuildFieldContext(Object, (unsigned int*)GLimbs788, (unsigned int*)GLimbs79c, (unsigned int*)GLimbs7b0, (unsigned int*)GLimbs7c4, 0x06ada7d8, 0x06ada7ec);
+        int32_t Status = Movie_BuildFieldContext(Object, (unsigned int*)GLimbs788, (unsigned int*)GLimbs79c, (unsigned int*)GLimbs7b0, (unsigned int*)GLimbs7c4, 0x06ada7d8, 0x06ada7ec);
         if (Status != 0)
         {
             MovieOperatorDelete(*Holder);
@@ -273,14 +273,14 @@ void  Movie_AllocateFieldContext(void** Holder)
     }
 }
 
-long __stdcall Movie_BuildFieldContext(unsigned int* Object, unsigned int* LimbsA, unsigned int* LimbsB, unsigned int* LimbsC, unsigned int* LimbsD, int NonNullA, int NonNullB)
+int32_t __stdcall Movie_BuildFieldContext(unsigned int* Object, unsigned int* LimbsA, unsigned int* LimbsB, unsigned int* LimbsC, unsigned int* LimbsD, int NonNullA, int NonNullB)
 {
-    long Built;
-    long Ok;
+    int32_t Built;
+    int32_t Ok;
     unsigned int* Modulus;
     if (Object == 0 || LimbsA == 0 || LimbsB == 0 || LimbsC == 0 || LimbsD == 0 || NonNullA == 0 || NonNullB == 0)
     {
-        return (long)0x80070057;
+        return (int32_t)0x80070057;
     }
     Movie_Copy5(Object, LimbsA);
     Movie_Copy5(Object + 0x19, LimbsB);
@@ -313,7 +313,7 @@ long __stdcall Movie_BuildFieldContext(unsigned int* Object, unsigned int* Limbs
             }
         }
     }
-    return (long)0x80004005;
+    return (int32_t)0x80004005;
 }
 
 void*  Movie_CreateFieldContext(void** Holder)
@@ -341,12 +341,12 @@ void  Movie_ReleaseFieldContext(void** Holder)
     LeaveCriticalSection(&GMovieGraphLock);
 }
 
-long __stdcall Movie_ReduceWithFixedWidth(void* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5)
+int32_t __stdcall Movie_ReduceWithFixedWidth(void* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5)
 {
     return ExponentiateSlidingWindow(Arg1, 4, 0x3c, Arg2, Arg3, Arg4, Arg5);
 }
 
-long  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs)
+int32_t  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs)
 {
     // Stack image of SUB ESP,0xDC. Adjacent 5-dword slots so a 10-dword
     // write through Local50 / Local78 lands in Local3c / Local64.
@@ -367,39 +367,39 @@ long  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed,
     unsigned int Index;
     if (*(int*)This == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (InLimbs == 0 || Seed == 0 || OutLimbs == 0)
     {
-        return (long)0x80070057;
+        return (int32_t)0x80070057;
     }
     Context = *(unsigned int**)This;
     Movie_CopyAndReduceLimbs(InLimbs, 5u, Frame.LocalA0, (unsigned int*)((unsigned char*)Context + 0x78));
     Movie_CopyAndReduceLimbs(InLimbs + 5, 5u, Frame.Local8c, (unsigned int*)((unsigned char*)Context + 0x78));
     if (MultiplyByFieldFactors(Frame.LocalA0, (int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (Movie_SearchFieldWitness(Seed, Frame.Local28, (unsigned int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     Movie_FillRandomBelow((int)Context, Frame.LocalB4, 5);
     if (Movie_ReduceWithFixedWidth((unsigned char*)Context + 0x3a14, Frame.LocalB4, 5, Frame.Local50, (unsigned char*)Context + 0x35d8) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (MultiplyByFieldFactors(Frame.LocalA0, (int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (Movie_ReduceExpandedRows(Frame.LocalA0, Frame.LocalB4, 5, Frame.LocalDc, (unsigned char*)Context + 0x35d8) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (Movie_AddFieldElements(Frame.LocalDc, Frame.Local28, Frame.Local78, 1, (unsigned int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     Movie_CopyOrReduceField(Frame.Local50, Frame.LocalDc, (unsigned int*)((unsigned char*)Context + 0x78));
     for (Index = 0; Index < 5u; Index = Index + 1)
@@ -424,23 +424,23 @@ long  Movie_MapFieldLimbs(void* This, unsigned int* InLimbs, unsigned int* Seed,
     return 0;
 }
 
-long __stdcall Movie_ReduceExpandedRows(unsigned int* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5)
+int32_t __stdcall Movie_ReduceExpandedRows(unsigned int* Arg1, void* Arg2, int Arg3, void* Arg4, void* Arg5)
 {
     unsigned char Local[0x988];
     CollectSquaredRows(Arg1, 4, 0x3c, Local, Arg5);
     return ExponentiateSlidingWindow(Local, 4, 0x3c, Arg2, Arg3, Arg4, Arg5);
 }
 
-long  Movie_MapFieldLimbsLocked(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs)
+int32_t  Movie_MapFieldLimbsLocked(void* This, unsigned int* InLimbs, unsigned int* Seed, unsigned int* OutLimbs)
 {
-    long Result;
+    int32_t Result;
     EnterCriticalSection(&GMovieGraphLock);
     Result = Movie_MapFieldLimbs(This, InLimbs, Seed, OutLimbs);
     LeaveCriticalSection(&GMovieGraphLock);
     return Result;
 }
 
-long  Movie_RecoverFieldLimbs(void* This, unsigned int* BaseLimbs, unsigned int* Groups, unsigned int* OutWords)
+int32_t  Movie_RecoverFieldLimbs(void* This, unsigned int* BaseLimbs, unsigned int* Groups, unsigned int* OutWords)
 {
     struct FFrame
     {
@@ -458,11 +458,11 @@ long  Movie_RecoverFieldLimbs(void* This, unsigned int* BaseLimbs, unsigned int*
     Context = *(unsigned int**)This;
     if (Context == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (BaseLimbs == 0 || Groups == 0 || OutWords == 0)
     {
-        return (long)0x80070057;
+        return (int32_t)0x80070057;
     }
     for (Index = 0; Index < 5u; Index = Index + 1)
     {
@@ -474,20 +474,20 @@ long  Movie_RecoverFieldLimbs(void* This, unsigned int* BaseLimbs, unsigned int*
     Movie_CopyAndReduceLimbs(Groups + 0xf, 5u, Frame.Local64, (unsigned int*)((unsigned char*)Context + 0x78));
     if (MultiplyByFieldFactors(Frame.LocalA0, (int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (Movie_ReduceExpandedRows(Frame.LocalA0, Frame.LocalB4, 5, Frame.Local50, (unsigned char*)Context + 0x35d8) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     if (Movie_AddFieldElements(Frame.Local78, Frame.Local50, Frame.Local28, -1, (unsigned int*)((unsigned char*)Context + 0x35d8)) == 0)
     {
-        return (long)0x80004005;
+        return (int32_t)0x80004005;
     }
     return Movie_CodeFromFlag((unsigned int)Movie_StoreLowFourLimbs(Frame.Local28, OutWords, (int*)((unsigned char*)Context + 0x35d8)));
 }
 
-long __stdcall Movie_StoreLowFourLimbs(unsigned int* Source, unsigned int* Dest, int* Holder)
+int32_t __stdcall Movie_StoreLowFourLimbs(unsigned int* Source, unsigned int* Dest, int* Holder)
 {
     unsigned int Local[5];
     unsigned int* Modulus = *(unsigned int**)Holder;
@@ -500,16 +500,16 @@ long __stdcall Movie_StoreLowFourLimbs(unsigned int* Source, unsigned int* Dest,
     return 1;
 }
 
-long  Movie_RecoverFieldLimbsLocked(void* This, unsigned int* BaseLimbs, unsigned int* Groups, unsigned int* OutWords)
+int32_t  Movie_RecoverFieldLimbsLocked(void* This, unsigned int* BaseLimbs, unsigned int* Groups, unsigned int* OutWords)
 {
-    long Result;
+    int32_t Result;
     EnterCriticalSection(&GMovieGraphLock);
     Result = Movie_RecoverFieldLimbs(This, BaseLimbs, Groups, OutWords);
     LeaveCriticalSection(&GMovieGraphLock);
     return Result;
 }
 
-long __stdcall Movie_AddFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Sum, int* Field)
+int32_t __stdcall Movie_AddFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Sum, int* Field)
 {
     int Kind = Field[2];
     int Count;
@@ -534,7 +534,7 @@ long __stdcall Movie_AddFieldLimbs(unsigned int* Left, unsigned int* Right, unsi
     return 0;
 }
 
-long __stdcall Movie_MultiplyAfterUnary(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* Field)
+int32_t __stdcall Movie_MultiplyAfterUnary(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* Field)
 {
     unsigned int Work[64];
     if (Movie_FieldUnaryByKind(Right, Work, Field) != 0)
@@ -547,7 +547,7 @@ long __stdcall Movie_MultiplyAfterUnary(unsigned int* Left, unsigned int* Right,
     return 0;
 }
 
-long __stdcall Movie_FieldLimbsEqual(int LeftAddr, int RightAddr, int* Field)
+int32_t __stdcall Movie_FieldLimbsEqual(int LeftAddr, int RightAddr, int* Field)
 {
     int Count;
     unsigned int Left;
@@ -574,7 +574,7 @@ long __stdcall Movie_FieldLimbsEqual(int LeftAddr, int RightAddr, int* Field)
     }
 }
 
-long __stdcall Movie_SetFieldFromSigned(unsigned int Value, unsigned int* Dest, int* Field)
+int32_t __stdcall Movie_SetFieldFromSigned(unsigned int Value, unsigned int* Dest, int* Field)
 {
     int Signed = (int)Value;
     int Sign = Signed >> 31;
@@ -602,7 +602,7 @@ long __stdcall Movie_SetFieldFromSigned(unsigned int Value, unsigned int* Dest, 
     return 0;
 }
 
-long __stdcall Movie_BindFieldHeader(int Modulus, int Stored, int* Field)
+int32_t __stdcall Movie_BindFieldHeader(int Modulus, int Stored, int* Field)
 {
     int Count = *(int*)(Modulus + 0x100);
     int* Src = (int*)(Modulus + 0x1144);
@@ -624,7 +624,7 @@ long __stdcall Movie_BindFieldHeader(int Modulus, int Stored, int* Field)
     return 1;
 }
 
-long __stdcall Movie_FieldUnaryByKind(unsigned int* Source, unsigned int* Dest, unsigned int* Field)
+int32_t __stdcall Movie_FieldUnaryByKind(unsigned int* Source, unsigned int* Dest, unsigned int* Field)
 {
     unsigned int WorkLow[64];
     unsigned int WorkHigh[64];
@@ -632,7 +632,7 @@ long __stdcall Movie_FieldUnaryByKind(unsigned int* Source, unsigned int* Dest, 
     unsigned int Count = Field[0];
     unsigned int Second = Field[1];
     unsigned int Kind = Field[2];
-    long Step;
+    int32_t Step;
     if (Kind == 1u)
     {
         unsigned int* Modulus = (unsigned int*)Field[4];
@@ -670,7 +670,7 @@ long __stdcall Movie_FieldUnaryByKind(unsigned int* Source, unsigned int* Dest, 
     return 0;
 }
 
-long __stdcall Movie_FieldLimbsAreZero(int Element, int* Field)
+int32_t __stdcall Movie_FieldLimbsAreZero(int Element, int* Field)
 {
     int Count;
     int Kind = Field[2];
@@ -691,7 +691,7 @@ long __stdcall Movie_FieldLimbsAreZero(int Element, int* Field)
     return 1;
 }
 
-long __stdcall Movie_MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int* Field)
+int32_t __stdcall Movie_MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int* Field)
 {
     unsigned int Kind = Field[2];
     if (Kind == 1u)
@@ -710,7 +710,7 @@ long __stdcall Movie_MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right,
     return 0;
 }
 
-long __stdcall Movie_MultiplyThenAddField(unsigned int* Left, unsigned int* Right, unsigned int* Addend, unsigned int* Dest, unsigned int* Field)
+int32_t __stdcall Movie_MultiplyThenAddField(unsigned int* Left, unsigned int* Right, unsigned int* Addend, unsigned int* Dest, unsigned int* Field)
 {
     unsigned int Work[64];
     if (Movie_MultiplyFieldLimbs(Left, Right, Work, Field) != 0)
@@ -723,7 +723,7 @@ long __stdcall Movie_MultiplyThenAddField(unsigned int* Left, unsigned int* Righ
     return 0;
 }
 
-long __stdcall Movie_NegateFieldLimbs(unsigned int* Source, unsigned int* Dest, int* Field)
+int32_t __stdcall Movie_NegateFieldLimbs(unsigned int* Source, unsigned int* Dest, int* Field)
 {
     int Kind = Field[2];
     if (Kind == 1)
@@ -777,7 +777,7 @@ unsigned int __stdcall Movie_SquareFieldLimbs(unsigned int* Source, unsigned int
     return 0;
 }
 
-long __stdcall Movie_SubtractFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Difference, int* Field)
+int32_t __stdcall Movie_SubtractFieldLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Difference, int* Field)
 {
     int Kind = Field[2];
     int Count;
@@ -802,11 +802,11 @@ long __stdcall Movie_SubtractFieldLimbs(unsigned int* Left, unsigned int* Right,
     return 0;
 }
 
-long __stdcall Movie_ShiftFieldLimbs(unsigned int* Source, unsigned int Shift, int Dest, unsigned int* Field)
+int32_t __stdcall Movie_ShiftFieldLimbs(unsigned int* Source, unsigned int Shift, int Dest, unsigned int* Field)
 {
     unsigned int Low[64];
     unsigned int High[64];
-    long Flag = 1;
+    int32_t Flag = 1;
     unsigned int Words = Field[0];
     unsigned int Limit = Field[1];
     unsigned int Index;
@@ -829,14 +829,14 @@ long __stdcall Movie_ShiftFieldLimbs(unsigned int* Source, unsigned int Shift, i
     return Flag;
 }
 
-long __stdcall Movie_PowFieldByBitScan(unsigned int* Base, int Dest, unsigned int* Field)
+int32_t __stdcall Movie_PowFieldByBitScan(unsigned int* Base, int Dest, unsigned int* Field)
 {
     unsigned int Buf100[64];
     unsigned int Buf200[64];
     unsigned int Esi = Field[1] - 1u;
-    unsigned long Bit = 0;
+    uint32_t Bit = 0;
     int Ebx;
-    long Eax;
+    int32_t Eax;
     _BitScanReverse(&Bit, Esi | 1u);
     Ebx = (int)Bit;
     if (Movie_FieldLimbsAreZero((int)Base, (int*)Field) != 0)
@@ -904,7 +904,7 @@ long __stdcall Movie_PowFieldByBitScan(unsigned int* Base, int Dest, unsigned in
     }
 }
 
-long __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int* Field)
+int32_t __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right, unsigned int* Product, unsigned int* Field)
 {
     unsigned int Copy2Raw[257];
     unsigned int Copy1Raw[257];
@@ -915,7 +915,7 @@ long __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right
     unsigned short* Pairs = (unsigned short*)Field[7];
     unsigned int PairCount = Field[6];
     unsigned int Complement = 0x20u - Shift;
-    long Square;
+    int32_t Square;
     unsigned int Index;
     if (Field[2] != 2u)
     {
@@ -971,7 +971,7 @@ long __stdcall Movie_MultiplyBinaryField(unsigned int* Left, unsigned int* Right
     return Square != 0 ? 1 : 0;
 }
 
-long __stdcall Movie_TraceFieldLimbs(unsigned int* Source, unsigned int* Dest, unsigned int* Field)
+int32_t __stdcall Movie_TraceFieldLimbs(unsigned int* Source, unsigned int* Dest, unsigned int* Field)
 {
     unsigned int Kind = Field[2];
     unsigned int Words = Field[0];
@@ -1011,7 +1011,7 @@ long __stdcall Movie_TraceFieldLimbs(unsigned int* Source, unsigned int* Dest, u
         unsigned int BitPlace = Field[8];
         unsigned int BitWord = BitPlace >> 5;
         unsigned int BitMask = 1u << (BitPlace & 0x1fu);
-        long Ok;
+        int32_t Ok;
         unsigned int* Slot;
         Movie_ZeroBytes(Local, Movie_GroupBytes((int*)Field, 1));
         Ok = 1;
@@ -1048,10 +1048,10 @@ long __stdcall Movie_TraceFieldLimbs(unsigned int* Source, unsigned int* Dest, u
     return 0;
 }
 
-long __stdcall Movie_BuildModulusRecord(unsigned int* Limbs, unsigned int Count, unsigned int Flag, unsigned int* Record)
+int32_t __stdcall Movie_BuildModulusRecord(unsigned int* Limbs, unsigned int Count, unsigned int Flag, unsigned int* Record)
 {
     unsigned int* Block = (unsigned int*)Movie_AllocateBlock(0x304);
-    long Result = 0;
+    int32_t Result = 0;
     unsigned int* Wide;
     unsigned int* Half;
     unsigned int HalfWord;

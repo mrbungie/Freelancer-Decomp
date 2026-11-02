@@ -31,19 +31,19 @@ static long int hashindex (TObject *ref) {
       h = (long int)nvalue(ref);
       break;
     case LUA_T_STRING: case LUA_T_USERDATA:
-      h = (IntPoint)tsvalue(ref);
+      h = (IntPoint)(intptr_t)(tsvalue(ref));
       break;
     case LUA_T_ARRAY:
-      h = (IntPoint)avalue(ref);
+      h = (IntPoint)(intptr_t)(avalue(ref));
       break;
     case LUA_T_PROTO:
-      h = (IntPoint)tfvalue(ref);
+      h = (IntPoint)(intptr_t)(tfvalue(ref));
       break;
     case LUA_T_CPROTO:
-      h = (IntPoint)fvalue(ref);
+      h = (IntPoint)(intptr_t)(fvalue(ref));
       break;
     case LUA_T_CLOSURE:
-      h = (IntPoint)clvalue(ref);
+      h = (IntPoint)(intptr_t)(clvalue(ref));
       break;
     default:
       lua_error("unexpected type to index table");

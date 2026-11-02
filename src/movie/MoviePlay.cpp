@@ -125,7 +125,7 @@ struct FServiceProvider : IServiceProvider
 
 	FServiceProvider();
 
-	long RefCount;
+	int32_t RefCount;
 };
 
 struct FAuthorizer : IWMAuthorizer
@@ -141,7 +141,7 @@ struct FAuthorizer : IWMAuthorizer
 
 	FAuthorizer();
 
-	long RefCount;
+	int32_t RefCount;
 	void* Inner;
 };
 
@@ -153,8 +153,8 @@ static_assert(offsetof(FAuthorizer, Inner) == 8, "inner");
 
 static bool GuidsMatch(const GUID* Left, const GUID* Right)
 {
-	const unsigned long* LeftWords = (const unsigned long*)Left;
-	const unsigned long* RightWords = (const unsigned long*)Right;
+	const uint32_t* LeftWords = (const uint32_t*)Left;
+	const uint32_t* RightWords = (const uint32_t*)Right;
 	return LeftWords[0] == RightWords[0]
 		&& LeftWords[1] == RightWords[1]
 		&& LeftWords[2] == RightWords[2]
@@ -183,16 +183,16 @@ void FAuthorizer::ClearInner()
 // FUN_06ac242c. IUnknown::AddRef. RET 4.
 ULONG STDMETHODCALLTYPE FAuthorizer::AddRef()
 {
-	return (unsigned long)InterlockedIncrement(&RefCount);
+	return (uint32_t)InterlockedIncrement(&RefCount);
 }
 
 // FUN_06ac243d. IUnknown::Release. RET 4. Deletes on a zero return from the decrement.
 ULONG STDMETHODCALLTYPE FAuthorizer::Release()
 {
-	long Count = InterlockedDecrement(&RefCount);
+	int32_t Count = InterlockedDecrement(&RefCount);
 	if (Count != 0)
 	{
-		return (unsigned long)Count;
+		return (uint32_t)Count;
 	}
 	ClearInner();
 	::operator delete(this);
@@ -203,11 +203,11 @@ ULONG STDMETHODCALLTYPE FAuthorizer::Release()
 // Failure stores NULL through Out.
 HRESULT STDMETHODCALLTYPE FAuthorizer::QueryInterface(REFIID Iid, void** Out)
 {
-	const unsigned long* IidWords = (const unsigned long*)&Iid;
-	const unsigned long* UnknownWords = (const unsigned long*)&GIidUnknown;
-	long Index = 4;
+	const uint32_t* IidWords = (const uint32_t*)&Iid;
+	const uint32_t* UnknownWords = (const uint32_t*)&GIidUnknown;
+	int32_t Index = 4;
 	bool bMatch = true;
-	for (long Word = 0; Word < Index; Word += 1)
+	for (int32_t Word = 0; Word < Index; Word += 1)
 	{
 		if (IidWords[Word] != UnknownWords[Word])
 		{
@@ -217,9 +217,9 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::QueryInterface(REFIID Iid, void** Out)
 	}
 	if (!bMatch)
 	{
-		const unsigned long* AuthorizerWords = (const unsigned long*)&GIidWmAuthorizer;
+		const uint32_t* AuthorizerWords = (const uint32_t*)&GIidWmAuthorizer;
 		bMatch = true;
-		for (long Word = 0; Word < Index; Word += 1)
+		for (int32_t Word = 0; Word < Index; Word += 1)
 		{
 			if (IidWords[Word] != AuthorizerWords[Word])
 			{
@@ -235,17 +235,17 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::QueryInterface(REFIID Iid, void** Out)
 		return 0;
 	}
 	*Out = nullptr;
-	return (long)0x80004002;
+	return (int32_t)0x80004002;
 }
 
-static long ForwardInnerAuthorizer(void* Inner, int Slot, void* Arg0, void* Arg1)
+static int32_t ForwardInnerAuthorizer(void* Inner, int Slot, void* Arg0, void* Arg1)
 {
 	FAuthorizer* Authorizer = (FAuthorizer*)Inner;
 	if (Slot == 3)
 	{
-		return Authorizer->GetCertCount((unsigned long*)Arg0);
+		return Authorizer->GetCertCount((uint32_t*)Arg0);
 	}
-	return Authorizer->GetCert((unsigned long)(ULONG_PTR)Arg0, (unsigned char**)Arg1);
+	return Authorizer->GetCert((uint32_t)(ULONG_PTR)Arg0, (unsigned char**)Arg1);
 }
 
 // FUN_06ac24b2. IWMAuthorizer::GetCertCount. RET 8.
@@ -253,13 +253,13 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetCertCount(DWORD* Count)
 {
 	if (Count == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 	if (Inner != nullptr)
 	{
 		return ForwardInnerAuthorizer(Inner, 3, Count, nullptr);
 	}
-	*Count = (unsigned long)GAuthorizerCertCount;
+	*Count = (uint32_t)GAuthorizerCertCount;
 	return 0;
 }
 
@@ -269,24 +269,24 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetCert(DWORD Index, BYTE** CertOut)
 {
 	if (CertOut == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 	if (Inner != nullptr)
 	{
 		return ForwardInnerAuthorizer(Inner, 4, (void*)(ULONG_PTR)Index, CertOut);
 	}
-	if (Index >= (unsigned long)GAuthorizerCertCount)
+	if (Index >= (uint32_t)GAuthorizerCertCount)
 	{
-		return (long)0x80070057;
+		return (int32_t)0x80070057;
 	}
 	unsigned char* Blob = (unsigned char*)CoTaskMemAlloc(0x64);
 	*CertOut = Blob;
 	if (Blob == nullptr)
 	{
-		return (long)0x8007000E;
+		return (int32_t)0x8007000E;
 	}
-	const unsigned long* CertDwords = (const unsigned long*)(GAuthorizerCerts + Index * 0x78);
-	unsigned long* DestDwords = (unsigned long*)Blob;
+	const uint32_t* CertDwords = (const uint32_t*)(GAuthorizerCerts + Index * 0x78);
+	uint32_t* DestDwords = (uint32_t*)Blob;
 	for (int Count = 0x19; Count != 0; Count -= 1)
 	{
 		*DestDwords = *CertDwords;
@@ -302,12 +302,12 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 {
 	if (Cert == nullptr || SharedData == nullptr || OutShared == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 
 	void* Context;
 	Movie_CreateFieldContext(&Context);
-	long Status = Movie_HresultIfNonZeroLocked((int*)&Context);
+	int32_t Status = Movie_HresultIfNonZeroLocked((int*)&Context);
 	if (Status < 0)
 	{
 		Movie_ReleaseFieldContext(&Context);
@@ -318,21 +318,21 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 	if (SharedScratch == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8007000E;
+		return (int32_t)0x8007000E;
 	}
 
 	if (Inner != nullptr)
 	{
 		unsigned char* InnerOut = nullptr;
 		FAuthorizer* InnerAuthorizer = (FAuthorizer*)Inner;
-		long InnerHr = InnerAuthorizer->GetSharedData(CertIndex, SharedData, (unsigned char*)GAuthorizerCerts, &InnerOut);
+		int32_t InnerHr = InnerAuthorizer->GetSharedData(CertIndex, SharedData, (unsigned char*)GAuthorizerCerts, &InnerOut);
 		if (InnerHr < 0)
 		{
 			CoTaskMemFree(SharedScratch);
 			Movie_ReleaseFieldContext(&Context);
 			return InnerHr;
 		}
-		long StepHr = Movie_RecoverFieldLimbsLocked(&Context, (unsigned int*)(GAuthorizerCerts + 0x64), (unsigned int*)InnerOut, (unsigned int*)SharedScratch);
+		int32_t StepHr = Movie_RecoverFieldLimbsLocked(&Context, (unsigned int*)(GAuthorizerCerts + 0x64), (unsigned int*)InnerOut, (unsigned int*)SharedScratch);
 		if (StepHr < 0)
 		{
 			CoTaskMemFree(SharedScratch);
@@ -342,14 +342,14 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 	}
 	else
 	{
-		if (CertIndex >= (unsigned long)GAuthorizerCertCount)
+		if (CertIndex >= (uint32_t)GAuthorizerCertCount)
 		{
 			CoTaskMemFree(SharedScratch);
 			Movie_ReleaseFieldContext(&Context);
-			return (long)0x80070057;
+			return (int32_t)0x80070057;
 		}
 		const unsigned char* Record = GAuthorizerCerts + 0x64 + CertIndex * 0x78;
-		long StepHr = Movie_RecoverFieldLimbsLocked(&Context, (unsigned int*)Record, (unsigned int*)SharedData, (unsigned int*)SharedScratch);
+		int32_t StepHr = Movie_RecoverFieldLimbsLocked(&Context, (unsigned int*)Record, (unsigned int*)SharedData, (unsigned int*)SharedScratch);
 		if (StepHr < 0)
 		{
 			CoTaskMemFree(SharedScratch);
@@ -360,21 +360,21 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 	if (SharedScratch == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8000FFFF;
+		return (int32_t)0x8000FFFF;
 	}
 
 	unsigned char* SharedResult = (unsigned char*)CoTaskMemAlloc(0x50);
 	if (SharedResult == nullptr)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8007000E;
+		return (int32_t)0x8007000E;
 	}
 
-	long StepHr = Movie_MapFieldLimbsLocked(&Context, (unsigned int*)(Cert + 0x30), (unsigned int*)SharedScratch, (unsigned int*)SharedResult);
+	int32_t StepHr = Movie_MapFieldLimbsLocked(&Context, (unsigned int*)(Cert + 0x30), (unsigned int*)SharedScratch, (unsigned int*)SharedResult);
 	if (StepHr < 0)
 	{
 		Movie_ReleaseFieldContext(&Context);
-		return (long)0x8000FFFF;
+		return (int32_t)0x8000FFFF;
 	}
 
 	*OutShared = SharedResult;
@@ -385,21 +385,21 @@ HRESULT STDMETHODCALLTYPE FAuthorizer::GetSharedData(DWORD CertIndex, const BYTE
 
 // FUN_06ac23a0. Builds an IWMAuthorizer and QI's it for IID_IUnknown into *OutUnknown.
 // A failed QI becomes 0x8000FFFF. RET 4.
-static long __stdcall CreateAuthorizer(void** OutUnknown)
+static int32_t __stdcall CreateAuthorizer(void** OutUnknown)
 {
 	if (OutUnknown == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 	FAuthorizer* Object = new (std::nothrow) FAuthorizer;
 	if (Object == nullptr)
 	{
-		return (long)0x8007000E;
+		return (int32_t)0x8007000E;
 	}
-	long Hr = Object->QueryInterface(GIidUnknown, OutUnknown);
+	int32_t Hr = Object->QueryInterface(GIidUnknown, OutUnknown);
 	if (Hr < 0)
 	{
-		Hr = (long)0x8000FFFF;
+		Hr = (int32_t)0x8000FFFF;
 	}
 	Object->Release();
 	return Hr;
@@ -414,16 +414,16 @@ FServiceProvider::FServiceProvider()
 // FUN_06ac1aa0. AddRef. JMP InterlockedIncrement(&RefCount).
 ULONG STDMETHODCALLTYPE FServiceProvider::AddRef()
 {
-	return (unsigned long)InterlockedIncrement(&RefCount);
+	return (uint32_t)InterlockedIncrement(&RefCount);
 }
 
 // FUN_06ac1ac0. Release. operator delete when the stored count is 0. RET 4.
 ULONG STDMETHODCALLTYPE FServiceProvider::Release()
 {
-	long Count = InterlockedDecrement(&RefCount);
+	int32_t Count = InterlockedDecrement(&RefCount);
 	if (RefCount != 0)
 	{
-		return (unsigned long)Count;
+		return (uint32_t)Count;
 	}
 	::operator delete(this);
 	return 0;
@@ -435,7 +435,7 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryInterface(REFIID Iid, void** Ou
 {
 	if (Out == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 	if (GuidsMatch(&Iid, &GIidUnknown) || GuidsMatch(&Iid, &GIidServiceProvider))
 	{
@@ -443,7 +443,7 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryInterface(REFIID Iid, void** Ou
 		AddRef();
 		return 0;
 	}
-	return (long)0x80004002;
+	return (int32_t)0x80004002;
 }
 
 // FUN_06ac1b60. IServiceProvider::QueryService. RET 0x10.
@@ -452,14 +452,14 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryService(REFGUID Service, REFIID
 {
 	if (Out == nullptr)
 	{
-		return (long)0x80004003;
+		return (int32_t)0x80004003;
 	}
 	if (!GuidsMatch(&Service, &GIidWmReader) || !GuidsMatch(&Iid, &GIidUnknown))
 	{
-		return (long)0x80004002;
+		return (int32_t)0x80004002;
 	}
 	void* Authorizer = Out;
-	long Hr = CreateAuthorizer(&Authorizer);
+	int32_t Hr = CreateAuthorizer(&Authorizer);
 	if (Hr < 0)
 	{
 		return Hr;
@@ -471,9 +471,9 @@ HRESULT STDMETHODCALLTYPE FServiceProvider::QueryService(REFGUID Service, REFIID
 static LRESULT CALLBACK MoviePlaybackWndProc(HWND Hwnd, UINT Message, WPARAM WParam, LPARAM LParam);
 
 // FUN_06ac1e50. Approach 0. Run() is inside this function; it returns while playback continues.
-long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
+int32_t __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 {
-	long Hr = 0;
+	int32_t Hr = 0;
 	FServiceProvider* ServiceProvider = nullptr;
 	IObjectWithSite* Site = nullptr;
 	wchar_t WidePath[0x400];
@@ -488,17 +488,17 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	MSG Message;
 	RECT Client;
 	HWND FrameWindow = nullptr;
-	long IdealWidth = 0;
-	long IdealHeight = 0;
-	long UsedWidth = 0;
-	long UsedHeight = 0;
-	long Left = 0;
-	long Top = 0;
-	long Style = 0;
+	int32_t IdealWidth = 0;
+	int32_t IdealHeight = 0;
+	int32_t UsedWidth = 0;
+	int32_t UsedHeight = 0;
+	int32_t Left = 0;
+	int32_t Top = 0;
+	int32_t Style = 0;
 	OAFilterState State = (OAFilterState)0;
-	long NextHr = 0;
-	long StateHr = 0;
-	long RenderHr = 0;
+	int32_t NextHr = 0;
+	int32_t StateHr = 0;
+	int32_t RenderHr = 0;
 	PIN_DIRECTION Direction = PINDIR_INPUT;
 
 	g_playing = 0;
@@ -526,7 +526,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 	if (g_graphBuilder == nullptr)
 	{
-		Hr = (long)0x80004003;
+		Hr = (int32_t)0x80004003;
 		goto Epilogue;
 	}
 
@@ -594,7 +594,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	EnumPins->Release();
 	if (bRenderFailed)
 	{
-		Hr = (long)0x80004004;
+		Hr = (int32_t)0x80004004;
 	}
 	FileSource->Release();
 	AsfReader->Release();
@@ -624,11 +624,11 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 			Control = g_mediaControl;
 			StateHr = Control->GetState(0xA, &State);
 			Movie_LogNegativeCode(StateHr, GMoviePlayerSourceFile, 0x227);
-			if (StateHr == (long)0x80004005 || StateHr == (long)0x00040268)
+			if (StateHr == (int32_t)0x80004005 || StateHr == (int32_t)0x00040268)
 			{
-				return (long)0x80004005;
+				return (int32_t)0x80004005;
 			}
-			if (StateHr == 0 && (long)State == 1)
+			if (StateHr == 0 && (int32_t)State == 1)
 			{
 				bPaused = true;
 			}
@@ -639,7 +639,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 				{
 					if (GetMessageA(&Message, nullptr, 0, 0) == 0)
 					{
-						return (long)0x80004005;
+						return (int32_t)0x80004005;
 					}
 					TranslateMessage(&Message);
 					DispatchMessageA(&Message);
@@ -650,7 +650,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 
 			if (g_graphBuilder == nullptr)
 			{
-				return (long)0x80004005;
+				return (int32_t)0x80004005;
 			}
 			if (!bPaused)
 			{
@@ -664,7 +664,7 @@ long __cdecl BuildAndRunWmAsfGraph(HWND Hwnd, int Fullscreen, const char* Path)
 	Video = g_videoWindow;
 	Video->put_Visible(-1);
 	Video->get_WindowStyle(&Style);
-	Style = (Style & (long)0xFF3BFFFF) | (long)0x46000000;
+	Style = (Style & (int32_t)0xFF3BFFFF) | (int32_t)0x46000000;
 	Video->put_WindowStyle(Style);
 	LockWindowUpdate(nullptr);
 	Hr = Video->SetWindowForeground(-1);
@@ -774,7 +774,7 @@ static LRESULT CALLBACK MoviePlaybackWndProc(HWND Hwnd, UINT Message, WPARAM WPa
 			{
 				return 0;
 			}
-			long Code = 0;
+			int32_t Code = 0;
 			LONG_PTR Param1 = 0;
 			LONG_PTR Param2 = 0;
 			if (Events->GetEvent(&Code, &Param1, &Param2, 0) < 0)
@@ -801,7 +801,7 @@ static LRESULT CALLBACK MoviePlaybackWndProc(HWND Hwnd, UINT Message, WPARAM WPa
 
 	if (g_videoWindow != nullptr && g_initSuccess != 0)
 	{
-		g_videoWindow->NotifyOwnerMessage((OAHWND)Hwnd, (long)Message, (LONG_PTR)WParam, (LONG_PTR)LParam);
+		g_videoWindow->NotifyOwnerMessage((OAHWND)Hwnd, (int32_t)Message, (LONG_PTR)WParam, (LONG_PTR)LParam);
 	}
 	return DefWindowProcA(Hwnd, Message, WParam, LParam);
 }

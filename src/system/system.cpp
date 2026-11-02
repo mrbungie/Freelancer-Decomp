@@ -19,8 +19,8 @@
 // Aggregate that loads System profile entries and fans interface queries out to its children.
 
 
-static const unsigned long kAggDescSize = 0x14;
-static const unsigned long kRegisterPriority = 0x40000000;
+static const uint32_t kAggDescSize = 0x14;
+static const uint32_t kRegisterPriority = 0x40000000;
 static const unsigned int kFdumpNotice = 0x100003;
 static const int kLoadComponentsLine = 0x123;
 
@@ -40,7 +40,7 @@ static const unsigned int kLineBufferSize = 0x100;    // ReadLine buffer @06f112
 // +8 = outer IUnknown (aggregation), +0xC = inner out, +0x10 = optional extra.
 struct FSystemAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -82,10 +82,10 @@ public:
     FInnerUnknown();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FSystemContainer* Outer;
 };
 
@@ -96,8 +96,8 @@ public:
     ~FSystemContainer();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API Initialize() override;
     GENRESULT DACOM_API Shutdown() override;
@@ -114,8 +114,8 @@ public:
     FComponentNode* Tail;
     FInnerUnknown Inner;
     IDAComponent* Controlling;
-    unsigned long bAggregated;
-    unsigned long bLoaded;
+    uint32_t bAggregated;
+    uint32_t bLoaded;
 };
 
 static_assert(offsetof(FSystemContainer, Head) == 0x08, "Head at +8");
@@ -133,11 +133,11 @@ public:
     FSystemContainerFactory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -190,7 +190,7 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
     struct FQiEntry
     {
         const char* Iid;
-        unsigned long ByteOffset;
+        uint32_t ByteOffset;
     };
     static const FQiEntry Table[] = {
         {Iids::SystemContainer, 0},            // 06f1205c / 06f12060
@@ -204,13 +204,10 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
     {
         if (strcmp(Table[Index].Iid, Iid) == 0)
         {
-            unsigned char* Base = (unsigned char*)(Outer);
-            unsigned long Offset = Table[Index].ByteOffset;
-            IDAComponent* Face = nullptr;
-            if ((Offset & 0x80000000u) != 0)
-                Face = *(IDAComponent**)(Base + (Offset & 0x7FFFFFFFu));
-            else
-                Face = (IDAComponent*)(Base + Offset);
+            // PORT: retail added ByteOffset (0 or 4) to the object; the facet is named by type instead.
+            IDAComponent* Face = Table[Index].ByteOffset == 0
+                                     ? static_cast<IDAComponent*>(static_cast<ISystemContainer*>(Outer))
+                                     : static_cast<IDAComponent*>(static_cast<IDAConnectionPointContainer*>(Outer));
             Face->AddRef();
             *Out = Face;
             return GR_OK;
@@ -230,7 +227,7 @@ GENRESULT DACOM_API FInnerUnknown::QueryInterface(const char* Iid, void** Out)
 }
 
 // LAB_06f11990 (shared with the factory's AddRef).
-unsigned long DACOM_API FInnerUnknown::AddRef()
+uint32_t DACOM_API FInnerUnknown::AddRef()
 {
     ++RefCount;
     return RefCount;
@@ -238,7 +235,7 @@ unsigned long DACOM_API FInnerUnknown::AddRef()
 
 // LAB_06f119a0: last release runs the container destructor (FUN_06f11130) and free()s the
 // calloc'd block.
-unsigned long DACOM_API FInnerUnknown::Release()
+uint32_t DACOM_API FInnerUnknown::Release()
 {
     if (RefCount > 0)
         --RefCount;
@@ -278,12 +275,12 @@ GENRESULT DACOM_API FSystemContainer::QueryInterface(const char* Iid, void** Out
     return Controlling->QueryInterface(Iid, Out);
 }
 
-unsigned long DACOM_API FSystemContainer::AddRef()
+uint32_t DACOM_API FSystemContainer::AddRef()
 {
     return Controlling->AddRef();
 }
 
-unsigned long DACOM_API FSystemContainer::Release()
+uint32_t DACOM_API FSystemContainer::Release()
 {
     return Controlling->Release();
 }
@@ -556,14 +553,14 @@ GENRESULT DACOM_API FSystemContainerFactory::QueryInterface(const char* Iid, voi
     return GR_OK;
 }
 
-unsigned long DACOM_API FSystemContainerFactory::AddRef()
+uint32_t DACOM_API FSystemContainerFactory::AddRef()
 {
     ++RefCount;
     return RefCount;
 }
 
 // FUN_06f11870.
-unsigned long DACOM_API FSystemContainerFactory::Release()
+uint32_t DACOM_API FSystemContainerFactory::Release()
 {
     if (RefCount > 0)
         --RefCount;

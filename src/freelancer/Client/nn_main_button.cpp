@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "nn_main_button.h"
+#include "fl/handles.h"
 #ifdef FREELANCER_WALK_MODE
 #include "base_walk.h"
 #endif
@@ -882,7 +883,7 @@ void NN_MainButton::SetGroupButtonMesh(int Mode)
     Saved.Translation.X = 0.0f;
     Saved.Translation.Y = 0.0f;
     Saved.Translation.Z = 0.0f;
-    void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    void* const NoInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
     WinControl* const Controls[2] = {GroupButton, GroupRoot};
     for (int Index = 0; Index < 2; ++Index)

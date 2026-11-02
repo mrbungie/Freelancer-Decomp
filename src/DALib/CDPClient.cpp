@@ -13,19 +13,19 @@
 
 // .data:065ca120 is seeded at DLL load by the static initializer LAB_065c19c0 (__xc table entry
 // .data:065ca004): CALL timeGetTime; MOV [065ca120],EAX.
-unsigned long CDPClient::m_dwLastMsgReceivedTime = timeGetTime();
-unsigned long CDPClient::m_dwPingSendTime = 0;
-unsigned long CDPClient::m_dwPingReceiveTime = 0;
-unsigned long CDPClient::m_dwPingSendCount = 0;
-unsigned long CDPClient::m_dwPingReceiveCount = 0;
-unsigned long CDPClient::m_dwPingLastTime = 0;
-unsigned long CDPClient::m_dwRoundTripTime = 0;
-unsigned long CDPClient::m_dwSourcePort = 0;
-unsigned long CDPClient::m_dwLinkQuality = 0xFF; // .data:065ca020 initialised to 0xFF
+uint32_t CDPClient::m_dwLastMsgReceivedTime = timeGetTime();
+uint32_t CDPClient::m_dwPingSendTime = 0;
+uint32_t CDPClient::m_dwPingReceiveTime = 0;
+uint32_t CDPClient::m_dwPingSendCount = 0;
+uint32_t CDPClient::m_dwPingReceiveCount = 0;
+uint32_t CDPClient::m_dwPingLastTime = 0;
+uint32_t CDPClient::m_dwRoundTripTime = 0;
+uint32_t CDPClient::m_dwSourcePort = 0;
+uint32_t CDPClient::m_dwLinkQuality = 0xFF; // .data:065ca020 initialised to 0xFF
 namespace
 {
     // Retail message Type values used internally by CDPMessage (arbitrary, DALib-internal).
-    enum EMsgType : unsigned long
+    enum EMsgType : uint32_t
     {
         kMsgReceive = 0,
         kMsgConnectComplete = 1,
@@ -50,7 +50,12 @@ CDPClient::CDPClient()
                                          IID_IDirectPlay8Client, (void**)(&Client));
     if (FAILED(Hr))
     {
-        (*CriticalWarningFn)(0xd4, nullptr);
+        // Portable build: global objects can construct before WinMain installs the handler, and
+        // DirectPlay is unavailable, so tolerate a missing handler.
+        if (CriticalWarningFn != nullptr)
+            (*CriticalWarningFn)(0xd4, nullptr);
+        else
+            fprintf(stderr, "[fl] DirectPlay unavailable (CoCreateInstance(DirectPlay8Client) failed)\n");
         return;
     }
 
@@ -189,7 +194,7 @@ void CDPClient::CancelEnums()
 }
 
 // Retail DALib.dll.c CDPClient::Send @ 0x27e0.
-bool CDPClient::Send(unsigned char* Data, unsigned long Size)
+bool CDPClient::Send(unsigned char* Data, uint32_t Size)
 {
     if (!bConnected)
         return false;
@@ -254,8 +259,8 @@ bool CDPClient::EnumerateHosts()
 }
 
 // Failure after address creation retains the addresses; this API does not unwind them.
-bool CDPClient::EnumerateHost(const wchar_t* HostAddress, unsigned long Port, unsigned long EnumCount,
-                               unsigned long RetryInterval, unsigned long TimeOut)
+bool CDPClient::EnumerateHost(const wchar_t* HostAddress, uint32_t Port, uint32_t EnumCount,
+                               uint32_t RetryInterval, uint32_t TimeOut)
 {
     if (Client == nullptr)
         return false;
@@ -295,7 +300,7 @@ bool CDPClient::EnumerateHost(const wchar_t* HostAddress, unsigned long Port, un
 }
 
 // Retail .text:065c2bc0: MOV EAX,[m_dwLastMsgReceivedTime]; RET.
-unsigned long CDPClient::GetLastMsgTimestamp()
+uint32_t CDPClient::GetLastMsgTimestamp()
 {
     return m_dwLastMsgReceivedTime;
 }
@@ -307,19 +312,19 @@ bool CDPClient::IsPingOutstanding()
 }
 
 // Retail .text:065c2c50: MOV [m_dwSourcePort],[ESP+4]; RET.
-void CDPClient::SetSourcePort(unsigned long Port)
+void CDPClient::SetSourcePort(uint32_t Port)
 {
     m_dwSourcePort = Port;
 }
 
 // Retail .text:065c2c60: MOV EAX,[m_dwLinkQuality]; RET.
-unsigned long CDPClient::GetLinkQuality()
+uint32_t CDPClient::GetLinkQuality()
 {
     return m_dwLinkQuality;
 }
 
 // Retail DALib.dll.c CDPClient::GetPingDelay @ 0x2bd0.
-unsigned long CDPClient::GetPingDelay()
+uint32_t CDPClient::GetPingDelay()
 {
     if (m_dwPingSendCount == 0)
         return 0;
@@ -329,7 +334,7 @@ unsigned long CDPClient::GetPingDelay()
         return m_dwPingReceiveTime - m_dwPingSendTime;
     }
     const DWORD Now = timeGetTime();
-    unsigned long Elapsed = Now - m_dwPingSendTime;
+    uint32_t Elapsed = Now - m_dwPingSendTime;
     if (Elapsed <= m_dwPingLastTime)
         Elapsed = m_dwPingLastTime;
     return Elapsed;
@@ -338,7 +343,7 @@ unsigned long CDPClient::GetPingDelay()
 // Retail DALib.dll.c CDPClient::GetSendQueueSize @ 0x2c10 — see header comment: the decompiled C
 // return value (the client pointer) is a decompiler artifact; ported as the real disassembled
 // behavior (the message count from GetSendQueueInfo).
-unsigned long CDPClient::GetSendQueueSize()
+uint32_t CDPClient::GetSendQueueSize()
 {
     if (GActiveClient == nullptr || GActiveClient->Client == nullptr)
         return 0;
@@ -350,10 +355,10 @@ unsigned long CDPClient::GetSendQueueSize()
 // Retail DALib.dll.c CDPClient::HandleClientMsg @ 0x19d0 — DirectPlay8 IO-thread callback. Only
 // queues into IncomingMsgs / updates ping globals; all higher-level dispatch happens on the game
 // thread in DispatchMsgs.
-long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long MessageId, void* MsgData)
+HRESULT __stdcall CDPClient::HandleClientMsg(void* UserContext, DWORD MessageId, void* MsgData)
 {
     CDPClient* Self = (CDPClient*)UserContext;
-    long Result = 0;
+    HRESULT Result = 0;
 
     switch (MessageId)
     {
@@ -503,7 +508,7 @@ long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long Messa
 }
 
 // Codec lifetime is lazy and ends at process teardown.
-void CDPClient::DispatchMsgs(unsigned long TimeoutMs)
+void CDPClient::DispatchMsgs(uint32_t TimeoutMs)
 {
     static CDPNetCodec Codec;
 

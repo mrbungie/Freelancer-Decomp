@@ -33,10 +33,7 @@
 #include "readfile.h"
 #include "render/IRenderPipeline.h"
 
-#include <windows.h>
-
-#define DIRECTINPUT_VERSION 0x0800
-#include <dinput.h>
+#include "fl/platform.h"   // fl::IMouse (via fl/input.h), fl::GetWindowHost()
 
 #include <list>
 #include <math.h>
@@ -45,13 +42,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// DirectInput8Create, and IID_IDirectInput8A / GUID_SysMouse / c_dfDIMouse2 (retail links the
-// same three statically: .rdata 0x005e752c, 0x005e74ec, 0x005e772c).
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
-
-static_assert(sizeof(DIDEVICEOBJECTDATA) == 0x14, "FUN_0041fa10 walks 0x14-byte records");
-static_assert(sizeof(DIMOUSESTATE2) == 0x14, "FUN_0041fd90 reads 0x14 bytes into +0x2c");
+// PORT: retail reads the mouse through a DirectInput8 device (DirectInput8Create + GUID_SysMouse +
+// c_dfDIMouse2). This build talks to fl::IMouse (fl/input.h) instead; the event/state records below
+// carry the same information as DIDEVICEOBJECTDATA / DIMOUSESTATE2 (DIMOFS_X/Y/Z, DIMOFS_BUTTON0..7).
 
 namespace
 {
@@ -99,13 +92,12 @@ namespace
         // +0x04 head / +0x08 size: 0x2c-byte nodes, the event at node+8 (FUN_004207b0 /
         // FUN_0041f850 / FUN_0041f8a0 insert before the sentinel; FUN_0041ef20 pops the front).
         std::list<FMouseEvent> Events;
-        IDirectInput8A* DirectInput;   // +0x0c DAT_006167c4
-        IDirectInputDevice8A* Device;  // +0x10 DAT_006167c8
+        fl::IMouse* Device;            // +0x10 DAT_006167c8 (retail: IDirectInputDevice8A*; +0x0c IDirectInput8A* dropped)
         unsigned char Flags;           // +0x14 DAT_006167cc
         int AbsoluteBase[3];           // +0x18 / +0x1c / +0x20 -- FUN_0041f7b0, absolute mode only
         unsigned BufferSize;           // +0x24 DAT_006167dc
-        DIDEVICEOBJECTDATA* Buffer;    // +0x28 DAT_006167e0
-        DIMOUSESTATE2 State;           // +0x2c
+        fl::MouseEvent* Buffer;        // +0x28 DAT_006167e0
+        fl::MouseState State;          // +0x2c
         unsigned DoubleClickTime;      // +0x40 DAT_006167f8
         unsigned LastPressTime[kMouseButtonCount]; // +0x44
         float Remainder[3];            // +0x64 / +0x68 / +0x6c -- sub-pixel carry per axis
@@ -114,8 +106,7 @@ namespace
         // FUN_0041e740: +0x0c, +0x10, the +0x14 dword, +0x68, +0x64, +0x24, +0x44..+0x63, +0x28
         // and the +0x70 byte. +0x6c, +0x18..+0x20, +0x2c..+0x40 are left as the .bss gave them.
         FMouseDevice()
-            : DirectInput(nullptr)
-            , Device(nullptr)
+            : Device(nullptr)
             , Flags(0)
             , BufferSize(0)
             , Buffer(nullptr)
@@ -283,13 +274,7 @@ namespace
 
         UnacquireAndFlush();
 
-        DIPROPDWORD Property;
-        Property.diph.dwSize = 0x14;
-        Property.diph.dwHeaderSize = 0x10;
-        Property.diph.dwObj = 0;
-        Property.diph.dwHow = DIPH_DEVICE;
-        Property.dwData = Entries;
-        if (G_Mouse.Device->SetProperty(DIPROP_BUFFERSIZE, &Property.diph) < 0)
+        if (!G_Mouse.Device->SetEventBuffer(Entries))
             return false;
 
         G_Mouse.BufferSize = Entries;
@@ -297,22 +282,17 @@ namespace
         G_Mouse.Buffer = nullptr;
         if (G_Mouse.BufferSize != 0)
         {
-            G_Mouse.Buffer = static_cast<DIDEVICEOBJECTDATA*>(
-                operator new(G_Mouse.BufferSize * sizeof(DIDEVICEOBJECTDATA)));
+            G_Mouse.Buffer = static_cast<fl::MouseEvent*>(
+                operator new(G_Mouse.BufferSize * sizeof(fl::MouseEvent)));
         }
         return true;
     }
 
-    // FUN_00420060 (thiscall, RET 8; the first argument, the window, is not read). No HRESULT is
-    // tested: a failed DirectInput8Create leaves +0x0c null and the next call faults, as in
-    // retail.
+    // FUN_00420060 (thiscall, RET 8; the first argument, the window, is not read).
     void CreateDevice(bool bBuffered)
     {
-        G_Mouse.DoubleClickTime = GetDoubleClickTime();
-        DirectInput8Create(GetModuleHandleA(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8A,
-                           reinterpret_cast<void**>(&G_Mouse.DirectInput), nullptr);
-        G_Mouse.DirectInput->CreateDevice(GUID_SysMouse, &G_Mouse.Device, nullptr);
-        G_Mouse.Device->SetDataFormat(&c_dfDIMouse2);
+        G_Mouse.DoubleClickTime = fl::GetWindowHost()->DoubleClickTimeMs();
+        G_Mouse.Device = fl::GetWindowHost()->CreateMouse();
 
         unsigned char const Flags = static_cast<unsigned char>(G_Mouse.Flags | kMouseNeedsPoll);
         G_Mouse.Flags = static_cast<unsigned char>((Flags & ~kMouseBuffered) |
@@ -341,12 +321,12 @@ namespace
             G_Mouse.Remainder[0] = 0.0f;
 
             // A windowed session picks the cursor up where the OS pointer is.
-            POINT Point;
+            int PointX = 0, PointY = 0;
             if (g_display.width != 0 && g_display.height != 0 && g_display.fullscreen == 0 &&
-                GetCursorPos(&Point) != 0 && ScreenToClient(g_client.window, &Point) != 0)
+                fl::GetWindowHost()->GetCursorInWindow(g_client.window, &PointX, &PointY))
             {
-                G_CursorX = Point.x;
-                G_CursorY = Point.y;
+                G_CursorX = PointX;
+                G_CursorY = PointY;
                 G_CursorZ = 0;
             }
 
@@ -361,9 +341,7 @@ namespace
             else if (G_CursorY >= Height)
                 G_CursorY = Height - 1;
 
-            while (ShowCursor(FALSE) >= 0)
-            {
-            }
+            fl::GetWindowHost()->SetCursorVisible(false);
             return;
         }
 
@@ -371,25 +349,15 @@ namespace
         UnacquireAndFlush();
         if (G_Mouse.Device != nullptr)
         {
-            G_Mouse.Device->SetCooperativeLevel(g_client.window,
-                                                DISCL_NONEXCLUSIVE | DISCL_BACKGROUND);
+            G_Mouse.Device->SetExclusive(g_client.window, false);
             G_Mouse.Flags = static_cast<unsigned char>(G_Mouse.Flags & ~kMouseExclusive);
         }
 
-        CURSORINFO Info;
-        Info.cbSize = 0x14;
-        GetCursorInfo(&Info);
-        if ((Info.flags & CURSOR_SHOWING) != 0)
+        if (fl::GetWindowHost()->IsCursorVisible())
             return;
 
-        POINT Point;
-        Point.x = G_CursorX;
-        Point.y = G_CursorY;
-        if (ClientToScreen(g_client.window, &Point) != 0)
-            SetCursorPos(Point.x, Point.y);
-        while (ShowCursor(TRUE) <= 0)
-        {
-        }
+        fl::GetWindowHost()->SetCursorInWindow(g_client.window, G_CursorX, G_CursorY);
+        fl::GetWindowHost()->SetCursorVisible(true);
     }
 
     // FUN_0041f720: take the device exclusive and foreground once. SetCooperativeLevel is called
@@ -399,38 +367,30 @@ namespace
         if ((G_Mouse.Flags & kMouseExclusive) == 0)
         {
             UnacquireAndFlush();
-            HRESULT const Result = G_Mouse.Device->SetCooperativeLevel(
-                g_client.window, DISCL_EXCLUSIVE | DISCL_FOREGROUND);
+            bool const bOk = G_Mouse.Device->SetExclusive(g_client.window, true);
             G_Mouse.Flags = static_cast<unsigned char>((G_Mouse.Flags & ~kMouseExclusive) |
-                                                       (Result >= 0 ? kMouseExclusive : 0));
+                                                       (bOk ? kMouseExclusive : 0));
         }
         return (G_Mouse.Flags & kMouseExclusive) != 0;
     }
 
-    // FUN_0041f7b0: acquire while the game window is in front, retrying up to 100 times while
-    // DirectInput answers DIERR_INPUTLOST; in absolute mode latch the axis base.
+    // FUN_0041f7b0: acquire while the game window is in front (retail retried up to 100 times on
+    // DIERR_INPUTLOST; IMouse::Acquire has no such failure mode); in absolute mode latch the axis base.
     bool Acquire()
     {
-        if ((G_Mouse.Flags & kMouseAcquired) == 0 && GetForegroundWindow() == g_client.window)
+        if ((G_Mouse.Flags & kMouseAcquired) == 0 &&
+            fl::GetWindowHost()->IsWindowForeground(g_client.window))
         {
-            HRESULT Result = 0;
-            int Attempt = 0;
-            do
-            {
-                Result = G_Mouse.Device->Acquire();
-                if (Result != DIERR_INPUTLOST)
-                    break;
-                ++Attempt;
-            } while (Attempt < 100);
+            bool const bOk = G_Mouse.Device->Acquire();
 
             G_Mouse.Flags = static_cast<unsigned char>((G_Mouse.Flags & ~kMouseAcquired) |
-                                                       (Result >= 0 ? kMouseAcquired : 0));
+                                                       (bOk ? kMouseAcquired : 0));
             if ((G_Mouse.Flags & kMouseAcquired) != 0 && (G_Mouse.Flags & kMouseAbsolute) != 0 &&
-                G_Mouse.Device->GetDeviceState(0x14, &G_Mouse.State) >= 0)
+                G_Mouse.Device->ReadState(&G_Mouse.State))
             {
-                G_Mouse.AbsoluteBase[0] = G_Mouse.State.lX - G_CursorX;
-                G_Mouse.AbsoluteBase[1] = G_Mouse.State.lY - G_CursorY;
-                G_Mouse.AbsoluteBase[2] = G_Mouse.State.lZ - G_CursorZ;
+                G_Mouse.AbsoluteBase[0] = G_Mouse.State.x - G_CursorX;
+                G_Mouse.AbsoluteBase[1] = G_Mouse.State.y - G_CursorY;
+                G_Mouse.AbsoluteBase[2] = G_Mouse.State.wheel - G_CursorZ;
             }
         }
         return (G_Mouse.Flags & kMouseAcquired) != 0;
@@ -502,52 +462,50 @@ namespace
     // the record's own timestamp.
     bool ReadBuffered()
     {
-        DWORD Count = G_Mouse.BufferSize;
-        HRESULT const Result = G_Mouse.Device->GetDeviceData(sizeof(DIDEVICEOBJECTDATA),
-                                                             G_Mouse.Buffer, &Count, 0);
-        bool const bOk = Result >= 0;
+        unsigned Count = G_Mouse.BufferSize;
+        bool const bOk = G_Mouse.Device->ReadEvents(G_Mouse.Buffer, &Count);
         if (!bOk || Count == 0)
             return bOk;
 
-        DWORD Index = 0;
+        unsigned Index = 0;
         for (; Index < Count; ++Index)
         {
-            DIDEVICEOBJECTDATA const* const Entry = &G_Mouse.Buffer[Index];
+            fl::MouseEvent const* const Entry = &G_Mouse.Buffer[Index];
             bool const bAbsolute = (G_Mouse.Flags & kMouseAbsolute) != 0;
-            switch (Entry->dwOfs)
+            switch (Entry->control)
             {
-            case DIMOFS_X:
+            case fl::MouseEvent::X:
                 if ((G_Mouse.Flags & kMouseBuffered) == 0)
                 {
-                    ApplyAxis(static_cast<int>(Entry->dwData), bAbsolute, G_Mouse.AbsoluteBase[0],
+                    ApplyAxis(Entry->value, bAbsolute, G_Mouse.AbsoluteBase[0],
                               AxisScale(), &G_Mouse.Remainder[0], &G_CursorX);
                 }
                 break;
-            case DIMOFS_Y:
+            case fl::MouseEvent::Y:
                 if ((G_Mouse.Flags & kMouseBuffered) == 0)
                 {
-                    ApplyAxis(static_cast<int>(Entry->dwData), bAbsolute, G_Mouse.AbsoluteBase[1],
+                    ApplyAxis(Entry->value, bAbsolute, G_Mouse.AbsoluteBase[1],
                               AxisScale(), &G_Mouse.Remainder[1], &G_CursorY);
                 }
                 break;
-            case DIMOFS_Z:
+            case fl::MouseEvent::Wheel:
                 if ((G_Mouse.Flags & kMouseBuffered) == 0)
                 {
-                    ApplyAxis(static_cast<int>(Entry->dwData), bAbsolute, G_Mouse.AbsoluteBase[2],
+                    ApplyAxis(Entry->value, bAbsolute, G_Mouse.AbsoluteBase[2],
                               static_cast<double>(kWheelScale), &G_Mouse.Remainder[2],
                               &G_CursorZ);
                 }
                 break;
-            case DIMOFS_BUTTON0:
-            case DIMOFS_BUTTON1:
-            case DIMOFS_BUTTON2:
-            case DIMOFS_BUTTON3:
-            case DIMOFS_BUTTON4:
-            case DIMOFS_BUTTON5:
-            case DIMOFS_BUTTON6:
-            case DIMOFS_BUTTON7:
-                OnButtonChange(Entry->dwOfs - DIMOFS_BUTTON0, ((Entry->dwData >> 7) & 1) != 0,
-                               Entry->dwTimeStamp);
+            case fl::MouseEvent::Button0 + 0:
+            case fl::MouseEvent::Button0 + 1:
+            case fl::MouseEvent::Button0 + 2:
+            case fl::MouseEvent::Button0 + 3:
+            case fl::MouseEvent::Button0 + 4:
+            case fl::MouseEvent::Button0 + 5:
+            case fl::MouseEvent::Button0 + 6:
+            case fl::MouseEvent::Button0 + 7:
+                OnButtonChange(Entry->control - fl::MouseEvent::Button0, Entry->value != 0,
+                               Entry->timestampMs);
                 break;
             default:
                 break;
@@ -560,16 +518,15 @@ namespace
     // DAT_00616850 disagrees with the device, stamped with the frame time FUN_0042d670.
     bool ReadImmediate()
     {
-        HRESULT const Result = G_Mouse.Device->GetDeviceState(0x14, &G_Mouse.State);
-        bool const bOk = Result >= 0;
+        bool const bOk = G_Mouse.Device->ReadState(&G_Mouse.State);
         if (!bOk)
             return false;
 
-        ApplyAxis(G_Mouse.State.lX, (G_Mouse.Flags & kMouseAbsolute) != 0,
+        ApplyAxis(G_Mouse.State.x, (G_Mouse.Flags & kMouseAbsolute) != 0,
                   G_Mouse.AbsoluteBase[0], AxisScale(), &G_Mouse.Remainder[0], &G_CursorX);
-        ApplyAxis(G_Mouse.State.lY, (G_Mouse.Flags & kMouseAbsolute) != 0,
+        ApplyAxis(G_Mouse.State.y, (G_Mouse.Flags & kMouseAbsolute) != 0,
                   G_Mouse.AbsoluteBase[1], AxisScale(), &G_Mouse.Remainder[1], &G_CursorY);
-        ApplyAxis(G_Mouse.State.lZ, (G_Mouse.Flags & kMouseAbsolute) != 0,
+        ApplyAxis(G_Mouse.State.wheel, (G_Mouse.Flags & kMouseAbsolute) != 0,
                   G_Mouse.AbsoluteBase[2], static_cast<double>(kWheelScale),
                   &G_Mouse.Remainder[2], &G_CursorZ);
 
@@ -577,7 +534,7 @@ namespace
         unsigned Index = 0;
         for (; Index < kMouseButtonCount; ++Index)
         {
-            bool const bDown = (G_Mouse.State.rgbButtons[Index] >> 7) != 0;
+            bool const bDown = G_Mouse.State.down[Index] != 0;
             bool const bHeld = (G_MouseButtons & (1u << Index)) != 0;
             if (bDown == bHeld)
                 continue;
@@ -878,7 +835,7 @@ namespace
                 continue;
 
             char const* const Nickname = Reader.get_value_string(0);
-            FMouseCursor* const Cursor = static_cast<FMouseCursor*>(operator new(0x90));
+            FMouseCursor* const Cursor = static_cast<FMouseCursor*>(operator new(sizeof(FMouseCursor) > 0x90 ? sizeof(FMouseCursor) : 0x90));
             CursorConstruct(Cursor);
             Cursor->Name = Nickname; // FUN_00420750
 
@@ -1137,16 +1094,8 @@ void MouseShutdown()
     if (G_Mouse.Device != nullptr)
     {
         G_Mouse.Device->Unacquire();
-        if (G_Mouse.Device != nullptr)
-        {
-            G_Mouse.Device->Release();
-            G_Mouse.Device = nullptr;
-        }
-    }
-    if (G_Mouse.DirectInput != nullptr)
-    {
-        G_Mouse.DirectInput->Release();
-        G_Mouse.DirectInput = nullptr;
+        G_Mouse.Device->Destroy();
+        G_Mouse.Device = nullptr;
     }
 
     G_CurrentCursor = nullptr;

@@ -30,7 +30,7 @@ namespace
     unsigned G_FpsWindowFrames = 0; // DAT_00667d6c
     // DAT_00667d20 — timeGetTime() of the current frame; seeded at load by the XC entry
     // LAB_0042d650 (0x0060f188: CALL timeGetTime / MOV [0x667d20],EAX).
-    unsigned long G_LastTickMs = timeGetTime();
+    uint32_t G_LastTickMs = timeGetTime();
     bool G_bNetworkStalled = false; // DAT_00667d58
     int G_PauseDepth = 0;         // DAT_00667d68 — frame-time getters (0042d680/6a0)
     int G_ServerTickPauseDepth = 0; // DAT_00667d54 — FUN_0042d740 skips IServer::Update
@@ -159,7 +159,7 @@ unsigned GetClientFrameCount()
     return G_FrameCount;
 }
 
-unsigned long GetClientFrameTimestampMs()
+uint32_t GetClientFrameTimestampMs()
 {
     // FUN_0042d670.
     return G_LastTickMs;

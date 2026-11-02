@@ -8,6 +8,7 @@
 // CMN-SPLIT stage 1 (2026-10-14): split out of common_iface.cpp unchanged.
 
 #include "common_iface.h"
+#include "fl/handles.h"
 #include "common_misc.h" // malloc_strcpy / malloc_strfree -- ScriptBehavior string slots
 
 #include <cstring>
@@ -173,12 +174,12 @@ void ScriptBehavior::destroy()
     DescFmtStr.destroy();                                               // .text:0632df83 (tail JMP)
 }
 
-unsigned long ScriptBehavior::get_key() const
+uint32_t ScriptBehavior::get_key() const
 {
     // .text:06261d90 (export 2848, ICF-folded with Rect::leftmost, BaseData::get_base_id and
     // a dozen other getters): `MOV EAX,dword ptr [this]; RET` -- the dword at +0x00, which is
     // BehaviorId. The previous body returned Field04 (+0x04).
-    return static_cast<unsigned long>(BehaviorId);
+    return static_cast<uint32_t>(BehaviorId);
 }
 
 // .text:0632e530. Starts with destroy() inlined (.text:0632e535-0632e590: free StringArray[i]
@@ -261,7 +262,7 @@ void ScriptBehavior::marshal(MarshalBuffer* Buf) const
 // retail, and only on a truncated buffer.
 void ScriptBehavior::unmarshal(MarshalBuffer* Buf)
 {
-    unsigned int Scratch = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Buf));
+    unsigned int Scratch = static_cast<unsigned int>(fl::PtrToHandle(Buf));
 
     Buf->get_void(&Scratch, 4);                                         // .text:0632e18b
     BehaviorId = static_cast<int>(Scratch);                             // .text:0632e19a

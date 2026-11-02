@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include "common_archetype.h"
+#include "fl/handles.h"
 #include "common_archetype_internal.h"
 
 #include "common_cobject.h" // CollisionGroupDesc (get_undamaged_collision_group_list)
@@ -657,7 +658,7 @@ namespace Archetype
         return false;
     }
 
-    long Munition::BEAM_ARCH_INDEX = -1;
+    int32_t Munition::BEAM_ARCH_INDEX = -1;
 
     // Port-only names for code retail inlines into its two callers (they need the protected
     // static): the LoadEquipment tail 062f930e..062f9347 and Archetype::Free 062fab7f..062fab98.
@@ -671,7 +672,7 @@ namespace Archetype
         FEngineArchetypeName Name;
         Name.Text = "BEAM_ARCH";
         Name.Crc = DACOM_CRC::GetCRC32("BEAM_ARCH");
-        BEAM_ARCH_INDEX = (long)DALib::Engine->CreateCompoundArchetype(&Name);
+        BEAM_ARCH_INDEX = (int32_t)fl::PtrToHandle(DALib::Engine->CreateCompoundArchetype(&Name));
     }
 
     void Munition::FreeBeamArchIdx()
@@ -679,7 +680,7 @@ namespace Archetype
         // 062fab7f: not -1 -> IEngine slot 15 (+0x3c, ReleaseHandle), then -1. No engine test.
         if (BEAM_ARCH_INDEX == -1)
             return;
-        DALib::Engine->ReleaseHandle((void*)BEAM_ARCH_INDEX);
+        DALib::Engine->ReleaseHandle((void*)fl::HandleToPtr(BEAM_ARCH_INDEX));
         BEAM_ARCH_INDEX = -1;
     }
 
@@ -691,7 +692,7 @@ namespace Archetype
         if (DaArchetype.Value[0] == '\0')
         {
             EngineIndex = BEAM_ARCH_INDEX;
-            DALib::Engine->AddRefHandle((void*)EngineIndex);
+            DALib::Engine->AddRefHandle((void*)fl::HandleToPtr(EngineIndex));
             LoadCount += 1;
             return true;
         }
@@ -707,7 +708,7 @@ namespace Archetype
         {
             if (EngineIndex != -1)
             {
-                DALib::Engine->ReleaseHandle((void*)EngineIndex);
+                DALib::Engine->ReleaseHandle((void*)fl::HandleToPtr(EngineIndex));
                 EngineIndex = -1;
             }
             CliObjFreeResources(Companion);

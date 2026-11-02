@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_compound.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "gf_script_object.h"
@@ -19,8 +20,8 @@ namespace
     char const* const GScriptCompoundFile =
         "E:\\FL\\Scratch\\Source\\Client\\Gf\\ScriptCompound.cpp";
 
-    void* const kCompoundNoAnimScript = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    unsigned long const kCompoundNoPlayback = 0xFFFFFFFFu;
+    void* const kCompoundNoAnimScript = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
+    uint32_t const kCompoundNoPlayback = 0xFFFFFFFFu;
 
     // DAT_0066d11c -- this file's 3DMathEngine, acquired (FUN_005b73e0) on first use by each of
     // the eight bodies that read it (0x00451515 .. 0x00451d17; nothing else references it).
@@ -33,9 +34,9 @@ namespace
         return G_ThornCompoundMath;
     }
 
-    void* InstancePointer(long Instance)
+    void* InstancePointer(int32_t Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Instance)));
     }
 
     FVector const& AsMathVector(Vector const& Value)
@@ -174,12 +175,12 @@ GENRESULT DACOM_API FThornCompound::StartMotion(void* DescArg)
 
     EventId[Slot] = Desc->Common.UniqueId;
     bPlaying[Slot] = 1;
-    unsigned long const PlaybackId = DALib::Anim->PlayScript(
+    uint32_t const PlaybackId = DALib::Anim->PlayScript(
         AnimScript, InstancePointer(Instance), Desc->Animation, nullptr, nullptr);
     Playback[Slot] = PlaybackId;
     if (PlaybackId != kCompoundNoPlayback)
     {
-        DALib::Anim->EvalPlayback(PlaybackId, static_cast<unsigned long>(Desc->Common.EventFlags),
+        DALib::Anim->EvalPlayback(PlaybackId, static_cast<uint32_t>(Desc->Common.EventFlags),
                                   Desc->StartTime, Desc->TimeScale,
                                   AsOpaqueDword(Desc->TransTime), AsOpaqueDword(Desc->Weight),
                                   AsOpaqueDword(Desc->TransScale), nullptr);
@@ -271,7 +272,7 @@ GENRESULT DACOM_API FThornCompound::GetHardpointXform(int TargetType, char const
             int const Index = Hardpoints.find_name(Name);
             if (Index == -1)
                 return GR_GENERIC;
-            long const HpInstance = Hardpoints.get_instance(Index);
+            int32_t const HpInstance = Hardpoints.get_instance(Index);
             HardpointInfo const Info = Hardpoints.get_info(Index);
             Vector const InstPos = *reinterpret_cast<Vector const*>(
                 DALib::Engine->GetInstancePosition(InstancePointer(HpInstance)));
@@ -441,7 +442,7 @@ void FThornCompound::SetFlags(unsigned char bVisible, unsigned char bLit, unsign
 }
 
 // FUN_00451330.
-void FThornCompound::SetInstance(long InInstance)
+void FThornCompound::SetInstance(int32_t InInstance)
 {
     Instance = InInstance;
     Hardpoints.destroy();

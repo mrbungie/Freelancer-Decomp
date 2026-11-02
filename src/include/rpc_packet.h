@@ -17,6 +17,7 @@
 //
 // Ground truth: docs/re/rpclocal.md, EXE/Disasm/rpclocal.dll.txt.
 #pragma once
+#include <cstdint>
 
 #include <iosfwd>
 #include <map>
@@ -93,8 +94,10 @@ public:
     unsigned int GetOpcode() const { return PacketId & 0xfff; }
 
     // Payload starts at +0x20 and belongs to the concrete packet class.
-    unsigned char* Payload() { return reinterpret_cast<unsigned char*>(this) + 0x20; }
-    const unsigned char* Payload() const { return reinterpret_cast<const unsigned char*>(this) + 0x20; }
+    // (LP64: the header is wider than retail's 0x20 -- 8-byte vptr and pointers -- so the payload starts
+    // right behind it, where the concrete class's Body[] member is.)
+    unsigned char* Payload() { return reinterpret_cast<unsigned char*>(this) + sizeof(FPacketBase); }
+    const unsigned char* Payload() const { return reinterpret_cast<const unsigned char*>(this) + sizeof(FPacketBase); }
     unsigned int* PayloadDwords() { return reinterpret_cast<unsigned int*>(Payload()); }
     const unsigned int* PayloadDwords() const { return reinterpret_cast<const unsigned int*>(Payload()); }
 
@@ -121,13 +124,20 @@ public:
     // and +0x1c and leaves +0x14 / +0x18 alone, as retail's does.
     unsigned int MarshalCursor;   // +0x10  bytes emitted/consumed so far
     unsigned int MarshalLimit;    // +0x14  capacity of the caller's buffer
-    unsigned int MarshalPtr;      // +0x18  moving read/write pointer into that buffer
+    uintptr_t MarshalPtr;         // +0x18 (pointer-sized on LP64 builds; 32-bit in retail)  moving read/write pointer into that buffer
     unsigned int MarshalError;    // +0x1c  0 = ok, 0x16 = encode overflow, 0x17 = decode overrun
 };
 
 // The compiler must place the vptr first and pack the seven dwords behind it, so the
 // payload really does begin at +0x20 exactly as retail's does.
 static_assert(sizeof(FPacketBase) == 0x20, "FPacketBase must match the retail CDAPacket base");
+
+// Retail payload offsets (>= 0x20, as the listings address them off the packet) -> this build's address of
+// the same payload byte. Identity when the header really is 0x20 bytes.
+inline unsigned int FPacketRetailOffset(unsigned int RetailOffset)
+{
+    return RetailOffset >= 0x20u ? RetailOffset - 0x20u + static_cast<unsigned int>(sizeof(FPacketBase)) : RetailOffset;
+}
 
 // ===========================================================================
 // The retail packet factory -- one per registered class.

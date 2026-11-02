@@ -361,7 +361,7 @@ namespace
                 return false;
             }
             fseek(File, 0, SEEK_END);
-            const long FileSize = ftell(File);
+            const int32_t FileSize = ftell(File);
             fseek(File, 0, SEEK_SET);
             Buffer = new char[(size_t)FileSize];
             if (fread(Buffer, 1, (size_t)FileSize, File) != (size_t)FileSize)
@@ -786,10 +786,10 @@ namespace
         explicit FProfileParserInner(FProfileParserObject* OwnerIn) : RefCount(1), Owner(OwnerIn) {}
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override { return ++RefCount; } // 065b4740
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override { return ++RefCount; } // 065b4740
+        uint32_t DACOM_API Release() override;
 
-        unsigned long RefCount;      // +0x20
+        uint32_t RefCount;      // +0x20
         FProfileParserObject* Owner; // +0x24
     };
 
@@ -813,9 +813,9 @@ namespace
             return Outer->QueryInterface(Iid, Out);
         }
 
-        unsigned long DACOM_API AddRef() override { return Outer->AddRef(); }
+        uint32_t DACOM_API AddRef() override { return Outer->AddRef(); }
 
-        unsigned long DACOM_API Release() override { return Outer->Release(); }
+        uint32_t DACOM_API Release() override { return Outer->Release(); }
 
         // Retail FUN_065b4430: load an INI file. Flag 1 is refused.
         // formerly UnnamedSlot3
@@ -967,7 +967,7 @@ namespace
     }
 
     // Retail LAB_065b4920: at zero the count is reset to 1 and the owner object deleted.
-    unsigned long DACOM_API FProfileParserInner::Release()
+    uint32_t DACOM_API FProfileParserInner::Release()
     {
         if (RefCount > 0)
             --RefCount;
@@ -999,10 +999,10 @@ namespace
         }
 
         // Retail LAB_065b4740.
-        unsigned long DACOM_API AddRef() override { return ++RefCount; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount; }
 
         // Retail FUN_065b5c90.
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount > 0)
                 --RefCount;
@@ -1050,7 +1050,7 @@ namespace
         }
 
     private:
-        unsigned long RefCount; // +4
+        uint32_t RefCount; // +4
         const char* Name;       // +8
     };
 
@@ -1063,7 +1063,7 @@ namespace
     {
         IComponentFactory* Factory;
         char* Name;
-        unsigned long Priority;
+        uint32_t Priority;
         char* LibraryName;
     };
 
@@ -1091,7 +1091,7 @@ namespace
 
     typedef std::list<FFactoryLink> FFactoryLinkList;
     // Retail std::map keyed by DACOM_CRC::GetCRC32(name), ascending (COManager +0x08).
-    typedef std::map<unsigned long, FFactoryLinkList> FComponentRegistry;
+    typedef std::map<uint32_t, FFactoryLinkList> FComponentRegistry;
 
     class FCOManager final : public ICOManager
     {
@@ -1118,8 +1118,8 @@ namespace
         }
 
         // Retail LAB_065b20f0 (both slots).
-        unsigned long DACOM_API AddRef() override { return 1; }
-        unsigned long DACOM_API Release() override { return 1; }
+        uint32_t DACOM_API AddRef() override { return 1; }
+        uint32_t DACOM_API Release() override { return 1; }
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
         GENRESULT DACOM_API RegisterComponent(IDAComponent* Factory, const char* Name, void* Priority) override;
@@ -1198,6 +1198,9 @@ namespace
         for (FFactoryLinkList::iterator It = Links.begin(); It != Links.end(); ++It)
         {
             Result = It->Factory->CreateInstance(Desc, Instance);
+            if (getenv("FL_TRACE_DACOM"))   // porting aid
+                fprintf(stderr, "[dacom] CreateInstance('%s') via %s -> 0x%lx\n", Desc->interface_name,
+                        It->LibraryName ? It->LibraryName : "?", (uint32_t)Result);
             if (Result == GR_OK)
                 return GR_OK;
         }
@@ -1213,7 +1216,7 @@ namespace
             return GR_INVALID_PARMS;
 
         FFactoryLinkList& Links = Registry[DACOM_CRC::GetCRC32(Name)];
-        const unsigned long NewPriority = (unsigned long)((uintptr_t)Priority);
+        const uint32_t NewPriority = (uint32_t)((uintptr_t)Priority);
         FFactoryLinkList::iterator Position = Links.begin();
         while (Position != Links.end() && NewPriority < Position->Priority)
             ++Position;
@@ -1718,7 +1721,7 @@ namespace
     int GRegNpar = 0;             // DAT_065b8b78
     char GRegDummy = 0;           // DAT_065b8b84
     char* GRegCode = nullptr;     // DAT_065b8b88
-    long GRegSize = 0;            // DAT_065b8b8c
+    int32_t GRegSize = 0;            // DAT_065b8b8c
     const char* GRegInput = nullptr; // DAT_065b8b7c; borrowed subject cursor
     const char* GRegBol = nullptr;   // DAT_065b8b98; subject start
     const char** GRegStartP = nullptr; // DAT_065b8b90; writable capture pointers
@@ -2486,10 +2489,10 @@ namespace
         }
 
         // Retail LAB_065b5e10.
-        unsigned long DACOM_API AddRef() override { return ++RefCount; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount; }
 
         // Retail FUN_065b5e20.
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount > 0)
                 --RefCount;
@@ -2598,7 +2601,7 @@ namespace
         FRegexpProgram* Program; // +0x08
         int MatchResult;         // +0x0C, not initialised by retail
         const char* Subject;     // +0x10
-        unsigned long RefCount;  // +0x14
+        uint32_t RefCount;  // +0x14
     };
 
     // "RegExp" factory, vtable 065b71ac: 0xC bytes {vtable, RefCount, Name}; QI / AddRef /
@@ -2618,9 +2621,9 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount; }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount > 0)
                 --RefCount;
@@ -2650,7 +2653,7 @@ namespace
         }
 
     private:
-        unsigned long RefCount;
+        uint32_t RefCount;
         const char* Name;
     };
 
@@ -2688,7 +2691,7 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID /*Reserved*/)
     return TRUE;
 }
 
-unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Str)
+uint32_t __cdecl DACOM_CRC::GetCRC32(const char* Str)
 {
     // Retail FUN_065b60f0 (export thunk 065b4380).
     if (Str == nullptr)
@@ -2699,7 +2702,7 @@ unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Str)
     return ~Crc;
 }
 
-unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Begin, const char* End)
+uint32_t __cdecl DACOM_CRC::GetCRC32(const char* Begin, const char* End)
 {
     // A nonempty range never terminates; volatile reads preserve the faulting access.
     if (Begin == End)
@@ -2709,7 +2712,7 @@ unsigned long __cdecl DACOM_CRC::GetCRC32(const char* Begin, const char* End)
         Crc = StepCrc(Crc, *Cursor);
 }
 
-unsigned long __cdecl DACOM_CRC::GetContinuedCRC32(unsigned long InitialCrc, const char* Str)
+uint32_t __cdecl DACOM_CRC::GetContinuedCRC32(uint32_t InitialCrc, const char* Str)
 {
     // Retail FUN_065b6140 (export thunk 065b43a0).
     if (Str == nullptr)
@@ -2720,7 +2723,7 @@ unsigned long __cdecl DACOM_CRC::GetContinuedCRC32(unsigned long InitialCrc, con
     return ~Crc;
 }
 
-unsigned long __cdecl DACOM_CRC::GetContinuedCRC32(unsigned long InitialCrc, char Ch)
+uint32_t __cdecl DACOM_CRC::GetContinuedCRC32(uint32_t InitialCrc, char Ch)
 {
     // Retail FUN_065b6190 (export thunk 065b43b0).
     return ~StepCrc(~(unsigned int)InitialCrc, Ch);
@@ -2762,11 +2765,11 @@ namespace LogStream
     {
     }
 
-    void __cdecl LogEvent(const char* /*Name*/, float /*Value*/, unsigned long /*Flags*/)
+    void __cdecl LogEvent(const char* /*Name*/, float /*Value*/, uint32_t /*Flags*/)
     {
     }
 
-    void __cdecl LogNamedEvent(const char* /*Name*/, const char* /*Value*/, unsigned long /*Flags*/)
+    void __cdecl LogNamedEvent(const char* /*Name*/, const char* /*Value*/, uint32_t /*Flags*/)
     {
     }
 

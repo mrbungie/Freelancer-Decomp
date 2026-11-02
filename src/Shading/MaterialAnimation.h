@@ -17,15 +17,15 @@ public:
     ~FImaData();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     FMaKeyBlock* DACOM_API KeyBlock() override;
-    void DACOM_API CrcOut(unsigned long* Out) override;
+    void DACOM_API CrcOut(uint32_t* Out) override;
 
-    unsigned long NameCrc; // +4
+    uint32_t NameCrc; // +4
     FMaKeyBlock Keys;      // +8
-    unsigned long RefCount; // +18
+    uint32_t RefCount; // +18
 };
 
 static_assert(offsetof(FImaData, NameCrc) == 0x04, "IMAData CRC +4");
@@ -39,8 +39,8 @@ public:
     ~FImaInstance();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     void AttachData(FImaData* NewData);
     FMaKeyBlock* DACOM_API GetKeyBlock() override;
@@ -50,10 +50,10 @@ public:
 
     FImaData* Data;        // +4
     float Time;            // +8
-    unsigned long Frame;   // +C
+    uint32_t Frame;   // +C
     FImaInstance* Next;    // +10 DAT_06ed57e4 walk
     FImaInstance* Prev;    // +14
-    unsigned long RefCount; // +18
+    uint32_t RefCount; // +18
 };
 
 static_assert(offsetof(FImaInstance, Data) == 0x04, "IMAInstance data +4");
@@ -73,8 +73,8 @@ public:
     explicit FMaterialAnimationController(FMaterialAnimation* InOwner);
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     FMaterialAnimation* Owner;
 };
@@ -85,8 +85,8 @@ public:
     FMatAnimAggregate();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API Initialize() override;
 
     FMaterialAnimation* Owner;
@@ -94,7 +94,7 @@ public:
 
 struct FCrcAnimSlot
 {
-    unsigned long Crc;
+    uint32_t Crc;
     FImaData* Data;
 };
 
@@ -105,19 +105,19 @@ public:
     ~FMaterialAnimation();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     void* DACOM_API LoadAnimationGroup(void* FileSystem) override;
     GENRESULT DACOM_API UnloadAnimationGroup(void* Arg) override;
     GENRESULT DACOM_API CreateAnimationInstance(int Unused, void* Query, IImaInstance** OutInstance) override;
     GENRESULT DACOM_API TickAnimationInstances(int Filter, float Dt) override;
 
     FMatAnimAggregate Aggregate; // +4
-    unsigned long RefCount;
+    uint32_t RefCount;
     IDAComponent* Outer; // retail controlling unknown at +0x1C
     FMaterialAnimationController Controller; // retail non-delegating unknown @ +0x20
     std::vector<FCrcAnimSlot> CrcMap;
 
-    FImaData* FindData(unsigned long Crc) const;
-    void StoreData(unsigned long Crc, FImaData* Data);
+    FImaData* FindData(uint32_t Crc) const;
+    void StoreData(uint32_t Crc, FImaData* Data);
 };

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_physys.h"
+#include "fl/handles.h"
 
 #include "common_archetype.h"
 #include "common_cobject.h"
@@ -388,7 +389,7 @@ namespace
         return true;
     }
 
-    float PhySys_GetChildrenRadius(Vector const& Center, CObject const* Owner, long Instance,
+    float PhySys_GetChildrenRadius(Vector const& Center, CObject const* Owner, int32_t Instance,
                                    bool bIncludeChildren, uint32_t UseHullSlot);
 
     // FUN_06284390 (.text:06284390..0628447f, cdecl).
@@ -403,7 +404,7 @@ namespace
     {
         float Radius;                                       // param_3
         memcpy(&Radius, &UseHullSlot, sizeof(Radius));
-        uint32_t ObjectSlot = (uint32_t)(uintptr_t)Object; // param_1, its low byte the flag
+        uint32_t ObjectSlot = (uint32_t)fl::PtrToHandle(Object); // param_1, its low byte the flag
         switch (Object->PhysicsControlMode)
         {
         case 0:
@@ -468,11 +469,11 @@ namespace
     // FUN_06284480 (.text:06284480..0628456b, cdecl): the largest
     // `child radius + distance(child centre, Center)` over Instance's children; instances of
     // Owner itself are descended into.
-    float PhySys_GetChildrenRadius(Vector const& Center, CObject const* Owner, long Instance,
+    float PhySys_GetChildrenRadius(Vector const& Center, CObject const* Owner, int32_t Instance,
                                    bool bIncludeChildren, uint32_t UseHullSlot)
     {
         float Max = 0.0f;
-        for (long Child = PhySys_RelatedInstance(Instance, 1, -1); Child != -1;
+        for (int32_t Child = PhySys_RelatedInstance(Instance, 1, -1); Child != -1;
              Child = PhySys_RelatedInstance(Instance, 1, Child))
         {
             CObject const* const ChildObject = PhySys_InstanceObject(Child);
@@ -610,11 +611,11 @@ namespace
     // control mode (+0x74): 1 -> FUN_06284fc0 (the body is beamed), 2 -> the transform is
     // stored and FUN_062883c0 runs, else an error; then it is recursed into. The child object
     // is not tested for null.
-    void PhySys_BeamR_Children(CObject* Object, long Instance, FTransform const* NewXform,
+    void PhySys_BeamR_Children(CObject* Object, int32_t Instance, FTransform const* NewXform,
                                FTransform const* InvXform, bool bOptimize)
     {
         // .text:06285190..062851b5 / 06285310..06285333
-        for (long ChildInstance = PhySys_RelatedInstance(Instance, 1, -1); ChildInstance != -1;
+        for (int32_t ChildInstance = PhySys_RelatedInstance(Instance, 1, -1); ChildInstance != -1;
              ChildInstance = PhySys_RelatedInstance(Instance, 1, ChildInstance))
         {
             // .text:062851c0..062851dc

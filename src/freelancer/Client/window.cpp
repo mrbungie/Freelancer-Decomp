@@ -15,7 +15,7 @@
 #include "common_misc.h" // SinglePlayer
 #include "render/IRenderPipeline.h"
 
-#include <windows.h>
+#include "fl/platform.h"   // fl::GetWindowHost(), fl::IWindowEvents
 
 DisplaySettings g_display = {};
 ClientGlobals g_client = {};
@@ -29,12 +29,13 @@ bool G_bRenderMgrShuttingDown = false;     // DAT_006679f9, FUN_004247c0's re-en
 bool G_bRenderPostCreate = true;           // DAT_00610864 (initialised .data 01h)
 bool G_bRenderFrameBegun = false;          // DAT_006679f8 (.data, no initialiser)
 
-// FUN_004246e0 (.text:004246e0-00424791), cdecl(ClassName, Display, Title). A zero width or height
-// in the options object is replaced by 640/480 locally only -- retail never writes it back. The
-// window handle is also stored in RenderMgr's DAT_006679f4 (0x00424788).
-HWND CreateGameWindow(const char* class_name, DisplaySettings* display, const char* title)
+// FUN_004246e0 (.text:004246e0-00424791), cdecl(Display, Title). A zero width or height in the options
+// object is replaced by 640/480 locally only -- retail never writes it back. The window handle is
+// also stored in RenderMgr's DAT_006679f4 (0x00424788).
+// PORT: the window is created by the front end (fl::IWindowHost); the Win32 class name and the
+// AdjustWindowRect/style arithmetic no longer apply -- the requested size is the client area.
+HWND CreateGameWindow(DisplaySettings* display, const char* title)
 {
-    const HINSTANCE instance = GetModuleHandleA(nullptr);
     int width = display->width;
     if (width == 0)
         width = 0x280;
@@ -42,67 +43,24 @@ HWND CreateGameWindow(const char* class_name, DisplaySettings* display, const ch
     if (height == 0)
         height = 0x1e0;
 
-    int x = 0;
-    int y = 0;
-    if (display->fullscreen == 0)
-    {
-        RECT rc = {0, 0, width, height};
-        x = CW_USEDEFAULT;
-        y = CW_USEDEFAULT;
-        if (AdjustWindowRect(&rc, 0x2CA0000, FALSE))
-            width = rc.right - rc.left;
-        // 0x00424758: the height is taken from the rect whether or not the call succeeded.
-        height = rc.bottom - rc.top;
-    }
-
-    G_RenderMgrWindow = CreateWindowExA(0, class_name, title, 0x2CA0000, x, y, width, height,
-                                        nullptr, nullptr, instance, nullptr);
+    G_RenderMgrWindow = fl::GetWindowHost()->CreateGameWindow(title, width, height,
+                                                              display->fullscreen != 0);
     return G_RenderMgrWindow;
 }
 
 // FUN_00424870 (.text:00424870-004249b8), cdecl(hwnd, fullscreen, width, height): records the
 // surface size and mode, then restyles and resizes the window for it.
+// PORT: the front end owns window styles; fullscreen is a desktop-resolution borderless window.
 void ApplyGameWindowLayout(HWND Hwnd, bool bFullscreen, unsigned Width, unsigned Height)
 {
     G_RenderSurfaceWidth = Width;
     G_RenderSurfaceHeight = Height;
     G_bRenderSurfaceFullscreen = bFullscreen;
 
-    if (bFullscreen)
-    {
-        // 0x00424898: never smaller than the desktop (unsigned compares, JAE).
-        RECT Desktop;
-        GetWindowRect(GetDesktopWindow(), &Desktop);
-        if (Width < static_cast<unsigned>(Desktop.right))
-            Width = static_cast<unsigned>(Desktop.right);
-        if (Height < static_cast<unsigned>(Desktop.bottom))
-            Height = static_cast<unsigned>(Desktop.bottom);
-
-        SetWindowLongA(Hwnd, GWL_STYLE, static_cast<LONG>(0x80000000)); // WS_POPUP
-        SetWindowPos(Hwnd, nullptr, 0, 0, 0, 0, 0x27);
-        SetWindowPos(Hwnd, HWND_TOPMOST, 0, 0, static_cast<int>(Width), static_cast<int>(Height),
-                     0x100);
-        ShowWindow(Hwnd, SW_SHOWNORMAL);
-        return;
-    }
-
-    // 0x00424906.
-    SetWindowLongA(Hwnd, GWL_STYLE, 0x2ca0000);
-    SetWindowPos(Hwnd, nullptr, 0, 0, 0, 0, 0x27);
-    RECT Frame;
-    Frame.left = 0;
-    Frame.top = 0;
-    Frame.right = static_cast<LONG>(Width);
-    Frame.bottom = static_cast<LONG>(Height);
-    // Argument evaluation order as retail: ex-style, menu, style.
-    const DWORD ExStyle = static_cast<DWORD>(GetWindowLongA(Hwnd, GWL_EXSTYLE));
-    const BOOL bMenu = GetMenu(Hwnd) != nullptr ? TRUE : FALSE;
-    const DWORD Style = static_cast<DWORD>(GetWindowLongA(Hwnd, GWL_STYLE));
-    AdjustWindowRectEx(&Frame, Style, bMenu, ExStyle);
-    SetWindowPos(Hwnd, HWND_NOTOPMOST, 0, 0, Frame.right - Frame.left, Frame.bottom - Frame.top,
-                 0x102);
-    ShowWindow(Hwnd, G_bRenderMgrShuttingDown ? SW_HIDE : SW_SHOWNORMAL);
-    InvalidateRect(nullptr, nullptr, TRUE);
+    if (G_bRenderMgrShuttingDown && !bFullscreen)
+        return;   // retail hid the window (SW_HIDE) while shutting the render manager down
+    fl::GetWindowHost()->SetWindowMode(Hwnd, bFullscreen, static_cast<int>(Width),
+                                       static_cast<int>(Height));
 }
 
 namespace
@@ -139,7 +97,7 @@ namespace
         return SinglePlayer();
     }
 
-    void OnActivateApp(bool bActive)
+    void OnActivateAppState(bool bActive)
     {
         // LAB_005b264c. DAT_00615ba9 is the local "active" copy; the derived gate is
         // DAT_00615ba8, which stays 1 whenever the app is not a fullscreen single-player
@@ -215,75 +173,37 @@ void RequestClientQuitDialog()
     NnExitOpen(false);
 }
 
-LRESULT CALLBACK ClientWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+// Replaces ClientWndProc (LAB_005b2570): the front end calls these from PumpEvents.
+// PORT: the IME's first look at every message (IMEFocus::WndProc) is not routed here yet, and
+// WM_NCHITTEST / WM_ERASEBKGND / WM_SYSKEYUP / SC_SCREENSAVE have no meaning outside Windows.
+namespace
 {
-    // LAB_005b2570 head. The IME gets first refusal on every message; a true return means it
-    // consumed it, and the LRESULT comes back through the out parameter. Retail hands WndProc
-    // the GLOBAL window handle (DAT_0067eca0) rather than the hwnd it was called with, and
-    // reuses the lparam argument slot as that out parameter (005b258f / 005b25ac).
-    IMEFocus* const Ime = IMEFocus::GetSingleton();
-    if (Ime != nullptr)
+    class FClientWindowEvents : public fl::IWindowEvents
     {
-        int Handled = 0;
-        if (Ime->WndProc(g_client.window, msg, wparam, lparam, &Handled))
-            return Handled;
-    }
+    public:
+        void OnFocus(bool bGained) override
+        {
+            if (bGained)
+                ClientInputOnFocusGained(); // caseD_7 -- FUN_0041eac0
+            else
+                ClientInputOnFocusLost();   // caseD_8 -- FUN_0041ecf0
+        }
+        void OnActivateApp(bool bActive) override
+        {
+            OnActivateAppState(bActive);
+            if (!G_bAppActive && g_display.fullscreen != 0)
+            {
+                // DALib::Pipeline slot 14 (+0x38) -- release the device while minimised.
+                ReleaseRenderDeviceForDeactivate();
+            }
+        }
+        void OnCloseRequested() override { OnSysCommandClose(); }
+        void OnMouseMove() override { ClientInputOnMouseMove(); }
+    };
+}
 
-    switch (msg)
-    {
-    case WM_SETFOCUS:
-        ClientInputOnFocusGained(); // caseD_7 — FUN_0041eac0
-        break;
-    case WM_KILLFOCUS:
-        ClientInputOnFocusLost(); // caseD_8 — FUN_0041ecf0
-        break;
-    case WM_ERASEBKGND:
-        // caseD_14 — FUN_00425160 returns DAT_00610864; non-zero means "the engine owns the
-        // surface, do not let GDI erase it".
-        if (G_bRenderPostCreate)
-            return 1;
-        break;
-    // WM_PAINT (0xF): retail switch byte at 0x005b27b9 = 5 → caseD_3 → DefWindowProcA
-    // (LAB_005b277e). No BeginPaint/EndPaint / ValidateRect here — those were a port scaffold.
-    case WM_ACTIVATEAPP:
-        OnActivateApp(wparam == 1);
-        if (!G_bAppActive && g_display.fullscreen != 0)
-        {
-            // DALib::Pipeline slot 14 (+0x38) — release the device while minimised.
-            ReleaseRenderDeviceForDeactivate();
-        }
-        break;
-    case WM_NCHITTEST:
-        // LAB_005b26fb — a fullscreen window claims every pixel as client area.
-        if (g_display.fullscreen != 0)
-            return HTCLIENT;
-        break;
-    case WM_SYSKEYUP:
-        // 0x105 — swallowed so Alt releases never reach DefWindowProc's menu handling.
-        return 0;
-    case WM_SYSCOMMAND:
-        if (wparam == SC_CLOSE)
-        {
-            OnSysCommandClose();
-            return 0;
-        }
-        if (wparam == SC_SCREENSAVE)
-            return 0;
-        break;
-    case WM_MOUSEMOVE:
-        // 0x005b276c..0x005b2776: CMP ESI,0x200 -> FUN_0041e890, then caseD_3 -> DefWindowProcA.
-        // Retail's WndProc has no WM_LBUTTONDOWN / WM_LBUTTONUP case: buttons arrive through
-        // the DirectInput queue (MouseDispatchEvents, FUN_0041ef20) and the Win3D handler.
-        ClientInputOnMouseMove();
-        break;
-    case WM_CLOSE:
-        DestroyWindow(hwnd);
-        return 0;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-    default:
-        return DefWindowProcA(hwnd, msg, wparam, lparam);
-    }
-    return DefWindowProcA(hwnd, msg, wparam, lparam);
+fl::IWindowEvents* ClientWindowEvents()
+{
+    static FClientWindowEvents Events;
+    return &Events;
 }

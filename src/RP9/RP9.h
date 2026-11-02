@@ -29,7 +29,7 @@
 #include <map>
 #include <vector>
 
-static const unsigned long kRp9RegisterPriority = 0x40000000;
+static const uint32_t kRp9RegisterPriority = 0x40000000;
 // QueryDeviceAbility accepts 0..0x14. Indices 0..0x13 live here; 0x14 reads render-state entry
 // 0, which is where RP8's 21st ability dword overlaps (see FDirectX9::QueryDeviceAbility).
 static const unsigned int kRp9AbilityCount = 20;
@@ -60,7 +60,7 @@ enum ERp9PipelineState : int
 
 struct FRp9AggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -91,8 +91,8 @@ struct FRp9Property
 {
     const char* Name;
     int Id;
-    unsigned long Default;
-    unsigned long Value;
+    uint32_t Default;
+    uint32_t Value;
     unsigned char bEnabled;
 };
 
@@ -101,21 +101,21 @@ typedef std::map<int, FRp9Property> FRp9PropertyMap;
 // One pipeline-state slot {value, has-default, set-by-ini} (RP8: [this + 0x354 + Id*0xC]).
 struct FRp9PipelineStateSlot
 {
-    unsigned long Value;
-    unsigned long bHasDefault;
-    unsigned long bOverridden;
+    uint32_t Value;
+    uint32_t bHasDefault;
+    uint32_t bOverridden;
 };
 
 // RP8 FRp8AdapterMode: one display-mode record of an adapter. Only the two pf indices are set.
 struct FRp9AdapterMode
 {
-    unsigned long Field00;
-    unsigned long Field04;
-    unsigned long Field08;
-    unsigned long Field0C;
-    unsigned long PfIndex10;
-    unsigned long PfIndex14;
-    unsigned long Field18;
+    uint32_t Field00;
+    uint32_t Field04;
+    uint32_t Field08;
+    uint32_t Field0C;
+    uint32_t PfIndex10;
+    uint32_t PfIndex14;
+    uint32_t Field18;
 };
 
 // RP8 FRp8Adapter: one 0x520-byte adapter record, copied out whole by get_device_info. The
@@ -125,10 +125,10 @@ struct FRp9Adapter
     FRp9Identifier8 Identifier;        // +0x000 D3DADAPTER_IDENTIFIER8 shape
     D3DDISPLAYMODE DisplayMode;        // +0x42C GetAdapterDisplayMode (same layout in D3D8/9)
     FRp9Caps8 Caps;                    // +0x43C D3DCAPS8 shape
-    unsigned long Field510;            // +0x510 TODO: no writer found in RP8's startup either
-    unsigned long CanRenderWindowed;   // +0x514 Caps.Caps2 & D3DCAPS2_CANRENDERWINDOWED
+    uint32_t Field510;            // +0x510 TODO: no writer found in RP8's startup either
+    uint32_t CanRenderWindowed;   // +0x514 Caps.Caps2 & D3DCAPS2_CANRENDERWINDOWED
     FRp9AdapterMode* Modes;            // +0x518 operator new(ModeCount * 0x1C)
-    unsigned long ModeCount;           // +0x51C display-mode count (RP9 mode list)
+    uint32_t ModeCount;           // +0x51C display-mode count (RP9 mode list)
 };
 
 static_assert(sizeof(FRp9Adapter) == 0x520, "get_device_info copies a 0x520-byte record");
@@ -141,14 +141,14 @@ struct FRp9Vb
 {
     void ReleaseGpu(); // formerly ReleaseVbGpu
 
-    unsigned long Flags;
-    unsigned long Fvf;
-    unsigned long Count;
-    unsigned long Used;
-    unsigned long Locked;
+    uint32_t Flags;
+    uint32_t Fvf;
+    uint32_t Count;
+    uint32_t Used;
+    uint32_t Locked;
     FRp9Vb* Next;
     FRp9Vb* Prev;
-    unsigned long Field1C;
+    uint32_t Field1C;
     IDirect3DVertexBuffer9* Gpu;
 };
 
@@ -157,13 +157,13 @@ struct FRp9Ib
     HRESULT LockRange(unsigned int Start, unsigned int Count, void** OutBits,
                       unsigned int* OutStart, unsigned char bSysLock); // formerly LockIbRange
 
-    unsigned long Flags;
+    uint32_t Flags;
     IDirect3DIndexBuffer9* Gpu;
     void* LockedBits;
     FRp9Ib* Next;
     FRp9Ib* Prev;
-    unsigned long Cursor;
-    unsigned long Capacity;
+    uint32_t Cursor;
+    uint32_t Capacity;
 };
 
 // The intrusive lists of create_vb / create_ib nodes (RP8 object +0x22E4 / +0x22F0).
@@ -171,14 +171,14 @@ struct FRp9VbList
 {
     FRp9Vb* First;
     FRp9Vb* Last;
-    unsigned long Count;
+    uint32_t Count;
 };
 
 struct FRp9IbList
 {
     FRp9Ib* First;
     FRp9Ib* Last;
-    unsigned long Count;
+    uint32_t Count;
 };
 
 enum ERp9StreamDirtyFlag : unsigned char
@@ -196,10 +196,10 @@ struct FRp9StreamDirtyFlags
 struct FRp9StreamCache
 {
     void Reset(); // formerly ResetStreamCache
-    void SelectVertexStream(FRp9Vb* Buffer, unsigned long Fvf); // formerly MarkStreamVb / MarkStreamFvf
+    void SelectVertexStream(FRp9Vb* Buffer, uint32_t Fvf); // formerly MarkStreamVb / MarkStreamFvf
     void SelectIndices(FRp9Ib* Buffer, unsigned int BaseVertex); // formerly MarkStreamScratchIb / SelectIb cache stores
 
-    unsigned long Fvf;
+    uint32_t Fvf;
     FRp9Vb* VertexBuffer;
     FRp9Ib* IndexBuffer;
     unsigned int BaseVertex;
@@ -208,7 +208,7 @@ struct FRp9StreamCache
 
 struct FRp9TextureStageState
 {
-    unsigned long Value;
+    uint32_t Value;
     unsigned char bValid;
     unsigned char Reserved[3];
 };
@@ -241,8 +241,8 @@ struct FRp9DeviceStateCaches
 
     // Type is a D3D8 D3DTSS_* number (the cache is indexed in D3D8 numbering); sampler states
     // are read back with GetSamplerState.
-    unsigned long ReadTextureStageState(IDirect3DDevice9* Device, unsigned long Stage,
-                                        unsigned long Type); // formerly ReadTssCache
+    uint32_t ReadTextureStageState(IDirect3DDevice9* Device, uint32_t Stage,
+                                        uint32_t Type); // formerly ReadTssCache
 
     FRp9TextureStageState TextureStates[StageCount][StateCount];
     FRp9TextureBinding TextureBindings[StageCount];
@@ -256,7 +256,7 @@ struct FRp9DeviceStateCaches
 struct FRp9ExStageSave
 {
     static const unsigned int SamplerTypeCount = 10;
-    static const unsigned long SamplerTypes[SamplerTypeCount];
+    static const uint32_t SamplerTypes[SamplerTypeCount];
 
     FRp9TextureBinding Binding;
     FRp9TextureStageState Samplers[SamplerTypeCount];
@@ -282,16 +282,16 @@ struct FormatClassNode
 struct FRp9LightManager
 {
     void Initialize(); // formerly LightManagerConstruct
-    int FindOrCreate(unsigned long Handle, const D3DLIGHT8* Data); // formerly LightFindOrCreate
-    bool Remove(unsigned long Handle); // formerly LightRemove
-    unsigned char GetEnable(unsigned long Handle); // formerly LightGetEnable
-    bool Update(unsigned long Handle); // formerly LightUpdate
-    bool SetEnable(unsigned long Handle, int Enable); // formerly LightSetEnable
+    int FindOrCreate(uint32_t Handle, const D3DLIGHT8* Data); // formerly LightFindOrCreate
+    bool Remove(uint32_t Handle); // formerly LightRemove
+    unsigned char GetEnable(uint32_t Handle); // formerly LightGetEnable
+    bool Update(uint32_t Handle); // formerly LightUpdate
+    bool SetEnable(uint32_t Handle, int Enable); // formerly LightSetEnable
     void Reset(); // formerly LightReset
     HRESULT Flush(IDirect3DDevice9* Device); // formerly LightFlush
 
-    long EnabledCount; // lights whose LightEnable state on the device is on
-    long Generation;   // flush counter
+    int32_t EnabledCount; // lights whose LightEnable state on the device is on
+    int32_t Generation;   // flush counter
 };
 
 class FDirectX9;
@@ -300,10 +300,10 @@ struct FRp9ExState; // RP9Ex.h
 
 struct FRp9RenderStateEntry
 {
-    unsigned long Cached;
-    unsigned long Pending;
-    unsigned long Generation;
-    unsigned long bEnabled;
+    uint32_t Cached;
+    uint32_t Pending;
+    uint32_t Generation;
+    uint32_t bEnabled;
 };
 
 // Indexed by D3D8 D3DRENDERSTATETYPE; Apply translates a state to its D3D9 call.
@@ -313,19 +313,19 @@ struct FRp9RenderStateCache
 
     void Initialize(); // formerly InitRsQueue
     void ResetGeneration(); // formerly RsQueueResetGeneration
-    unsigned long GetPending(unsigned int StateId) const; // formerly RsQueueReadPending
-    HRESULT Apply(IDirect3DDevice9* Device, unsigned int StateId, unsigned long Value); // formerly RsQueueApply
-    bool MarkDirty(unsigned int StateId, unsigned long Value); // formerly RsQueueMarkDirty
+    uint32_t GetPending(unsigned int StateId) const; // formerly RsQueueReadPending
+    HRESULT Apply(IDirect3DDevice9* Device, unsigned int StateId, uint32_t Value); // formerly RsQueueApply
+    bool MarkDirty(unsigned int StateId, uint32_t Value); // formerly RsQueueMarkDirty
     void Flush(IDirect3DDevice9* Device); // formerly RsQueueFlush
     // RP9 Ex only: queue every state whose requested value differs from Snapshot (a copy of
     // the Pending column taken by BeginExPass) back to the snapshot value, so the next flush
     // re-sends what the pass changed. Disabled states are untouched, as MarkDirty does.
-    void RestorePending(const unsigned long* Snapshot);
+    void RestorePending(const uint32_t* Snapshot);
 
     FRp9RenderStateEntry Entries[StateCount];
-    unsigned long DirtyStates[StateCount];
-    unsigned long DirtyCount;
-    unsigned long Generation;
+    uint32_t DirtyStates[StateCount];
+    uint32_t DirtyCount;
+    uint32_t Generation;
     // D3D9 only: depth bits of the auto depth-stencil surface, for the D3DRS_ZBIAS ->
     // D3DRS_DEPTHBIAS conversion (set by create_buffers before the defaults are applied).
     int DepthBiasZBits;
@@ -337,10 +337,10 @@ public:
     FRp9Inner();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     FDirectX9* Owner;
 };
 
@@ -350,11 +350,11 @@ public:
     FRp9Factory();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
     GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
-    unsigned long RefCount;
+    uint32_t RefCount;
     const char* Name;
 };
 
@@ -375,22 +375,22 @@ public:
     ~FDirectX9();
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API Startup(const char* SectionName) override;
     GENRESULT DACOM_API ShutdownPipeline() override;
     GENRESULT DACOM_API SetPipelineState(int Id, int Value) override;
     GENRESULT DACOM_API GetPipelineState(int Id, int* Out) override;
     GENRESULT DACOM_API GetDeviceInfo(void* Out520) override;
-    GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, unsigned long* Out) override;
+    GENRESULT DACOM_API QueryDeviceAbility(unsigned int Index, uint32_t* Out) override;
     GENRESULT DACOM_API GetDisplayModeCount(unsigned int* Out) override;
     GENRESULT DACOM_API GetDisplayModeEnum(unsigned int Index, void* Out) override;
     GENRESULT DACOM_API SelectMode(int* Mode, unsigned int* OutIndex) override;
     GENRESULT DACOM_API CreateBuffers(HWND Hwnd, int* Mode, int* OutMode) override;
     GENRESULT DACOM_API GetModeBlob(void* OutAdapter, void* OutMode10Dwords) override;
     GENRESULT DACOM_API DestroyGpuResources() override;
-    GENRESULT DACOM_API ClearBuffers(unsigned long Flags, const void* Rects) override;
+    GENRESULT DACOM_API ClearBuffers(uint32_t Flags, const void* Rects) override;
     GENRESULT DACOM_API SwapBuffers() override;
     GENRESULT DACOM_API LockBuffer(void* Out) override;
     GENRESULT DACOM_API UnlockBuffer() override;
@@ -453,16 +453,16 @@ public:
     GENRESULT DACOM_API SetTextureStageTexture(int Stage, void* Handle) override;
     GENRESULT DACOM_API GetTextureStageTexture(int Stage, void** OutHandle) override;
     GENRESULT DACOM_API VerifyState() override;
-    GENRESULT DACOM_API DrawPrimitive(unsigned long Prim, unsigned int Fvf, const void* Verts,
+    GENRESULT DACOM_API DrawPrimitive(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                       unsigned int Count, void* Unused) override;
-    GENRESULT DACOM_API DrawIndexedPrimitiveUp(unsigned long Prim, unsigned int Fvf, const void* Verts,
+    GENRESULT DACOM_API DrawIndexedPrimitiveUp(uint32_t Prim, unsigned int Fvf, const void* Verts,
                                                unsigned int VertCount, const void* Indices,
-                                               unsigned int IndexCount, unsigned long Unused) override;
-    GENRESULT DACOM_API DrawPrimitiveVb(unsigned long Prim, void* Vb, unsigned int StartVertex,
+                                               unsigned int IndexCount, uint32_t Unused) override;
+    GENRESULT DACOM_API DrawPrimitiveVb(uint32_t Prim, void* Vb, unsigned int StartVertex,
                                         unsigned int Count, void* Unused) override;
-    GENRESULT DACOM_API DrawIndexedPrimitiveVb(unsigned long Prim, void* Vb, unsigned int BaseVertex,
+    GENRESULT DACOM_API DrawIndexedPrimitiveVb(uint32_t Prim, void* Vb, unsigned int BaseVertex,
                                                unsigned int NumVerts, const void* Indices,
-                                               unsigned int IndexCount, unsigned long Unused) override;
+                                               unsigned int IndexCount, uint32_t Unused) override;
     GENRESULT DACOM_API AddLight(void* Handle) override;
     GENRESULT DACOM_API RemoveLight(void* Handle) override;
     GENRESULT DACOM_API UpdateLight(void* Handle) override;
@@ -477,7 +477,7 @@ public:
                                       const FRpVertexSrcDesc* Source,
                                       unsigned int StartVertex, unsigned int Count) override;
 
-    GENRESULT DACOM_API DrawIndexedPrimitive(unsigned long Prim, unsigned int MinIndex,
+    GENRESULT DACOM_API DrawIndexedPrimitive(uint32_t Prim, unsigned int MinIndex,
                                              unsigned int NumVertices, unsigned int StartIndex,
                                              unsigned int Count) override;
 
@@ -535,31 +535,31 @@ public:
     GENRESULT DACOM_API ReloadExPrograms() override;
     GENRESULT DACOM_API CreateExRenderTarget(const FRPExRenderTargetDesc* Desc,
                                              FRPExTexture** Out) override;
-    GENRESULT DACOM_API CreateExVolumeTexture(unsigned long Width, unsigned long Height,
-                                              unsigned long Depth, ERPExFormat Format,
+    GENRESULT DACOM_API CreateExVolumeTexture(uint32_t Width, uint32_t Height,
+                                              uint32_t Depth, ERPExFormat Format,
                                               const void* Data, FRPExTexture** Out) override;
     GENRESULT DACOM_API DestroyExTexture(FRPExTexture* Texture) override;
-    GENRESULT DACOM_API GetExTextureSize(FRPExTexture* Texture, unsigned long* OutWidth,
-                                         unsigned long* OutHeight) override;
+    GENRESULT DACOM_API GetExTextureSize(FRPExTexture* Texture, uint32_t* OutWidth,
+                                         uint32_t* OutHeight) override;
     GENRESULT DACOM_API GetSceneDepth(FRPExTexture** Out) override;
     GENRESULT DACOM_API BeginExPass(const FRPExPassDesc* Desc) override;
     GENRESULT DACOM_API EndExPass() override;
     GENRESULT DACOM_API SetExRenderTarget(FRPExTexture* ColorTarget,
-                                          unsigned long bKeepDepth) override;
+                                          uint32_t bKeepDepth) override;
     GENRESULT DACOM_API BindExProgram(FRPExProgram* Program) override;
-    GENRESULT DACOM_API SetExVertexConstants(unsigned long StartRegister, const float* Data,
-                                             unsigned long Vector4Count) override;
-    GENRESULT DACOM_API SetExPixelConstants(unsigned long StartRegister, const float* Data,
-                                            unsigned long Vector4Count) override;
-    GENRESULT DACOM_API BindExTexture(unsigned long Sampler, FRPExTexture* Texture,
+    GENRESULT DACOM_API SetExVertexConstants(uint32_t StartRegister, const float* Data,
+                                             uint32_t Vector4Count) override;
+    GENRESULT DACOM_API SetExPixelConstants(uint32_t StartRegister, const float* Data,
+                                            uint32_t Vector4Count) override;
+    GENRESULT DACOM_API BindExTexture(uint32_t Sampler, FRPExTexture* Texture,
                                       const FRPExSamplerState* State) override;
-    GENRESULT DACOM_API BindExPipelineTexture(unsigned long Sampler, void* Handle,
+    GENRESULT DACOM_API BindExPipelineTexture(uint32_t Sampler, void* Handle,
                                               const FRPExSamplerState* State) override;
 
     // IRPDrawEx (RP9Ex.cpp).
     GENRESULT DACOM_API DrawFullscreenQuad() override;
-    GENRESULT DACOM_API DrawExPrimitiveUp(unsigned long Prim, unsigned long Fvf,
-                                          const void* Verts, unsigned long Count) override;
+    GENRESULT DACOM_API DrawExPrimitiveUp(uint32_t Prim, uint32_t Fvf,
+                                          const void* Verts, uint32_t Count) override;
 
     // RP9 Ex hooks into the RP8-mirrored lifetime (RP9Ex.cpp). With no Ex object ever created
     // and no INTZ support they do nothing, so the RP8 behaviour is unchanged.
@@ -580,8 +580,8 @@ public:
     void ExDestroyAll();
     // RP9.cpp helpers on the RP8-mirrored caches and handles.
     IDirect3DBaseTexture9* PipelineTextureFromHandle(void* Handle);
-    void ExSaveStage(unsigned long Stage, FRp9ExStageSave* Out);
-    void ExRestoreStage(unsigned long Stage, const FRp9ExStageSave* Saved);
+    void ExSaveStage(uint32_t Stage, FRp9ExStageSave* Out);
+    void ExRestoreStage(uint32_t Stage, const FRp9ExStageSave* Saved);
 
     GENRESULT QueryLocal(const char* Iid, void** Out);
     void FlushDrawState(IDirect3DDevice9* Device); // formerly static FlushDrawState
@@ -592,11 +592,11 @@ public:
     void ApplyDeviceCaps(const FRp9Caps8* Caps);
     void ApplyMgsdbFlags(FMgsdbDatabase* Db);
     void ApplyAbilityOverrides();
-    unsigned long QueryVidMem();
+    uint32_t QueryVidMem();
     D3DFORMAT PickDepthFormat(D3DFORMAT AdapterFormat, D3DFORMAT BackBufferFormat, int* WantedZ,
                               int* WantedS);
-    bool CheckTextureFormat(unsigned int Format, unsigned long Usage, D3DRESOURCETYPE RType);
-    unsigned int PrimCountFromVerts(unsigned long Prim, unsigned int Count);
+    bool CheckTextureFormat(unsigned int Format, uint32_t Usage, D3DRESOURCETYPE RType);
+    unsigned int PrimCountFromVerts(uint32_t Prim, unsigned int Count);
     void EnumAdapters();
     // Shared lifetime checks retain the diagnostic and source line of each caller.
     GENRESULT NeedStartup(const char* Message, int Line);
@@ -605,8 +605,8 @@ public:
     // RP8 FDirectX8::ObjectBase has no counterpart: its raw offsets are the named members below.
     // RP8 [this + 0x354 + Id*0xC]: the three dwords of pipeline-state Id; Id 0xE addresses
     // Ability_[0..2] as in RP8. False for any other id (RP9-GAP, see RP9.cpp).
-    bool PipelineStateWords(int Id, unsigned long** OutValue, unsigned long** OutHasDefault,
-                            unsigned long** OutOverridden);
+    bool PipelineStateWords(int Id, uint32_t** OutValue, uint32_t** OutHasDefault,
+                            uint32_t** OutOverridden);
     // RP8 ResolveIbHandle(IbThis, Handle): handle -1 is the inline scratch index buffer.
     FRp9Ib* ResolveIbHandle(void* Handle);
     // D3D9 helpers: the adapter identifier in D3D8 shape, and the adapter's display modes as
@@ -629,7 +629,7 @@ public:
     FRp9Vb* FindOrInsertPoolVb(unsigned int Fvf);
     void GrowPoolVb(FRp9Vb* Wrapper, unsigned int Fvf, unsigned int Count);
     void ReleasePoolVbs();
-    unsigned long StageCount();
+    uint32_t StageCount();
     int PipelineStateValue(int Id);
 
     // Pixel-format-class catalog (retail FUN_06d04693/FUN_06d046e6/FUN_06d047df).
@@ -650,9 +650,9 @@ public:
     // The section startup last read DeviceId/DeviceType/DeviceTypeFallback from; a startup with
     // the same name skips that block. The ability map is read from this section too.
     char LastSection_[0x80];
-    unsigned long CreateFlags_;
+    uint32_t CreateFlags_;
     // bit0 LOCKABLE_BACKBUFFER, bit1 USE_SYSLOCK, bit2 HANDLE_SWAPLOSS.
-    unsigned long SwapFlags_;
+    uint32_t SwapFlags_;
     IDirect3D9* D3d_;
     IDirect3DDevice9* Device_;
     IDirect3DSurface9* LockBufferSurf_;
@@ -660,23 +660,23 @@ public:
     // RP8 +0x14C..+0x168 (ScratchIbFlags_, ScratchIb_, Pad154_, IbUsed_, IbCapacity_ there): the
     // inline scratch index-buffer node; IRPIndexBuffer handle -1 names it.
     FRp9Ib ScratchIb_;
-    unsigned long VidMem_;
+    uint32_t VidMem_;
     // The VBMgr / create_vb(flags & 1) pool: map<FVF, vertex-buffer node>.
-    std::map<unsigned long, FRp9Vb> VbPool_;
+    std::map<uint32_t, FRp9Vb> VbPool_;
     // Bytes held by the pool's vertex buffers (stride * count per entry).
-    unsigned long VbPoolBytes_;
+    uint32_t VbPoolBytes_;
     // bit0: create_buffers .. destroy_buffers window. bit1: IGammaControl enable
     // (set_gamma_enable writes it, set_gamma_function / set_gamma_ramp pass it as D3DSGR_CALIBRATE).
-    unsigned long DeviceReady_;
+    uint32_t DeviceReady_;
     FormatClassNode* FormatCatalogBegin_;
     FormatClassNode* FormatCatalogEnd_;
     FormatClassNode* FormatCatalogCap_;
     std::vector<FRp9Adapter> Adapters_;
-    unsigned long AdapterIndex_;
-    unsigned long DeviceType_;
+    uint32_t AdapterIndex_;
+    uint32_t DeviceType_;
     char MgsdbPath_[0x80];
-    unsigned long Field230_;
-    unsigned long BbPfIndex_;
+    uint32_t Field230_;
+    uint32_t BbPfIndex_;
     // {mode index, ?, width, height, colour bits, z bits, stencil bits, interval, buffer count,
     // byte flags (+0x24 swap-is-flip-or-copy, +0x25 fullscreen)}.
     int ModeBlob_[10];
@@ -694,7 +694,7 @@ public:
     // RP8 +0x354..+0x3FC (Pad354_, TextureAllow8Bit_..Field398_, Pad39C_, BltNotFlip_,
     // Field3F4_, Field3F8_ there).
     FRp9PipelineStateSlot PipelineStates_[kRp9PipelineStateCount];
-    unsigned long Ability_[kRp9AbilityCount];
+    uint32_t Ability_[kRp9AbilityCount];
     FRp9RenderStateCache RenderStates_;
     FRp9DeviceStateCaches DeviceStates_;
     FRp9LightManager LightManager_;

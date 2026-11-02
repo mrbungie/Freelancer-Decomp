@@ -75,6 +75,7 @@ bool LoginToServer()
         Result = G_LoginMgr.Login();
     }
 
+    if (getenv("FL_TRACE_RPC")) fprintf(stderr, "[fl] login: result=%d status=%d disconnected=%d\n", Result, (int)G_LoginMgr.LoginStatus, (int)G_bServerDisconnected);
     if (Result == 1)
     {
         ChatResetForConnect(); // .text:005a894c FUN_0046b2b0 (returns at once in single player)

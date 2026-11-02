@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_deformable.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "character_info.h"      // GetCharacterInfoDb
@@ -22,12 +23,12 @@ namespace
     char const* const GScriptDeformableFile =
         "E:\\FL\\Scratch\\Source\\Client\\Gf\\ScriptDeformable.cpp";
 
-    void* const kDeformNoScript = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
-    void* const kDeformNoInstance = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    void* const kDeformNoScript = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
+    void* const kDeformNoInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 
-    void* InstancePointer(long Instance)
+    void* InstancePointer(int32_t Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Instance)));
     }
 
     Vector InstancePosition(void* Instance)
@@ -114,7 +115,7 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
 
     GENRESULT const PlayResult = DALib::Deform->Play(
         Character->Lod.Instance, &Motions[Slot].Handle, AnimScript,
-        const_cast<char*>(Desc->Animation), AsOpaqueDword(Desc->StartTime),
+        const_cast<char*>(static_cast<const char*>(Desc->Animation)), AsOpaqueDword(Desc->StartTime),
         AsOpaqueDword(Desc->TransTime), AsOpaqueDword(Desc->TimeScale),
         AsOpaqueDword(Desc->Weight), AsOpaqueDword(Desc->Common.EventFlags),
         AsOpaqueDword(Desc->Heading), nullptr);
@@ -122,11 +123,11 @@ GENRESULT DACOM_API FThornDeformable::StartMotion(void* DescArg)
 
     if (LockedBone == nullptr)
         return PlayResult;
-    long const Part = Character->FindPart(LockedBone);
+    int32_t const Part = Character->FindPart(LockedBone);
     if (Part == -1)
         return PlayResult;
-    unsigned long const BlockResult =
-        DALib::Anim->RegisterHandle(static_cast<unsigned long>(Part));
+    uint32_t const BlockResult =
+        DALib::Anim->RegisterHandle(static_cast<uint32_t>(Part));
     if (BlockResult != 0)
     {
         FDUMP(0x100002,
@@ -158,9 +159,9 @@ GENRESULT DACOM_API FThornDeformable::StopMotion(void* DescArg)
 
     if (Desc->LockedBone != nullptr)
     {
-        long const Part = Character->FindPart(Desc->LockedBone);
+        int32_t const Part = Character->FindPart(Desc->LockedBone);
         if (Part != -1)
-            DALib::Anim->HasAnyHandle(static_cast<unsigned long>(Part));
+            DALib::Anim->HasAnyHandle(static_cast<uint32_t>(Part));
     }
 
     FMotionSlot& Motion = Motions[Slot];
@@ -247,7 +248,7 @@ GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char con
     }
     else if (TargetType == 2)
     {
-        long const Part = Character->FindPart(Name);
+        int32_t const Part = Character->FindPart(Name);
         if (Part == -1)
         {
             FDUMP(0x100002,
@@ -269,7 +270,7 @@ GENRESULT DACOM_API FThornDeformable::GetHardpointXform(int TargetType, char con
                   GScriptDeformableFile, 0x265, Name);
             return GR_GENERIC;
         }
-        long const HpInstance = Hardpoints.get_instance(Index);
+        int32_t const HpInstance = Hardpoints.get_instance(Index);
         Vector const HpPos = Hardpoints.get_info(Index).Position;
         Matrix const HpOrient = Hardpoints.get_info(Index).Orient;
         Csys InstanceFrame;
@@ -327,7 +328,7 @@ GENRESULT DACOM_API FThornDeformable::GetTransform(float* OutTransform12)
 GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, float* Orientation)
 {
     FThornStartIkDesc const* Desc = static_cast<FThornStartIkDesc const*>(DescArg);
-    long const EndPart = Character->FindPart(Desc->EndEffector);
+    int32_t const EndPart = Character->FindPart(Desc->EndEffector);
     void* const Root = GfEngineInstanceAncestor(InstancePointer(EndPart), Desc->CountToRoot);
     if (EndPart == -1 || Root == kDeformNoInstance)
         return GR_GENERIC;
@@ -355,10 +356,10 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
     Aim.bActive = 1;
     Aim.Target.Orient = TargetOrient;
 
-    unsigned long const EventFlags = static_cast<unsigned long>(Desc->Common.EventFlags);
+    uint32_t const EventFlags = static_cast<uint32_t>(Desc->Common.EventFlags);
     FDeformAimDesc AimDesc;
     AimDesc.Name = "";
-    AimDesc.RootPart = static_cast<long>(reinterpret_cast<intptr_t>(Root));
+    AimDesc.RootPart = static_cast<int32_t>(fl::PtrToHandle(Root));
     AimDesc.EndPart = EndPart;
     AimDesc.Flags = EventFlags;
     AimDesc.TargetPos = &Aim.Target.Pos.x;

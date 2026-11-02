@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "alchemy_effectobject.h"
+#include "fl/handles.h"
 
 #include "alchemy_common.h"
 
@@ -50,10 +51,10 @@ namespace AlchemyImpl
 
     namespace
     {
-        unsigned long EffectRecordDistance(const FFxEffectNodeRec* First,
+        uint32_t EffectRecordDistance(const FFxEffectNodeRec* First,
                                            const FFxEffectNodeRec* Last)
         {
-            return First == Last ? 0 : static_cast<unsigned long>(Last - First);
+            return First == Last ? 0 : static_cast<uint32_t>(Last - First);
         }
 
         FFxEffectNodeRec* CopyEffectRecords(const FFxEffectNodeRec* First,
@@ -69,7 +70,7 @@ namespace AlchemyImpl
             return Destination;
         }
 
-        void ConstructEffectRecords(FFxEffectNodeRec* Destination, unsigned long Count,
+        void ConstructEffectRecords(FFxEffectNodeRec* Destination, uint32_t Count,
                                     const FFxEffectNodeRec& Record)
         {
             while (Count != 0)
@@ -150,7 +151,7 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FFxEffectObject::Release()
+    uint32_t DACOM_API FFxEffectObject::Release()
     {
         // LAB_06222810 (alchemy.dll.txt:71219-71236): retail also guards the
         // decrement itself against underflow (`if (refcount != 0)
@@ -163,7 +164,7 @@ namespace AlchemyImpl
         // sweep.
         if (RefCount_ != 0)
             --RefCount_;
-        const unsigned long Next = RefCount_;
+        const uint32_t Next = RefCount_;
         if (Next == 0)
         {
             // retail resets the refcount to 1 before tearing the object down
@@ -199,8 +200,8 @@ namespace AlchemyImpl
 
         // 0621f611..0621f625: the override node's vt+0x3c takes the call alone (tail JMP),
         // with no null test on the node.
-        const unsigned long SlotIndex =
-            static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
+        const uint32_t SlotIndex =
+            static_cast<uint32_t>(reinterpret_cast<std::uintptr_t>(A));
         const float* const Source12 = static_cast<const float*>(B);
         if (TransformExtra_ != nullptr)
         {
@@ -212,7 +213,7 @@ namespace AlchemyImpl
         // node. vt+0x1c answering non-zero in AL skips it (0621f646); otherwise vt+0x3c(A, B),
         // and a non-zero result is reported.
         FFxEffectNodeRec* Record = Nodes_;
-        for (long Index = 0; Index < RootNodeCount_; ++Index, ++Record)
+        for (int32_t Index = 0; Index < RootNodeCount_; ++Index, ++Record)
         {
             IGenericFx* const Fx = AsFx(Record->Node);
             if (static_cast<unsigned char>(Fx->IsNodeDead()) != 0)
@@ -233,8 +234,8 @@ namespace AlchemyImpl
         // always fell through to Nodes_[0].Node regardless of TransformExtra_).
         // 0621f6a0..0621f6b3: tail JMP to the override node's vt+0x40, no null test.
         // A = slot index, B = float** out (FUN_062400b0 behind the node's vt+0x40).
-        const unsigned long SlotIndex =
-            static_cast<unsigned long>(reinterpret_cast<std::uintptr_t>(A));
+        const uint32_t SlotIndex =
+            static_cast<uint32_t>(reinterpret_cast<std::uintptr_t>(A));
         float** const OutSlot = static_cast<float**>(B);
         if (TransformExtra_ != nullptr)
         {
@@ -269,9 +270,9 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::Slot10(void* IdRaw, void* Out)
     {
-        const unsigned long Id =
-            static_cast<unsigned long>(reinterpret_cast<unsigned int>(IdRaw));
-        for (unsigned long Index = 0; Index < NodeCount_; ++Index)
+        const uint32_t Id =
+            static_cast<uint32_t>(fl::PtrToHandle(IdRaw));
+        for (uint32_t Index = 0; Index < NodeCount_; ++Index)
         {
             if (Nodes_[Index].Id != Id)
                 continue;
@@ -283,7 +284,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::Slot11(void* Arg)
     {
-        return WalkNodesFlagged(static_cast<unsigned long>(reinterpret_cast<unsigned int>(Arg)));
+        return WalkNodesFlagged(static_cast<uint32_t>(fl::PtrToHandle(Arg)));
     }
 
     GENRESULT DACOM_API FFxEffectObject::Slot12(void* A, void* B)
@@ -293,7 +294,7 @@ namespace AlchemyImpl
 
     GENRESULT DACOM_API FFxEffectObject::Slot13(void* Arg)
     {
-        return DispatchFlagsToAlchemy(static_cast<unsigned long>(reinterpret_cast<unsigned int>(Arg)));
+        return DispatchFlagsToAlchemy(static_cast<uint32_t>(fl::PtrToHandle(Arg)));
     }
 
     GENRESULT DACOM_API FFxEffectObject::Slot15(void* Arg)
@@ -366,7 +367,7 @@ namespace AlchemyImpl
     {
         GENRESULT Result = GR_OK;
         FFxEffectNodeRec* Record = Nodes_;
-        for (long Index = 0; Index < RootNodeCount_; ++Index, ++Record)
+        for (int32_t Index = 0; Index < RootNodeCount_; ++Index, ++Record)
         {
             IDAComponent* Node = Record->Node;
             if (static_cast<unsigned char>(AsFx(Node)->IsNodeDead()) != 0)
@@ -384,11 +385,11 @@ namespace AlchemyImpl
         return OutFlag;
     }
 
-    GENRESULT FFxEffectObject::WalkNodesFlagged(unsigned long Flags)
+    GENRESULT FFxEffectObject::WalkNodesFlagged(uint32_t Flags)
     {
-        const unsigned long Count = NodeCount_;
+        const uint32_t Count = NodeCount_;
         FFxEffectNodeRec* Record = Nodes_;
-        for (unsigned long Index = 0; Index < Count; ++Index, ++Record)
+        for (uint32_t Index = 0; Index < Count; ++Index, ++Record)
         {
             if (TransformExtra_ != nullptr &&
                 Record->Node == TransformExtra_->Node)
@@ -408,14 +409,14 @@ namespace AlchemyImpl
         return static_cast<GENRESULT>(1);
     }
 
-    GENRESULT FFxEffectObject::DispatchFlagsToAlchemy(unsigned long Flags)
+    GENRESULT FFxEffectObject::DispatchFlagsToAlchemy(uint32_t Flags)
     {
         FFxEffectNodeRec* Record = Nodes_;
         if (Flags == 7)
         {
-            const unsigned long Count = NodeCount_;
-            for (long Index = 0; Index < RootNodeCount_ &&
-                                  static_cast<unsigned long>(Index) < Count; ++Index, ++Record)
+            const uint32_t Count = NodeCount_;
+            for (int32_t Index = 0; Index < RootNodeCount_ &&
+                                  static_cast<uint32_t>(Index) < Count; ++Index, ++Record)
             {
                 IDAComponent* Node = Record->Node;
                 if (static_cast<unsigned char>(AsFx(Node)->IsNodeDead()) == 0)
@@ -448,11 +449,11 @@ namespace AlchemyImpl
 
     GENRESULT FFxEffectObject::WalkNodesEnumerate(void* Callback, void* Context)
     {
-        using FnEnum = unsigned long(__cdecl*)(const FNodeIdPair*, void*);
+        using FnEnum = uint32_t(__cdecl*)(const FNodeIdPair*, void*);
         FnEnum Enum = reinterpret_cast<FnEnum>(Callback);
-        const unsigned long Count = NodeCount_;
+        const uint32_t Count = NodeCount_;
         FFxEffectNodeRec* Record = Nodes_;
-        for (unsigned long Index = 0; Index < Count; ++Index, ++Record)
+        for (uint32_t Index = 0; Index < Count; ++Index, ++Record)
         {
             FNodeIdPair Pair;
             Pair.Id = Record->Id;
@@ -466,7 +467,7 @@ namespace AlchemyImpl
     GENRESULT FFxEffectObject::MergeNodeBoundsSphere(void* Arg)
     {
         float* Sphere = static_cast<float*>(Arg);
-        unsigned long SphereCount = 0;
+        uint32_t SphereCount = 0;
         FFxEffectNodeRec* Record = Nodes_;
         FFxEffectNodeRec* const End = NodeCount_ == 0 ? Nodes_ : Nodes_ + NodeCount_;
         for (; Record != End; ++Record)
@@ -565,17 +566,17 @@ namespace AlchemyImpl
 
     // 06220ef0: copy ranges retain captured cursors; container endpoints are
     // reloaded only where the listing reloads them after reference callbacks.
-    void FFxEffectObject::InsertNodeRecords(unsigned long InsertIndex,
-                                           unsigned long InsertCount,
+    void FFxEffectObject::InsertNodeRecords(uint32_t InsertIndex,
+                                           uint32_t InsertCount,
                                            const FFxEffectNodeRec& Record)
     {
         FFxEffectNodeRec* const Position = InsertIndex == 0 ? Nodes_ : Nodes_ + InsertIndex;
         FFxEffectNodeRec* const EntryEnd = NodeRecordsEnd();
         if (NodeCapacity_ - NodeCount_ < InsertCount)
         {
-            const unsigned long Growth = NodeCount_ > InsertCount ? NodeCount_ : InsertCount;
-            const unsigned long Capacity = NodeCount_ + Growth;
-            const unsigned long AllocationCount = static_cast<long>(Capacity) < 0 ? 0 : Capacity;
+            const uint32_t Growth = NodeCount_ > InsertCount ? NodeCount_ : InsertCount;
+            const uint32_t Capacity = NodeCount_ + Growth;
+            const uint32_t AllocationCount = static_cast<int32_t>(Capacity) < 0 ? 0 : Capacity;
             FFxEffectNodeRec* Next = static_cast<FFxEffectNodeRec*>(
                 ::operator new(sizeof(FFxEffectNodeRec) * AllocationCount));
             FFxEffectNodeRec* const NewPosition = CopyEffectRecords(Nodes_, Position, Next);
@@ -584,7 +585,7 @@ namespace AlchemyImpl
             DestroyEffectRecords(Nodes_, NodeRecordsEnd());
             ::operator delete(Nodes_);
             NodeCapacity_ = Capacity;
-            const unsigned long CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
+            const uint32_t CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
             Nodes_ = Next;
             NodeCount_ = CurrentCount + InsertCount;
             return;
@@ -609,16 +610,16 @@ namespace AlchemyImpl
     }
 
     // 06220ac0: single-element overload, including its own returned position.
-    FFxEffectNodeRec* FFxEffectObject::InsertSingleNodeRecord(unsigned long InsertIndex,
+    FFxEffectNodeRec* FFxEffectObject::InsertSingleNodeRecord(uint32_t InsertIndex,
                                                             const FFxEffectNodeRec& Record)
     {
         FFxEffectNodeRec* const Position = InsertIndex == 0 ? Nodes_ : Nodes_ + InsertIndex;
         FFxEffectNodeRec* const EntryEnd = NodeRecordsEnd();
         if (NodeCapacity_ - NodeCount_ < 1)
         {
-            const unsigned long Growth = NodeCount_ > 1 ? NodeCount_ : 1;
-            const unsigned long Capacity = NodeCount_ + Growth;
-            const unsigned long AllocationCount = static_cast<long>(Capacity) < 0 ? 0 : Capacity;
+            const uint32_t Growth = NodeCount_ > 1 ? NodeCount_ : 1;
+            const uint32_t Capacity = NodeCount_ + Growth;
+            const uint32_t AllocationCount = static_cast<int32_t>(Capacity) < 0 ? 0 : Capacity;
             FFxEffectNodeRec* Next = static_cast<FFxEffectNodeRec*>(
                 ::operator new(sizeof(FFxEffectNodeRec) * AllocationCount));
             FFxEffectNodeRec* const NewPosition = CopyEffectRecords(Nodes_, Position, Next);
@@ -627,7 +628,7 @@ namespace AlchemyImpl
             DestroyEffectRecords(Nodes_, NodeRecordsEnd());
             ::operator delete(Nodes_);
             NodeCapacity_ = Capacity;
-            const unsigned long CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
+            const uint32_t CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
             Nodes_ = Next;
             NodeCount_ = CurrentCount + 1;
             return InsertIndex == 0 ? Next : Next + InsertIndex;
@@ -655,27 +656,27 @@ namespace AlchemyImpl
     GENRESULT FFxEffectObject::InstantiateNodesFromArchetype(
         IFxEffectArchetype* InitialArchetype, const FFxEffectCreateDesc* Desc)
     {
-        const unsigned long RecCount = InitialArchetype->GetRec16Count();
+        const uint32_t RecCount = InitialArchetype->GetRec16Count();
         DestroyNodeRecords();
         if (NodeCapacity_ < RecCount)
         {
-            const unsigned long AllocationCount = static_cast<long>(RecCount) < 0 ? 0 : RecCount;
+            const uint32_t AllocationCount = static_cast<int32_t>(RecCount) < 0 ? 0 : RecCount;
             FFxEffectNodeRec* Next = static_cast<FFxEffectNodeRec*>(
                 ::operator new(sizeof(FFxEffectNodeRec) * AllocationCount));
             CopyEffectRecords(Nodes_, NodeRecordsEnd(), Next);
             DestroyEffectRecords(Nodes_, NodeRecordsEnd());
             ::operator delete(Nodes_);
             NodeCapacity_ = RecCount;
-            const unsigned long CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
+            const uint32_t CurrentCount = Nodes_ != nullptr ? NodeCount_ : 0;
             Nodes_ = Next;
             NodeCount_ = CurrentCount;
         }
-        unsigned long SortedRootCount = 0;
-        unsigned long OverrideId = kNodeParentRoot;
-        for (long Index = 0; Index < static_cast<long>(RecCount); ++Index)
+        uint32_t SortedRootCount = 0;
+        uint32_t OverrideId = kNodeParentRoot;
+        for (int32_t Index = 0; Index < static_cast<int32_t>(RecCount); ++Index)
         {
             FAleRec16 Rec = {};
-            InitialArchetype->GetRec16(static_cast<unsigned long>(Index), &Rec);
+            InitialArchetype->GetRec16(static_cast<uint32_t>(Index), &Rec);
 
             FFxTemporaryInterface Created;
             IDAComponent*& Node = Created.Value;
@@ -713,7 +714,7 @@ namespace AlchemyImpl
             }
 
             const bool bRoot = Rec.C == kNodeParentRoot;
-            unsigned long InsertIndex = NodeCount_;
+            uint32_t InsertIndex = NodeCount_;
             if (bRoot)
             {
                 InsertIndex = 0;
@@ -738,7 +739,7 @@ namespace AlchemyImpl
         TransformExtra_ = nullptr;
         if (OverrideId != kNodeParentRoot)
         {
-            unsigned long Index = 0;
+            uint32_t Index = 0;
             while (Index < NodeCount_ && Nodes_[Index].Id != OverrideId)
                 ++Index;
             TransformExtra_ = &Nodes_[Index];
@@ -768,7 +769,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    IDAComponent* FFxEffectObject::FindNodeById(unsigned long Id) const
+    IDAComponent* FFxEffectObject::FindNodeById(uint32_t Id) const
     {
         const FFxEffectNodeRec* const End = NodeRecordsEnd();
         const FFxEffectNodeRec* Record = Nodes_;
@@ -800,11 +801,11 @@ namespace AlchemyImpl
 
     void FFxEffectObject::BindRec8Associates(IFxEffectArchetype* InitialArchetype)
     {
-        const unsigned long Rec8Count = InitialArchetype->GetRec8Count();
-        for (long Index = 0; Index < static_cast<long>(Rec8Count); ++Index)
+        const uint32_t Rec8Count = InitialArchetype->GetRec8Count();
+        for (int32_t Index = 0; Index < static_cast<int32_t>(Rec8Count); ++Index)
         {
             FAleRec8 Rec8 = {};
-            InitialArchetype->GetRec8(static_cast<unsigned long>(Index), &Rec8);
+            InitialArchetype->GetRec8(static_cast<uint32_t>(Index), &Rec8);
             IDAComponent* NodeA = FindNodeById(Rec8.A);
             FFxTemporaryInterface Emitter;
             FFxTemporaryInterface Appearance;
@@ -845,9 +846,9 @@ namespace AlchemyImpl
 
     void FFxEffectObject::DestroyNodeRecords()
     {
-        const unsigned long Count = NodeCount_;
+        const uint32_t Count = NodeCount_;
         FFxEffectNodeRec* Record = Nodes_;
-        for (unsigned long Index = 0; Index < Count; ++Index, ++Record)
+        for (uint32_t Index = 0; Index < Count; ++Index, ++Record)
         {
             Record->~FFxEffectNodeRec();
         }

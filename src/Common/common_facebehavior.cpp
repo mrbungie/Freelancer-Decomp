@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_facebehavior.h"
+#include "fl/handles.h"
 #include "common_pathfind.h" // PathfindManager (IBehaviorManager+0x0C)
 
 #include "common_systemmanager.h"  // SystemManager, ThrustManager::CheckSteeringGate (FUN_062e92e0)
@@ -860,7 +861,7 @@ void FaceBehavior::Slot21(void* Arg)
     IObjRW* const Watched = GetWatchedRawBlock();
     if (Watched == nullptr)                                         // 062c89c3-062c89d0
         return;
-    if (Watched->get_id() != static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg)))
+    if (Watched->get_id() != static_cast<unsigned int>(fl::PtrToHandle(Arg)))
         return;                                                     // 062c89e4
     Watcher30.set(nullptr);                                         // 062c89ea-062c89f3
 }

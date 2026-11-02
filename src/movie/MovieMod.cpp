@@ -15,31 +15,31 @@
 // sites (stdcall: the caller does not adjust ESP).
 
 // 0x06ac3110. RET 0xC. Zeros Groups * Field[0] dwords and returns 1.
-long __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
+int32_t __stdcall Movie_ZeroFieldGroups(unsigned int* Dest, int Groups, int* Field);
 
 // 0x06ac3140. RET 0x10. Copies Groups * Field[0] dwords from First to Second and returns 1.
-long __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
+int32_t __stdcall Movie_CopyFieldGroups(unsigned int* First, unsigned int* Second, int Groups, int* Field);
 
 // 0x06ac7e60. RET 0x8. 06ac69a0 takes the nonzero EAX as success and skips the slot write.
-long __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
+int32_t __stdcall Movie_FieldElementIsUnit(int Limbs, int* FieldHolder);
 
 // 0x06ac7f20. RET 0x10. Pushes are Sign, FieldHolder, SlotLimbs, Limbs.
-long __stdcall Movie_CopyOrNegatePair(unsigned int* Limbs, unsigned int* SlotLimbs, int* FieldHolder, int Sign);
+int32_t __stdcall Movie_CopyOrNegatePair(unsigned int* Limbs, unsigned int* SlotLimbs, int* FieldHolder, int Sign);
 
 // 0x06ac7760. RET 0x14. Pushes are Sign, Context, Slot, Limbs, Saved. EAX is ignored here.
 void __stdcall Movie_AssignWindowSlot(unsigned int* Saved, unsigned int* Limbs, int Slot, int* Context, int Sign);
 
 // 0x06ac8190. RET 0x8. Defined in MovieFieldHigh.cpp.
-long __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
+int32_t __stdcall StoreFieldUnit(unsigned int* Dest, int* FieldHolder);
 
 // 0x06ac6bb0. RET 0x10. Defined in MovieFieldHigh.cpp. Fourth push is the scratch base.
-long __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
+int32_t __stdcall SeedFieldWork(unsigned int* Value, unsigned int* Work, int* FieldHolder, unsigned int* Upper);
 
 // 0x06ac7210. Defined in MovieFieldHigh.cpp.
-long __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall MultiplyFieldLimbs(unsigned int* Left, unsigned int* Right, int* FieldHolder, unsigned int* Scratch);
 
 // 0x06ac7570. RET 0xC. The third argument is popped and not read.
-long __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
+int32_t __stdcall Movie_LoadFieldOne(unsigned int* Work, int* FieldHolder, unsigned int* Scratch);
 
 // Slot stride is 0x14f dwords (0x53c bytes). Work+0x53c0 is the scratch passed to the products.
 static unsigned int* Movie_ExponentSlot(unsigned int* Work, unsigned int Index)
@@ -412,7 +412,7 @@ void __stdcall Movie_AdvanceFieldRecordStates(int* Context)
 // 0x06ac69a0. Depth is the dword at byte +0x11158. Slot limbs are at +0x114 + Slot*0x204.
 // 06ac69c4 leaves EAX = Slot when *Context is 0. Every other path increments the depth,
 // merges the step into *Context as 0 or 1 (06ac6a65), then decrements the depth (06ac6a81).
-long __stdcall Movie_CommitFieldSlot(unsigned int* Limbs, int Slot, unsigned int* Context, int Sign)
+int32_t __stdcall Movie_CommitFieldSlot(unsigned int* Limbs, int Slot, unsigned int* Context, int Sign)
 {
     unsigned int Flag = Context[0];
     unsigned int* FieldHolder = (unsigned int*)Context[4];
@@ -436,7 +436,7 @@ long __stdcall Movie_CommitFieldSlot(unsigned int* Limbs, int Slot, unsigned int
         if (Movie_FieldElementIsUnit((int)SlotLimbs, (int*)FieldHolder) != 0)
         {
             // 06ac6a16. NEG / SBB / NEG collapses the callee's EAX to 0 or 1.
-            long Blended = Movie_CopyOrNegatePair(Limbs, SlotLimbs, (int*)FieldHolder, Sign);
+            int32_t Blended = Movie_CopyOrNegatePair(Limbs, SlotLimbs, (int*)FieldHolder, Sign);
             if (Blended != 0)
             {
                 Step = 1u;
@@ -471,7 +471,7 @@ long __stdcall Movie_CommitFieldSlot(unsigned int* Limbs, int Slot, unsigned int
     }
     Context[0] = Result;
     Context[0x4456] = Context[0x4456] - 1u;
-    return (long)Result;
+    return (int32_t)Result;
 }
 
 // 0x06ac6b70. 06ac6b7a calls 0x06ac61a0 while *Context is live and Context[2] is 0x14.
@@ -504,7 +504,7 @@ int __stdcall Movie_AllocateFieldRecord(int* Context)
 // Field+0x12c matching the high half tail-calls 0x06ac69a0. Otherwise the
 // record at Index * 0x410 gets state 1, the slot, and the sign, and three
 // limb groups are copied to +0x8418.
-long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int Slot, unsigned int* Context, unsigned int Sign)
+int32_t __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int Slot, unsigned int* Context, unsigned int Sign)
 {
     unsigned int* FieldHolder = (unsigned int*)Context[4];
     int* Field = (int*)FieldHolder[0];
@@ -514,7 +514,7 @@ long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int S
     {
         return 0;
     }
-    long Zero = Movie_FieldLimbsAreZero((int)High, Field);
+    int32_t Zero = Movie_FieldLimbsAreZero((int)High, Field);
     if (Zero != 0)
     {
         return Zero;
@@ -551,7 +551,7 @@ long __stdcall Movie_QueueOrCommitFieldLimbs(unsigned int* Limbs, unsigned int S
 // operand (5 groups) and returns that copy's EAX. Otherwise the halves are
 // squared or copied into Scratch at n..6n, and Field[2] >= 2 selects the
 // product formula (CMP [field+8], 2 / SETGE at 06ac6cc3).
-long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch)
+int32_t __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch)
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
@@ -728,7 +728,7 @@ long __stdcall Movie_MultiplyPairedLimbs(unsigned int* Left, unsigned int* Right
 }
 
 // 0x06ac6c40. 06ac6c55 is limb count * 5. Both callees must return nonzero; success is EAX = 1.
-long __stdcall Movie_SeedAndMultiplyLimbs(unsigned int* Left, unsigned int* Value, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch)
+int32_t __stdcall Movie_SeedAndMultiplyLimbs(unsigned int* Left, unsigned int* Value, unsigned int* Dest, unsigned int* FieldHolder, unsigned int* Scratch)
 {
     int* Field = (int*)FieldHolder[0];
     int LimbCount = Field[0];
@@ -772,7 +772,7 @@ int __stdcall Movie_ExponentiateByWindow(unsigned int* Base, unsigned int* Expon
 
     unsigned int* Dispatch = (unsigned int*)Context[0x42];
     unsigned int Top = Exponent[Significant - 1u];
-    unsigned long BitIndex = 0;
+    uint32_t BitIndex = 0;
     _BitScanReverse(&BitIndex, Top);
     unsigned int BitLength = BitIndex + 1u;
     unsigned int Second = Exponent[Significant - 2u];
@@ -903,7 +903,7 @@ int __stdcall Movie_ExponentiateByWindow(unsigned int* Base, unsigned int* Expon
             }
             if (Accum != 0u)
             {
-                unsigned long Zeros = 0;
+                uint32_t Zeros = 0;
                 _BitScanForward(&Zeros, Accum);
                 if ((unsigned int)Extra != Zeros)
                 {

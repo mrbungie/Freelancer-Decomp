@@ -168,7 +168,7 @@ static TaggedString *insert_u (void *buff, int tag, stringtable *tb) {
 
 
 TaggedString *luaS_createudata (void *udata, int tag) {
-  int t = ((unsigned)udata%NUM_HASHUDATA)+NUM_HASHSTR;
+  int t = ((unsigned)(intptr_t)(udata)%NUM_HASHUDATA)+NUM_HASHSTR;
   return insert_u(udata, tag, &L->string_root[t]);
 }
 

@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include "common_csys.h"
+#include "fl/handles.h"
 #include "x86math.h" // I3DMathEngine
 
 #include "DALib.h"   // DALib::Engine, for DALib_Engine_get_csys
@@ -617,7 +618,7 @@ void __cdecl MatrixSetColumn2(Matrix& M, Vector const& Src)
     M.E[2][2] = Src.z;
 }
 
-Csys __cdecl DALib_Engine_get_csys(long Handle)
+Csys __cdecl DALib_Engine_get_csys(int32_t Handle)
 {
     // .text:06307900..06307954 (cdecl, hidden Csys* result). 06307903..06307914: DALib::Engine
     // (through the import, untested) slot 40 (+0xa0, GetInstanceTransform) on Handle;
@@ -625,7 +626,7 @@ Csys __cdecl DALib_Engine_get_csys(long Handle)
     // 06307937..06307940: its 3x3 (9 dwords, REP MOVSD) into the orientation; 06307942..0630794d:
     // the 0x30-byte local copied to the result. Nothing is tested.
     Transform const* const Xform =
-        (Transform const*)DALib::Engine->GetInstanceTransform((void*)Handle);
+        (Transform const*)DALib::Engine->GetInstanceTransform((void*)fl::HandleToPtr(Handle));
 
     Csys Out;
     Out.Pos = Xform->Translation;
@@ -705,10 +706,10 @@ Csys __cdecl Csys_interpolate(Csys A, Csys B, float T)
 // .text:06307960..063079ab: the Csys repacked as a Transform on the stack (the 3x3 at +0xc,
 // REP MOVSD 9, then Pos into +0x24) and handed to IEngine slot 39 (+0x9c, SetInstanceMatrix)
 // through the DALib::Engine import, which is not tested.
-void __cdecl DALib_Engine_set_csys(long Handle, Csys const& InCsys)
+void __cdecl DALib_Engine_set_csys(int32_t Handle, Csys const& InCsys)
 {
     Transform Xform = InCsys.get_transform();
-    DALib::Engine->SetInstanceMatrix((void*)Handle, &Xform);
+    DALib::Engine->SetInstanceMatrix((void*)fl::HandleToPtr(Handle), &Xform);
 }
 
 // DELIBERATE DEVIATION FROM RETAIL, 2026-09-17 -- read this before "fixing" it back.

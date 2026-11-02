@@ -58,12 +58,12 @@ CPlayerTradeOffer::~CPlayerTradeOffer()
     // else here owns any resources.
 }
 
-unsigned long CPlayerTradeOffer::GetMoneyOffered()
+uint32_t CPlayerTradeOffer::GetMoneyOffered()
 {
     return MoneyOffered;
 }
 
-void CPlayerTradeOffer::SetMoneyOffered(unsigned long Money)
+void CPlayerTradeOffer::SetMoneyOffered(uint32_t Money)
 {
     MoneyOffered = Money;
 }

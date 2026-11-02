@@ -142,7 +142,7 @@ static void InitGlowDescDefaults(FStarGlowDesc* Desc, unsigned char OwnerTag)
 // +0x38 / +0x3c. The rest of the inline name (+0x15..+0x33) is not written.
 static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
-        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(0x40));
+        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(sizeof(FStarFxChild40) > 0x40 ? sizeof(FStarFxChild40) : 0x40));
         if (Child == nullptr)
             return nullptr;
         unsigned char* const Raw = Child->Raw;
@@ -1613,7 +1613,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
                         // whatever +0x0c holds; a non-zero result frees it and zeroes +0x0c.
                         if (this->StarCenter != nullptr)
                             operator delete(this->StarCenter);
-                        FStarGlowDesc* Center = static_cast<FStarGlowDesc*>(operator new(0x50));
+                        FStarGlowDesc* Center = static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc) > 0x50 ? sizeof(FStarGlowDesc) : 0x50));
                         if (Center != nullptr)
                             InitGlowDescDefaults(Center, 0);
                         this->StarCenter = Center;
@@ -2799,7 +2799,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     Owner = InOwner;
     Radius = 1000.0f; // 0x447a0000
 
-    FSunEffectBody* Body = static_cast<FSunEffectBody*>(operator new(0x30c));
+    FSunEffectBody* Body = static_cast<FSunEffectBody*>(operator new(sizeof(FSunEffectBody) > 0x30c ? sizeof(FSunEffectBody) : 0x30c));
     if (Body != nullptr)
         SunEffectBodyInit(Body);
     SunBody = Body;
@@ -2814,7 +2814,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     ZoneOcclusionFadeOut = 2.0f;
     Field30 = kPi;
 
-    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(0x50));
+    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc) > 0x50 ? sizeof(FStarGlowDesc) : 0x50));
     if (Glow != nullptr)
         InitGlowDescDefaults(Glow, 0);
     // 0x00510e99..0x00510ea8: +0x10, then +0x0c = 0, +0x38 = 0, +0x34 = 0, +0x64 = 1.0f.

@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "client_gameobj.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "cli_projectile_fx.h"   // CliEffectListClear / FCliEquipFirePacket / fire-host ports
@@ -1918,7 +1919,7 @@ void FClientSolarGameobj::Slot170()
     FClientEquippedObj::Slot170();
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+    DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
 }
 
 void FClientSolarGameobj::update(float Dt)
@@ -1973,8 +1974,8 @@ float FClientSolarGameobj::Slot178(Vector& Center)
     if ((Simple->TypeBits & 7u) != 0)
     {
         float Radius = 0.0f;
-        long const Inst = get_index();
-        DALib::Engine->GetInstanceExtent(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 0u,
+        int32_t const Inst = get_index();
+        DALib::Engine->GetInstanceExtent(static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Inst))), 0u,
                                          &Radius, &Center.x);
         FTransform const& Xform = reinterpret_cast<FTransform const&>(get_orientation());
         if (G_SolarMath == nullptr)
@@ -2083,7 +2084,7 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     // 0x00548358..0x005483d8: the colour is the palette entry DAT_00679b80 and the size 1.0;
     // with a player ship, a distance above 2500 (DAT_005db7d8; FCOM / TEST AH,0x41 / JNZ)
     // gives size = distance * 0.0005 (DAT_005e04d8), capped at 99 (DAT_005e04d4 -> 0x42c60000).
-    unsigned long Color = G_NnPaletteArgb_679b80;
+    uint32_t Color = G_NnPaletteArgb_679b80;
     float Size = 1.0f;
     IObjRW* const Player = static_cast<IObjRW*>(GetPlayerObjRW());
     if (Player != nullptr)
@@ -2109,10 +2110,10 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     unsigned char ColorBytes[4];
     std::memcpy(ColorBytes, &Color, sizeof(ColorBytes));
     ColorBytes[3] = static_cast<unsigned char>(
-        static_cast<long>(static_cast<double>(ColorBytes[3]) * Fade));
-    long const Inst = get_index();
+        static_cast<int32_t>(static_cast<double>(ColorBytes[3]) * Fade));
+    int32_t const Inst = get_index();
     int const Answer = SubmitWin3DMaterialEngineInstance(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 1, ColorBytes, 0, Size, 0,
+        Camera, static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Inst))), 1, ColorBytes, 0, Size, 0,
         0u);
     Lod = 0xffff0000u | static_cast<unsigned short>(Answer);
 
@@ -2131,10 +2132,10 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     Outline[0] = 0xff;
     Outline[1] = 0x80;
     Outline[2] = 0xff;
-    Outline[3] = static_cast<unsigned char>(static_cast<long>(static_cast<double>(Fade) * 255.0f));
-    long const OutlineInst = get_index();
+    Outline[3] = static_cast<unsigned char>(static_cast<int32_t>(static_cast<double>(Fade) * 255.0f));
+    int32_t const OutlineInst = get_index();
     SubmitWin3DTintedEngineInstanceWrapped(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(OutlineInst)), 1, Outline, 0, Size,
+        Camera, static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(OutlineInst))), 1, Outline, 0, Size,
         0u);
     *OutLod = Lod;
     return OutLod;
@@ -2235,7 +2236,7 @@ void FClientSolarGameobj::ReadIni(INI_Reader& Reader)
     // into +0x3c (FUN_005553b0, no hint).
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+    DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
 }
 
 // ===========================================================================
@@ -2479,7 +2480,7 @@ namespace
     // into Go's effect list (FUN_004fcea0) -- slot 0 there keeps the address of the caller's
     // stack archetype, exactly as retail's does. The local companion is cleared
     // (FUN_00502d90) either way.
-    void CreateEffectOnGameobj(FClientGameobj* Go, FEffectArch* Arch, long EngineIndex,
+    void CreateEffectOnGameobj(FClientGameobj* Go, FEffectArch* Arch, int32_t EngineIndex,
                                float const* Pose)
     {
         if (GetGameOption(kGameOptEffectsGroup) == 0)
@@ -2526,7 +2527,7 @@ namespace
         // 0x005456de..0x005457ab: the hardpoint in the object's own frame; an empty name or a
         // miss leaves position zero and orientation identity (the CRC word is not written).
         HardpointInfo Hp;
-        long HpHandle = 0;
+        int32_t HpHandle = 0;
         char const* const HpName = ShipArch->HpBaySurface.Value;
         if (HpName[0] == '\0' || !FindHardpoint_PS(Go->get_index(), HpName, HpHandle, Hp))
         {
@@ -2565,7 +2566,7 @@ namespace
         Pose[9] = Hp.Position.x;
         Pose[10] = Hp.Position.y;
         Pose[11] = Hp.Position.z;
-        long const EngineIndex = Go->get_index();
+        int32_t const EngineIndex = Go->get_index();
 
         // 0x00545883..0x005459a3; FUN_0040e2a0 (0x005459b5) is Scoped's destructor.
         CreateEffectOnGameobj(Go, &Arch, EngineIndex, Pose);
@@ -2591,7 +2592,7 @@ void FClientShipGameobj::PlayCargoJettisonSound()
             : nullptr;
     Archetype::Ship const* const ShipArch = static_cast<Archetype::Ship const*>(Ship->Archetype);
     HardpointInfo Hp;
-    long HpHandle = 0;
+    int32_t HpHandle = 0;
     char const* const HpName = ShipArch->HpBaySurface.Value;
     if (HpName[0] == '\0' || !FindHardpoint_PS(get_index(), HpName, HpHandle, Hp))
     {
@@ -2622,7 +2623,7 @@ void FClientShipGameobj::PlayCargoJettisonSound()
     Pose[10] = Hp.Position.y;
     Pose[11] = Hp.Position.z;
     // 0x005440e3: get_index.
-    long const EngineIndex = get_index();
+    int32_t const EngineIndex = get_index();
 
     // 0x005440e6..0x005441fa: the createeffect.h sequence (EFFECTS gate, factory, attach,
     // FUN_00544230, FUN_004fcea0, FUN_00502d90); 0x00544211: FUN_0040e2a0.
@@ -2710,7 +2711,7 @@ namespace
         Arch.SndEffect = LookupClientSoundArch(SoundId);
 
         float Pose[12] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
-        long const EngineIndex = Go->get_index();
+        int32_t const EngineIndex = Go->get_index();
         CreateEffectOnGameobj(Go, &Arch, EngineIndex, Pose);
     }
 }
@@ -2839,7 +2840,7 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
 
     // 0x005443a2..0x005443c6: "HpPilot" on the ship's own instance (vt+0x1c get_index); no
     // hardpoint, nothing.
-    long Handle = 0;
+    int32_t Handle = 0;
     HardpointInfo PilotInfo;
     if (!FindHardpoint_PS(get_index(), "HpPilot", Handle, PilotInfo))
         return;
@@ -2853,10 +2854,10 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
     Field_0x104->Companion->Load(0);
     // 0x005443fd..0x00544420: an engine instance of it (no parent); -1 stops here, anything
     // else goes to +0x10c (the mesh holder's instance).
-    long const Instance = Field_0x104->create_instance(nullptr);
+    int32_t const Instance = Field_0x104->create_instance(nullptr);
     if (Instance == -1)
         return;
-    Field_0x108.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+    Field_0x108.EngineInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Instance)));
 
     // 0x00544410..0x00544426: "HpConnect" on the pilot mesh, into the same handle; the result
     // is not tested. Retail reads its stack HardpointInfo whether or not the lookup filled it;
@@ -3497,10 +3498,10 @@ void FClientShipGameobj::Slot1b8(float Dt)
 
     // 0x00545628..0x00545643: FUN_005553b0(get_position() (vt+0), &+0x3c, hint +0x38) into
     // +0x38.
-    FNebulaEffect* const Hint = reinterpret_cast<FNebulaEffect*>(static_cast<uintptr_t>(DrawStateA));
+    FNebulaEffect* const Hint = static_cast<FNebulaEffect*>(fl::HandleToPtr(static_cast<uint32_t>(DrawStateA)));
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), Hint);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+    DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
 
     // 0x0054563c..0x0054565f: the clock reloaded; above the period it is reduced on the FPU
     // stack (FSUB / FCOM / TEST AH,0x41 / JZ loops while still greater) and stored once.
@@ -3877,7 +3878,7 @@ int FClientShipGameobj::slot_5c(int RequestType, unsigned const* TargetId,
     unsigned const Target = *TargetId;
     unsigned const SelfId = get_id();
     LocalServer()->RequestEvent(RequestType, SelfId, Target, Second,
-                                static_cast<unsigned long>(bFlag), GetPlayerConnectionId());
+                                static_cast<uint32_t>(bFlag), GetPlayerConnectionId());
     return 0;
 }
 
@@ -3888,7 +3889,7 @@ int FClientShipGameobj::slot_60(int RequestType, unsigned const* TargetId, int A
     Field_0xec = nullptr;
     unsigned const Target = *TargetId;
     unsigned const SelfId = get_id();
-    LocalServer()->RequestCancel(RequestType, SelfId, Target, static_cast<unsigned long>(Arg3),
+    LocalServer()->RequestCancel(RequestType, SelfId, Target, static_cast<uint32_t>(Arg3),
                                  GetPlayerConnectionId());
     return 0;
 }
@@ -4486,7 +4487,7 @@ namespace
     // FUN_00503070 on this gameobj at Xform, into OneShotCompanion (+0xb0). The id is tested
     // for emptiness first, as both slots do right before the call.
     void ProjectileStartConstEffect(FClientProjectileGameobj* Self, ID_String const* Effect,
-                                    long EngineIndex, Transform const& Xform)
+                                    int32_t EngineIndex, Transform const& Xform)
     {
         if (Effect->IsEmpty())
             return;
@@ -4516,7 +4517,7 @@ void FClientProjectileGameobj::Slot170()
     // 0x00542729..0x0054276a: Slot1c0(&Xform), get_index, start.
     Transform Xform;
     Slot1c0(&Xform);
-    long const EngineIndex = get_index();
+    int32_t const EngineIndex = get_index();
     ProjectileStartConstEffect(this, Effect, EngineIndex, Xform);
 }
 
@@ -4539,7 +4540,7 @@ void FClientProjectileGameobj::update(float Dt)
     // 0x00542801..0x00542825: the class & 7 object's archetype companion (no null test), then
     // get_index.
     Archetype::ICliObj* const Companion = NarrowObject(this, 0x7u)->Archetype->Companion;
-    long const EngineIndex = get_index();
+    int32_t const EngineIndex = get_index();
     ProjectileStartConstEffect(this, Archetype::CliProjConstEffect(Companion), EngineIndex,
                                Xform);
 }
@@ -4769,7 +4770,7 @@ namespace
             return;
         FNebulaEffect* const Nebula = StarSysFindNebula(
             &Self->get_position(), reinterpret_cast<float*>(&Self->DrawStateB), nullptr);
-        Self->DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+        Self->DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
         Self->Field_0x34 = 1.0f;
     }
 
@@ -5029,7 +5030,7 @@ void FClientGuidedGameobj::Slot1c0(Transform* Out)
     if (TrailParent[0] != '\0')
     {
         // 0x0053f08f..0x0053f0d2: FindHardpoint_PS(get_index(), name, &Handle (-1), &Info).
-        long Handle = -1;
+        int32_t Handle = -1;
         HardpointInfo Hp;
         if (FindHardpoint_PS(get_index(), TrailParent, Handle, Hp))
         {
@@ -5055,12 +5056,12 @@ void FClientGuidedGameobj::Slot1c0(Transform* Out)
     // 1.0; when both answer, the translation is {centre x, centre y, extents[4]}.
     float Extents[6];
     void* const MeshId =
-        reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+        static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Object->get_archetype()->EngineIndex)));
     if (DALib::Renderer->GetBounds(MeshId, 1.0f, Extents) != 0)
     {
         float Center[3];
         void* const MeshIdAgain =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+            static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Object->get_archetype()->EngineIndex)));
         if (DALib::Renderer->GetCentroid(MeshIdAgain, 1.0f, Center) != 0)
         {
             Local.Translation.x = Center[0];
@@ -5197,7 +5198,7 @@ void FClientLootGameobj::Slot170()
     // 0x0053e677..0x0053e68c: FUN_005553b0(&get_position(), &DrawStateB, 0) into DrawStateA.
     FNebulaEffect* const Nebula =
         StarSysFindNebula(&get_position(), reinterpret_cast<float*>(&DrawStateB), nullptr);
-    DrawStateA = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Nebula));
+    DrawStateA = static_cast<unsigned>(fl::PtrToHandle(Nebula));
 }
 
 void FClientLootGameobj::update(float Dt)

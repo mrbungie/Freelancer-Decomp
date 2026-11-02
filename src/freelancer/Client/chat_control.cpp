@@ -15,6 +15,7 @@
 //   FUN_00468260 Update             FUN_00468310 RefreshCounts
 //   LAB_0045fc50..LAB_0045fd50 the layout floats (DAT_0066d4a8..DAT_0066d4d8)
 
+#include "fl/handles.h"
 #include "chat_control.h"
 
 #include "chat_msg_win.h"          // MsgWin (HistoryDisplay, DAT_0066da80)
@@ -302,7 +303,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
         HistoryDisplay->SetAutoScrollbar(true);
         HistoryDisplay->SnapshotGeneration = 0;
         HistoryDisplay->Snapshot = G_ChatAllMessages;           // DAT_0066da64
-        HistoryDisplay->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
+        HistoryDisplay->SetFrameColor(reinterpret_cast<uint32_t const*>(G_HudChromeColorRgba));
         HistoryDisplay->SetDrawFrame(false);
         HistoryDisplay->SetKeepScrolledToEnd(true);
         HistoryDisplay->GetToolTipHoverInfo()->IdsAlt = 0x1b7c;
@@ -332,7 +333,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     {
         float const AttachOffset[3] = {G_ChatBroadcastX, 0.215f, 0.0f};   // DAT_0066d4b4 / DAT_005cef20
         BroadcastList->SetAttachOffset(AttachOffset);
-        BroadcastList->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
+        BroadcastList->SetFrameColor(reinterpret_cast<uint32_t const*>(G_HudChromeColorRgba));
         BroadcastList->SetResizable(false, false);
         BroadcastList->SetLayoutFlag(true);
         BroadcastList->SetBorders(false, false, false, true);
@@ -358,7 +359,7 @@ bool ChatControl::Create(Win3D* NewParent, void* Data)
     {
         float const AttachOffset[3] = {G_ChatPrivateX, G_ChatPrivateY, 0.0f};   // DAT_0066d4ac / DAT_0066d4a8
         PrivateList->SetAttachOffset(AttachOffset);
-        PrivateList->SetFrameColor(reinterpret_cast<unsigned long const*>(G_HudChromeColorRgba));
+        PrivateList->SetFrameColor(reinterpret_cast<uint32_t const*>(G_HudChromeColorRgba));
         PrivateList->SetResizable(false, false);
         PrivateList->SetLayoutFlag(true);
         PrivateList->SetDrawColumnLines(false);
@@ -955,7 +956,7 @@ bool ChatControl::Slot23(unsigned Msg, unsigned A, unsigned B)
         return true;
     }
 
-    UiScrollTable* const List = reinterpret_cast<UiScrollTable*>(static_cast<uintptr_t>(A));
+    UiScrollTable* const List = static_cast<UiScrollTable*>(fl::HandleToPtr(static_cast<uint32_t>(A)));
     bool const bOwnList = List == BroadcastList || List == PrivateList;
 
     if (Msg == 0x300d && bOwnList)

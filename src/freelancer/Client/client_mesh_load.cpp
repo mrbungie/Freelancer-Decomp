@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "client_mesh_load.h"
+#include "fl/handles.h"
 
 #include "DALib.h"
 #include "common_archetype.h"
@@ -28,7 +29,7 @@ namespace
 {
     // FUN_0059ec60 (cdecl Instance, Context) -- the CompoundInstanceAnalyze callback of
     // FUN_0059ec80: IEngine vt+0x7c SetInstanceUserData(Instance, Context), nothing else.
-    void __cdecl MeshAnalyzeSetUserData(long Instance, void* Context)
+    void __cdecl MeshAnalyzeSetUserData(int32_t Instance, void* Context)
     {
         DALib::Engine->SetInstanceUserData(reinterpret_cast<void*>(Instance), Context);
     }
@@ -37,7 +38,7 @@ namespace
     // with the holder's floats +0x14 as the context.
     void AnalyzeBoundInstance(FClientMeshHolder* Holder)
     {
-        long const Inst = static_cast<long>(reinterpret_cast<ptrdiff_t>(Holder->EngineInstance));
+        int32_t const Inst = static_cast<int32_t>(fl::PtrToHandle(Holder->EngineInstance));
         CompoundInstanceAnalyze(Inst, MeshAnalyzeSetUserData, Holder->UserFloats);
     }
 
@@ -116,7 +117,7 @@ bool ArchetypeLoadFromPath(IEngine* Engine, char const* RelPath, void** OutHandl
     char const* Ext = strrchr(RelPath, '.');
     if (Ext != nullptr && _stricmp(Ext, ".sph") == 0)
     {
-        const unsigned long StemLen = static_cast<unsigned long>(Ext - RelPath);
+        const uint32_t StemLen = static_cast<uint32_t>(Ext - RelPath);
         if (StemLen + 5 < sizeof(AltPath))
         {
             memcpy(AltPath, RelPath, StemLen);
@@ -126,7 +127,7 @@ bool ArchetypeLoadFromPath(IEngine* Engine, char const* RelPath, void** OutHandl
     }
     TryPaths[TryCount++] = RelPath;
 
-    long EngineIndex = -1;
+    int32_t EngineIndex = -1;
     char const* LoadedPath = RelPath;
     int TryIndex = 0;
     while (TryIndex < TryCount)
@@ -258,7 +259,7 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
         if (AuxPath != nullptr)
             Holder->AuxMaterialEntry = Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 
-        long Handle = -1;
+        int32_t Handle = -1;
         bOk = Archetype::Load(static_cast<IFileSystem*>(FsOut), &Handle, nullptr);
         if (bOk)
         {
@@ -272,7 +273,7 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
                 Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
             }
             // 00420ede: CreateInstance(Handle, 0), then ReleaseHandle(Handle).
-            void* const HandlePtr = reinterpret_cast<void*>(static_cast<ptrdiff_t>(Handle));
+            void* const HandlePtr = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(Handle)));
             Holder->EngineInstance = DALib::Engine->CreateInstance(HandlePtr, nullptr);
             DALib::Engine->ReleaseHandle(HandlePtr);
         }
@@ -297,7 +298,7 @@ bool ClientMeshHolderBindInstance(FMeshHolder* Holder, void* ArchHandle)
 {
     // FUN_00420d70. 0x00420d73..0x00420da2: a bound instance is destroyed, the slot set back to
     // -1 and both material entries released.
-    void* const NoInstance = reinterpret_cast<void*>(static_cast<ptrdiff_t>(-1));
+    void* const NoInstance = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     if (Holder->EngineInstance != NoInstance)
     {
         DALib::Engine->DestroyInstance(Holder->EngineInstance);
@@ -345,7 +346,7 @@ void ClientMeshHolderSetMatrix(FMeshHolder* Holder, void* Transform)
     DALib::Engine->SetInstanceMatrix(Holder->EngineInstance, Transform);
 }
 
-void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, unsigned long Flags)
+void ClientMeshHolderRender(FMeshHolder* Holder, void* Camera, uint32_t Flags)
 {
     // FUN_00421120: Renderer->vt+0x1c(Renderer, Camera, Holder+0x04, 1.0f, Flags, 0, 0).
     DALib::Renderer->RenderInstance(Camera, Holder->EngineInstance, 1.0f, Flags, nullptr, nullptr);
@@ -427,7 +428,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
 
         // Archetype::Load(Fs, &handle, holder +0x10) on both branches; the handle lands in
         // retail's own RelPath argument slot.
-        long LoadedHandle = -1;
+        int32_t LoadedHandle = -1;
         int* const AnimIndex = reinterpret_cast<int*>(&Holder->AnimOrArchIndex);
         if (bRegisterCache)
         {
@@ -435,7 +436,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             // unless already there -- and NOT released here (FUN_0059e8d0 does that).
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
-                void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+                void* const Loaded = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(LoadedHandle)));
                 if (FindModelCacheEntry(Loaded) == nullptr)
                     AppendModelCacheEntry(Loaded); // 0x0059ee0d..0x0059ee29 FUN_0059f5b0
                 if (ClientMeshHolderBindInstance(Holder, Loaded))
@@ -447,7 +448,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             // 0x0059ee56..0x0059eea6: bind, analyze on success, then release the handle.
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
-                void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+                void* const Loaded = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(LoadedHandle)));
                 if (ClientMeshHolderBindInstance(Holder, Loaded))
                     AnalyzeBoundInstance(Holder);
                 DALib::Engine->ReleaseHandle(Loaded);
@@ -503,11 +504,11 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
             Archetype::ResolveMaterialEntry(AuxPath, true, 0xffffffffu);
 
         // 0x0059eadc..0x0059eb08: Archetype::Load(Fs, &handle, &anim) with anim = -1.
-        long LoadedHandle = -1;
+        int32_t LoadedHandle = -1;
         int AnimIndex = -1;
         if (Archetype::Load(Filesys, &LoadedHandle, &AnimIndex))
         {
-            void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+            void* const Loaded = static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(LoadedHandle)));
             // 0x0059eb0e..0x0059eb67: append {handle, 0, 0} when not cached (FUN_0059ebf0 +
             // FUN_0059f5b0).
             if (FindModelCacheEntry(Loaded) == nullptr)

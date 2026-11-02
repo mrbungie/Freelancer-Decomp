@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_evadebehavior.h"
+#include "fl/handles.h"
 
 #include "common_aisteer.h"        // IsPointOutsideHeadingCone, IsWithinInterceptRangeOfIface,
                                    // GetIfaceVectorMagnitude
@@ -585,7 +586,7 @@ void EvadeBehavior::Slot21(void* Arg)
     if (!IsWatching(Watcher2a0))                                    // 062c7876-062c7886
         return;
     // 062c7888-062c789e: get_id (+0x20) on the watched object, compared with the argument.
-    if (WatchedObject(Watcher2a0)->get_id() != static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg)))
+    if (WatchedObject(Watcher2a0)->get_id() != static_cast<unsigned int>(fl::PtrToHandle(Arg)))
         return;
     Watcher2a0.set(nullptr);                                        // 062c78a0-062c78a9
 }

@@ -1887,14 +1887,14 @@ void HUD_ContactList::Draw()
 
             // 0x004d2838..0x004d290b: waypoints violet, the rest by reputation; a white NPC
             // ship with no faction marks the list dirty and is not shown.
-            unsigned long Colour = G_NnPaletteArgb_679bb0;
+            uint32_t Colour = G_NnPaletteArgb_679bb0;
             if (Entry.Kind == 4 || Entry.Kind == 3)
             {
                 Colour = G_NnPaletteArgb_679b80;
             }
             else
             {
-                unsigned long RepColour = 0;
+                uint32_t RepColour = 0;
                 HudReputationColor(&RepColour, Player, Entry.Object());   // FUN_0045a4e0
                 Colour = RepColour;
                 if ((Colour & 0xffffffu) == (G_NnPaletteArgb_679b84 & 0xffffffu))
@@ -1926,7 +1926,7 @@ void HUD_ContactList::Draw()
                      NameTexts[Row]->HitTest(Ray)) &&
                     !HudIsMousePickBlocked())
                 {
-                    unsigned long Pulsed = 0;
+                    uint32_t Pulsed = 0;
                     NnUiPulseBlendFromArgb(&Pulsed, Colour);   // FUN_00561f20
                     Colour = Pulsed;
                 }
@@ -2030,14 +2030,14 @@ void HUD_ContactList::Draw()
             }
             else
             {
-                wcscat(Name, L"?");                      // LAB_004d389d
+                wcscat(Name, L"???");                    // LAB_004d389d: DAT_005d0214
             }
         }
         else if (Gameobj->GetFlag3IfSurfaceWidthUnchanged() && !(bRefreshNames && Entry.Kind == 7))
         {
             // 0x004d2d98..0x004d2dc0: the object's label is still good.
             RowLabels[Row] = Gameobj->GetFontString48();
-            wcscat(Name, L"?");
+            wcscat(Name, L"???"); // 0x004d2dc0 -> LAB_004d389d
         }
         else
         {
@@ -2071,7 +2071,7 @@ void HUD_ContactList::Draw()
                             wchar_t Faction[0x80];
                             IdsInto(ShortName, Faction, 0x80);
                             wcscat(Name, Faction);
-                            wcscat(Name, L" ");
+                            wcscat(Name, L" - "); // 0x004d301c: DAT_005d01f4
                         }
                         wchar_t Pilot[0xff];
                         FmtStrSprintf(&NameB, Pilot, 0xff);
@@ -2098,7 +2098,7 @@ void HUD_ContactList::Draw()
                         {
                             if (bNamed != 0)
                             {
-                                wcscat(Name, L" ");
+                                wcscat(Name, L" - "); // 0x004d30ff: DAT_005d01f4
                             }
                             wchar_t TypeName[0x80];
                             IdsInto(GetObjectIdsName(Simple), TypeName, 0x80); // FUN_005472a0
@@ -2126,7 +2126,7 @@ void HUD_ContactList::Draw()
                                 }
                                 else
                                 {
-                                    wcscat(Name, L" ");
+                                    wcscat(Name, L" - "); // 0x004d3258: DAT_005d01f4
                                     bNamed = 1;
                                 }
                             }
@@ -2172,7 +2172,7 @@ void HUD_ContactList::Draw()
                         // LAB_004d3895.
                         if (bNamed == 0)
                         {
-                            wcscat(Name, L"?");
+                            wcscat(Name, L"???"); // 0x004d389d: DAT_005d0214
                         }
                     }
                     else if (Kind == 0xa && (Simple->TypeBits & 0x7f0000u) != 0)
@@ -2287,14 +2287,14 @@ void HUD_ContactList::Draw()
         }
 
         // 0x004d3a62..0x004d3c7d: the colour (no faction test in this pass).
-        unsigned long Colour = G_NnPaletteArgb_679bb0;
+        uint32_t Colour = G_NnPaletteArgb_679bb0;
         if (Entry.Kind == 4 || Entry.Kind == 3)
         {
             Colour = G_NnPaletteArgb_679b80;
         }
         else
         {
-            unsigned long RepColour = 0;
+            uint32_t RepColour = 0;
             HudReputationColor(&RepColour, Player, Entry.Object());
             Colour = RepColour;
         }
@@ -2310,7 +2310,7 @@ void HUD_ContactList::Draw()
                  NameTexts[Row]->HitTest(Ray)) &&
                 !HudIsMousePickBlocked())
             {
-                unsigned long Pulsed = 0;
+                uint32_t Pulsed = 0;
                 NnUiPulseBlendFromArgb(&Pulsed, Colour);
                 Colour = Pulsed;
             }

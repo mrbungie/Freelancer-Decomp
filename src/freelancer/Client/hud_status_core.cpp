@@ -170,7 +170,7 @@ namespace
     // LAB_004d4af0 sets it to -1 and nothing else writes it (XREFs 004d4af0 W, 004d5673 R). -1
     // equals FUN_00403ea0's "current list" key DAT_0061648c, so the flush takes the container
     // of the current material key, the one the chips were just queued on.
-    unsigned long G_HudCoreListKey = 0xffffffffu;
+    uint32_t G_HudCoreListKey = 0xffffffffu;
 }
 
 HUD_Core::HUD_Core(INI_Reader& /*Reader*/)
@@ -293,7 +293,7 @@ bool HUD_Core::OnEvent(unsigned MsgId)
     return true;
 }
 
-void HUD_Core::DrawBars(float DesignY, unsigned long Color, float Ratio)
+void HUD_Core::DrawBars(float DesignY, uint32_t Color, float Ratio)
 {
     // FUN_004d5410. The surface size is DAT_00610850 / DAT_00610854 (FILD, signed).
     int const SurfaceWidth = static_cast<int>(G_RenderSurfaceWidth);
@@ -362,7 +362,7 @@ void HUD_Core::DrawBars(float DesignY, unsigned long Color, float Ratio)
         std::memcpy(&Record.V0, &G_ScreenQuadDefaultFrame[2], sizeof(float));
         std::memcpy(&Record.U1, &G_ScreenQuadDefaultFrame[3], sizeof(float));
         std::memcpy(&Record.V1, &G_ScreenQuadDefaultFrame[4], sizeof(float));
-        std::memcpy(&Record.ColorBits, &Color, sizeof(float));
+        Record.ColorBits = Color;
         ScreenQuadAppendRecord(Record);
         // TEST AH,0x41 / JZ: only a strictly greater (ordered) next left edge ends the row.
         if (NextLeft > static_cast<double>(FillEnd))
@@ -1051,7 +1051,7 @@ void HUD_Status::RefreshWeaponRows()
     }
     for (int Slot = 0;;)
     {
-        unsigned long Color = G_NnPaletteArgb_679bb0;
+        uint32_t Color = G_NnPaletteArgb_679bb0;
         if (Weapons[Row].bActive != 0)
         {
             Color = G_NnPaletteArgb_679bac;
@@ -1061,7 +1061,7 @@ void HUD_Status::RefreshWeaponRows()
         {
             if (!HudIsMousePickBlocked())
             {
-                unsigned long Pulsed = 0;
+                uint32_t Pulsed = 0;
                 NnUiPulseBlendFromArgb(&Pulsed, Color);
                 Color = Pulsed;
             }
@@ -1727,12 +1727,12 @@ void HUD_Status::UpdateSpecialModeCaptions()
     }
 
     // 0x004dcb37..0x004dcc44: the cancel caption -- ids 0x62d as a format around the name of the
-    // key bound to the command that leaves the mode ("?" when none is bound): 0xbf in the turret
+    // key bound to the command that leaves the mode ("???" when none is bound): 0xbf in the turret
     // view, 0xf with mouse flight unlocked, 0xc8 otherwise.
     GetIdsStringWWithRawFallback(0x62d, G_StatusScratchFormat,
                                  G_NnTextScratchCapacity); // FUN_004347e0
     wchar_t KeyName[0x100];
-    wcscpy(KeyName, L"?");
+    wcscpy(KeyName, L"???"); // 0x004dcb58: DAT_005d0214
     unsigned Command = 0xc8;
     if (bTurretView != 0)
     {

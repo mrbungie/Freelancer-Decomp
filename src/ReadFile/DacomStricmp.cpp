@@ -6,7 +6,12 @@
 
 // Keep DACOM's imported comparator separate from CRT's similarly named declaration.
 
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 extern "C" __declspec(dllimport) int __cdecl stricmp(const char* Left, const char* Right);
+#else
+#include <strings.h>   // portable: libc's case-insensitive compare
+#define stricmp strcasecmp
+#endif
 
 int CallDacomStricmp(const char* Left, const char* Right)
 {

@@ -11,6 +11,7 @@
 // (common_behavior_internal.h).
 
 #include "common_behavior.h"
+#include "fl/handles.h"
 #include "common_behavior_internal.h" // CmnBehavior:: follower helpers (common_behavior.cpp)
 #include "common_aisteer.h" // GetIfacePositionOrZero, IsWithinInterceptRangeOfIface
 #include "common_systemmanager.h" // SystemManager -- BaseFollowerBehavior::NavHelper's real type
@@ -662,7 +663,7 @@ void BaseFollowerBehavior::slide_strafe_burst(StrafeDir Dir)
 // Slot 21, LAB_062cf300 (.text:062cf300-062cf339, RET 4).
 void BaseFollowerBehavior::Slot21(void* Arg)
 {
-    unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
+    unsigned int const LeftId = static_cast<unsigned int>(fl::PtrToHandle(Arg));
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(LeadWatcher.target()));
     if (Lead == nullptr)
         return;

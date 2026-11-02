@@ -44,7 +44,7 @@ void __cdecl SpacePopSetGcsClampEnabled(unsigned char EnabledByte)
 I3DMathEngine* __cdecl ContentAcquire3DMathEngine()
 {
     // FUN_06fa8fa0: 0xC descriptor, DACOM CreateInstance slot +0x0C.
-    FMathDesc Desc = { sizeof(FMathDesc), "3DMathEngine", nullptr };
+    FMathDesc Desc = { kRetailMathDescSize, "3DMathEngine", nullptr };
     void* Instance = nullptr;
     ICOManager* Manager = DACOM_Acquire();
     Manager->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), &Instance);

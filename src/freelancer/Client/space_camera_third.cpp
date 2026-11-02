@@ -413,7 +413,7 @@ void ThirdPersonCameraAttach(FThirdPersonCamera* Cam, void* Object)
 
         // 0x00518c6c..0x00518d33: the "HpCockpit" hardpoint of the object's instance (slot 0x1c)
         // in parent space; the fallback is (0, 0, -4) and identity.
-        long HardpointHandle = 0;
+        int32_t HardpointHandle = 0;
         HardpointInfo Info;
         if (FindHardpoint_PS(WatchedObject(Cam)->get_index(), "HpCockpit", HardpointHandle, Info))
         {

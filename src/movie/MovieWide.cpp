@@ -12,9 +12,9 @@
 // DAT_06ae097c. Defined in MovieGraph.cpp.
 extern int GMovieGraphCode;
 
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
-long __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
-long __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
+int32_t __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall SubtractLimbs(unsigned int* Minuend, unsigned int* Subtrahend, int Difference, int Count);
+int32_t __stdcall CompareLimbs(int Left, unsigned int LeftCount, int Right, int RightCount);
 
 static unsigned int Movie_SignificantLimbs(unsigned int* Limbs, unsigned int Count)
 {
@@ -302,7 +302,7 @@ void __stdcall Movie_MultiplyLowLimbs(unsigned int* Left, unsigned int* Right, u
 // 0x06ac8910
 // The listing pairs limbs with SBB, then propagates the borrow. A cleared borrow copies
 // the untouched tail when Dest is not Left. The final borrow is 0 or 1.
-long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum)
+int32_t __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum)
 {
     unsigned int* Diff = (unsigned int*)Sum;
     unsigned int Borrow = 0u;
@@ -333,7 +333,7 @@ long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsign
     }
     if (Remain == 0)
     {
-        return (long)Borrow;
+        return (int32_t)Borrow;
     }
     if (Diff != Left)
     {
@@ -351,7 +351,7 @@ long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsign
 // The longer vector is the left operand of AddLimbs. A nonzero carry becomes one more limb.
 unsigned int __stdcall Movie_AddLimbsLength(unsigned int* Left, unsigned int LeftCount, unsigned int* Right, unsigned int RightCount, int Dest)
 {
-    long Carry;
+    int32_t Carry;
     unsigned int Length;
     if (LeftCount < RightCount)
     {

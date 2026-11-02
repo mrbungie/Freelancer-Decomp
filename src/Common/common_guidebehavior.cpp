@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "common_guidebehavior.h"
+#include "fl/handles.h"
 #include "common_pathfind.h" // PathfindManager (IBehaviorManager+0x0C)
 #include "common_systemmanager.h" // SystemManager::Targeting / ExternalIface (NotifyManagerGuideEvent)
 
@@ -185,7 +186,7 @@ bool GuideBehavior::Slot10(void* DirectiveOp)
     bool bResult = true;                                            // 062cfcba
     // 062cfcad-062cfcda: WatcherB = the object GotoOp+0x1c names (FUN_062e74a0).
     IObjRW* const GotoTarget = NavHelperPtr24->Timers.FindVerifiedObject(
-        (unsigned const*)((unsigned char*)this + 0x84));
+        reinterpret_cast<unsigned const*>(&GotoOp.Field_1C));   // retail this+0x84 = GotoOp(+0x68) + 0x1c
     WatcherB.set(GotoTarget != nullptr ? static_cast<Watchable const*>(GotoTarget) : nullptr);
     Field104 = Op->Field_A4;                                        // 062cfce5
     AngleThreshold11c = Op->Field_A8;                               // 062cfcf1
@@ -232,7 +233,7 @@ bool GuideBehavior::Slot10(void* DirectiveOp)
 // Slot 21, LAB_062cf300 (.text:062cf300-062cf339, RET 4).
 void GuideBehavior::Slot21(void* Arg)
 {
-    unsigned int const LeftId = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Arg));
+    unsigned int const LeftId = static_cast<unsigned int>(fl::PtrToHandle(Arg));
     IObjRW* const Lead = ObjRwFromWatchable(const_cast<Watchable*>(WatcherA.target()));
     if (Lead == nullptr)
         return;

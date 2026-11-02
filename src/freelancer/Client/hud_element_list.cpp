@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "hud_element_list.h"
+#include "fl/handles.h"
 
 #include "common_cequip.h"
 #include "common_cobject.h"
@@ -65,7 +66,7 @@ namespace
     {
         void* const ObjRW = GetPlayerObjRW();
         // `ADD EAX,0xc / TEST EAX,EAX`: an IObjRW* of -0xc is the other "no object" value.
-        if (ObjRW == nullptr || ObjRW == reinterpret_cast<void*>(static_cast<intptr_t>(-0xc)))
+        if (ObjRW == nullptr || ObjRW == static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-0xc))))
             return nullptr;
         CEqObj* const EqObj =
             *reinterpret_cast<CEqObj**>(static_cast<unsigned char*>(ObjRW) + 0x10);
@@ -251,7 +252,7 @@ void HUDItem::ShowToolTip()
     Info.AuxField = 0;
     Info.bLive = 0;
     Info.IdsAlt = ToolTipIds;
-    Info.Ids = static_cast<int>(reinterpret_cast<intptr_t>(this) + ToolTipIds);
+    Info.Ids = static_cast<int>(fl::PtrToHandle(this) + ToolTipIds);
     NnToolTipFeedHover(&Info); // FUN_004be370
 
     // 0x004c8258 .. 0x004c82d7: the record's teardown (~FToolTipHoverInfo) -- FUN_004144f0,
@@ -602,7 +603,7 @@ HUD_Steer::~HUD_Steer()
     // FUN_004c8c20: with an instance bound, FUN_0059eee0; then the holder's destructor
     // FUN_0059ef20 (~FClientMeshHolder: the same release again, which finds nothing); then
     // ~HUDItem.
-    if (MeshHolder.EngineInstance != reinterpret_cast<void*>(static_cast<intptr_t>(-1)))
+    if (MeshHolder.EngineInstance != static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1))))
         ClientUiMeshHolderRelease(&MeshHolder);
 }
 

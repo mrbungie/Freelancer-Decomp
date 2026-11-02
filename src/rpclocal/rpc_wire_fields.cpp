@@ -82,6 +82,8 @@
 
 #include "portable_double_load.h"
 #include "rpc_containers.h"
+#include <cstring>
+#include "platform/fl_x87.h"
 #include "rpc_payloads.h"
 
 // ===========================================================================

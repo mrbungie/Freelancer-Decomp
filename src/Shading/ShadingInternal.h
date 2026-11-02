@@ -7,6 +7,7 @@
 #pragma once
 
 #include "dacom.h"
+#include "fl/handles.h"
 #include "render/IRenderPipeline.h"
 #include "x86math.h"
 #include "luaprofile.h"
@@ -37,43 +38,43 @@ static const D3DRENDERSTATETYPE kRsCullMode = D3DRS_CULLMODE;
 static const D3DRENDERSTATETYPE kRsAlphaRef = D3DRS_ALPHAREF;
 static const D3DRENDERSTATETYPE kRsAlphaFunc = D3DRS_ALPHAFUNC;
 static const D3DRENDERSTATETYPE kRsAlphaTestEnable = D3DRS_ALPHATESTENABLE;
-static const unsigned long kZFuncLessEqual = 4;
+static const uint32_t kZFuncLessEqual = 4;
 
-static const unsigned long kTssColorOp = 1;
-static const unsigned long kTssColorArg1 = 2;
-static const unsigned long kTssColorArg2 = 3;
-static const unsigned long kTssAlphaOp = 4;
-static const unsigned long kTssAlphaArg1 = 5;
-static const unsigned long kTssAlphaArg2 = 6;
-static const unsigned long kTssTexCoordIndex = 0xB;
-static const unsigned long kTssAddressU = 0xD;
-static const unsigned long kTssAddressV = 0xE;
-static const unsigned long kTssTextureTransformFlags = 0x18;
+static const uint32_t kTssColorOp = 1;
+static const uint32_t kTssColorArg1 = 2;
+static const uint32_t kTssColorArg2 = 3;
+static const uint32_t kTssAlphaOp = 4;
+static const uint32_t kTssAlphaArg1 = 5;
+static const uint32_t kTssAlphaArg2 = 6;
+static const uint32_t kTssTexCoordIndex = 0xB;
+static const uint32_t kTssAddressU = 0xD;
+static const uint32_t kTssAddressV = 0xE;
+static const uint32_t kTssTextureTransformFlags = 0x18;
 
-static const unsigned long kTopDisable = 1;
-static const unsigned long kTopSelectArg1 = 2;
-static const unsigned long kTopModulate = 4;
-static const unsigned long kTopModulate2X = 5;
-static const unsigned long kTopAdd = 7;
-static const unsigned long kTaDiffuse = 0;
-static const unsigned long kTaCurrent = 1;
-static const unsigned long kTaTexture = 2;
-static const unsigned long kBlendZero = 1;
-static const unsigned long kBlendSrcAlpha = 5;
-static const unsigned long kBlendInvSrcAlpha = 6;
-static const unsigned long kBlendDestColor = 9;
-static const unsigned long kBlendOne = 2;
+static const uint32_t kTopDisable = 1;
+static const uint32_t kTopSelectArg1 = 2;
+static const uint32_t kTopModulate = 4;
+static const uint32_t kTopModulate2X = 5;
+static const uint32_t kTopAdd = 7;
+static const uint32_t kTaDiffuse = 0;
+static const uint32_t kTaCurrent = 1;
+static const uint32_t kTaTexture = 2;
+static const uint32_t kBlendZero = 1;
+static const uint32_t kBlendSrcAlpha = 5;
+static const uint32_t kBlendInvSrcAlpha = 6;
+static const uint32_t kBlendDestColor = 9;
+static const uint32_t kBlendOne = 2;
 
-static const unsigned long kSubmitFlagIrDraw = 0x100;
-static const unsigned long kSubmitFlagSkipAlphaTest = 0x400;
+static const uint32_t kSubmitFlagIrDraw = 0x100;
+static const uint32_t kSubmitFlagSkipAlphaTest = 0x400;
 
 
 // DAT_06ed4848 dword[4]: NONE stays, CW↔CCW. Indexed by D3DRS_CULLMODE (0x16).
-static const unsigned long kCullFlip[4] = {0, 1, 3, 2};
+static const uint32_t kCullFlip[4] = {0, 1, 3, 2};
 
 // D3D8 D3DPRIMITIVETYPE. SphereMesh slot-10 arg2 is immediate 4 (TRIANGLELIST).
-static const unsigned long kD3dPrimTriangleList = 4;
-static const unsigned long kD3dPrimMax = 6;
+static const uint32_t kD3dPrimTriangleList = 4;
+static const uint32_t kD3dPrimMax = 6;
 
 enum EMaterialBind
 {
@@ -124,7 +125,7 @@ inline GENRESULT QiFrom(void* Object, const char* Iid, void** Out)
     return Component->QueryInterface(Iid, Out);
 }
 
-inline void* VtableSlot(void* Object, unsigned long ByteOffset)
+inline void* VtableSlot(void* Object, uint32_t ByteOffset)
 {
     if (Object == nullptr)
         return nullptr;
@@ -138,47 +139,47 @@ inline void PipeSetMaterial(IRenderPipeline* Pipeline, const float* MaterialBloc
         SetMaterialBlock(Pipeline, MaterialBlock);
 }
 
-inline void PipeSetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, unsigned long Value)
+inline void PipeSetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State, uint32_t Value)
 {
     if (Pipeline != nullptr)
         Pipeline->SetRenderState(State, (int)Value);
 }
 
-inline unsigned long PipeGetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State)
+inline uint32_t PipeGetRs(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State)
 {
     int Value = 0;
     if (Pipeline != nullptr)
         Pipeline->GetRenderState(State, &Value);
-    return (unsigned long)Value;
+    return (uint32_t)Value;
 }
 
 // IRenderPipeline +0xC8 slot 50 — get_texture_format (FUN_06d0e3d9).
-inline GENRESULT PipeGetTextureFormat(IRenderPipeline* Pipeline, unsigned long Handle,
+inline GENRESULT PipeGetTextureFormat(IRenderPipeline* Pipeline, uint32_t Handle,
                                       int* OutFormat)
 {
     if (Pipeline == nullptr || OutFormat == nullptr)
         return GR_GENERIC;
-    return Pipeline->GetTextureFormat((void*)Handle, OutFormat);
+    return Pipeline->GetTextureFormat((void*)fl::HandleToPtr(Handle), OutFormat);
 }
 
-static const unsigned long kPixelFormatField04[15] = {
+static const uint32_t kPixelFormatField04[15] = {
     0, 8, 0x18, 0x10, 0x10, 0x10, 0x10, 0x20, 0x20, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField08[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField18[15] = {0, 0, 8, 6, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatField28[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
-static const unsigned long kPixelFormatAlphaBits[15] = {
+static const uint32_t kPixelFormatField08[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
+static const uint32_t kPixelFormatField18[15] = {0, 0, 8, 6, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
+static const uint32_t kPixelFormatField28[15] = {0, 0, 8, 5, 5, 4, 5, 8, 8, 0, 0, 0, 0, 0, 0};
+static const uint32_t kPixelFormatAlphaBits[15] = {
     0, 0, 0, 0, 0, 4, 1, 8, 0, 0, 1, 0, 0, 0, 0};
 static const unsigned char kPixelFormatHasAlpha[15] = {0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1};
 static const int kDxtFormatIndexMin = 10;
 static const int kDxtFormatIndexMax = 14;
 static const int kPixelFormatFourCcCount = 22;
 // DAT_06ed51d8 — FUN_06ed0b50 / FUN_06ed0b80 (ids 9…21).
-static const unsigned long kPixelFormatFourCc[22] = {
+static const uint32_t kPixelFormatFourCc[22] = {
     0, 0x29, 0x14, 0x17, 0x18, 0x1A, 0x19, 0x15, 0x16, 0, 0x31545844u, 0x32545844u,
     0x33545844u, 0x34545844u, 0x35545844u, 0x504F4144u, 0x544F4144u, 0x41414144u,
     0x4C414144u, 0x31414144u, 0x34414144u, 0x38414144u};
 
-inline unsigned long PixelFormatAlphaBits(int FormatIndex)
+inline uint32_t PixelFormatAlphaBits(int FormatIndex)
 {
     if (FormatIndex < 0 || FormatIndex > 14)
         return kPixelFormatAlphaBits[0];
@@ -192,23 +193,23 @@ inline unsigned char PixelFormatHasAlpha(int FormatIndex)
     return kPixelFormatHasAlpha[FormatIndex];
 }
 
-inline void PipeSetTss(IRenderPipeline* Pipeline, unsigned long Stage, unsigned long Type,
-                       unsigned long Value)
+inline void PipeSetTss(IRenderPipeline* Pipeline, uint32_t Stage, uint32_t Type,
+                       uint32_t Value)
 {
     if (Pipeline != nullptr)
         Pipeline->SetTextureStageState((int)Stage, (int)Type,
                                        (int)Value);
 }
 
-inline void PipeSetTexture(IRenderPipeline* Pipeline, unsigned long Stage, unsigned long Handle)
+inline void PipeSetTexture(IRenderPipeline* Pipeline, uint32_t Stage, uint32_t Handle)
 {
     if (Pipeline != nullptr)
         Pipeline->SetTextureStageTexture((int)Stage,
-                                         (void*)Handle);
+                                         (void*)fl::HandleToPtr(Handle));
 }
 
 // IRenderPipeline +0x100 slot 64 — set_texture_stage_transform (FUN_06d0fdd2).
-inline void PipeSetTextureTransform(IRenderPipeline* Pipeline, unsigned long Stage,
+inline void PipeSetTextureTransform(IRenderPipeline* Pipeline, uint32_t Stage,
                                     const float* Matrix)
 {
     if (Pipeline == nullptr || Matrix == nullptr)
@@ -224,9 +225,9 @@ inline GENRESULT PipeVerify(IRenderPipeline* Pipeline)
 }
 
 // Draw a borrowed vertex buffer with its base vertex and index span.
-inline GENRESULT PipeDrawIndexedVb(IRenderPipeline* Pipeline, unsigned long Prim, void* Vb,
-                                   unsigned long StartIndex, unsigned long NumVerts, void* Indices,
-                                   unsigned long Count)
+inline GENRESULT PipeDrawIndexedVb(IRenderPipeline* Pipeline, uint32_t Prim, void* Vb,
+                                   uint32_t StartIndex, uint32_t NumVerts, void* Indices,
+                                   uint32_t Count)
 {
     if (Pipeline == nullptr)
         return GR_GENERIC;
@@ -256,9 +257,9 @@ inline ITextureLibrary2* AsTexLib(void* TexLib)
     return (ITextureLibrary2*)TexLib;
 }
 
-inline GENRESULT RpDrawIndexed(void* Draw, unsigned long Prim, unsigned long MinIndex,
-                               unsigned long NumVertices, unsigned long StartIndex,
-                               unsigned long Count)
+inline GENRESULT RpDrawIndexed(void* Draw, uint32_t Prim, uint32_t MinIndex,
+                               uint32_t NumVertices, uint32_t StartIndex,
+                               uint32_t Count)
 {
     if (Draw == nullptr)
         return GR_GENERIC;
@@ -269,7 +270,7 @@ inline GENRESULT RpDrawIndexed(void* Draw, unsigned long Prim, unsigned long Min
 }
 
 // FUN_06eb5940
-inline unsigned long FvfPosSize(unsigned long Fvf)
+inline uint32_t FvfPosSize(uint32_t Fvf)
 {
     const unsigned char Bits = (unsigned char)Fvf;
     if ((Bits & 0xC) == 0xC)
@@ -282,9 +283,9 @@ inline unsigned long FvfPosSize(unsigned long Fvf)
 }
 
 // FUN_06eb5980
-inline unsigned long FvfColorSize(unsigned long Fvf)
+inline uint32_t FvfColorSize(uint32_t Fvf)
 {
-    unsigned long Size = 0;
+    uint32_t Size = 0;
     if ((Fvf & 0x40) != 0)
         Size = 4;
     if ((Fvf & 0x80) != 0)
@@ -293,10 +294,10 @@ inline unsigned long FvfColorSize(unsigned long Fvf)
 }
 
 // FUN_06eb3310
-inline unsigned long FvfTexSize(unsigned long Fvf)
+inline uint32_t FvfTexSize(uint32_t Fvf)
 {
-    unsigned long Size = 0;
-    unsigned long Remaining = (Fvf >> 8) & 0xF;
+    uint32_t Size = 0;
+    uint32_t Remaining = (Fvf >> 8) & 0xF;
     unsigned char Shift = 0x10;
     while (Remaining != 0)
     {
@@ -321,19 +322,19 @@ inline unsigned long FvfTexSize(unsigned long Fvf)
     return Size;
 }
 
-inline unsigned long FvfNormalSize(unsigned long Fvf)
+inline uint32_t FvfNormalSize(uint32_t Fvf)
 {
     if ((Fvf & 0x10) != 0)
         return 0xC;
     return 0;
 }
 
-inline unsigned long FvfStride(unsigned long Fvf)
+inline uint32_t FvfStride(uint32_t Fvf)
 {
     return FvfPosSize(Fvf) + FvfNormalSize(Fvf) + FvfColorSize(Fvf) + FvfTexSize(Fvf);
 }
 
-inline GENRESULT VbMgrLock(void* VbMgr, unsigned long Fvf, unsigned long Count,
+inline GENRESULT VbMgrLock(void* VbMgr, uint32_t Fvf, uint32_t Count,
                            FVertexMemoryLock* Out)
 {
     if (VbMgr == nullptr || Out == nullptr)
@@ -350,20 +351,20 @@ inline void VbMgrUnlock(void* VbMgr, FVertexMemoryLock* Out)
 }
 
 // IVertexBufferManager+0x20 FUN_06d114c5 → FUN_06d1f040. RET 0x18.
-inline void VbMgrCopy(IVertexBufferManager* VbMgr, void* Dest, unsigned long Fvf, const FRpVertexSrcDesc* Mesh,
-                      unsigned long Start, unsigned long Count)
+inline void VbMgrCopy(IVertexBufferManager* VbMgr, void* Dest, uint32_t Fvf, const FRpVertexSrcDesc* Mesh,
+                      uint32_t Start, uint32_t Count)
 {
     if (VbMgr == nullptr || Dest == nullptr || Mesh == nullptr)
         return;
     VbMgr->CopyVertexData(Dest, Fvf, Mesh, Start, Count);
 }
 
-inline unsigned long PipeGetState(IRenderPipeline* Pipeline, unsigned long Id)
+inline uint32_t PipeGetState(IRenderPipeline* Pipeline, uint32_t Id)
 {
     int Value = 0;
     if (Pipeline != nullptr)
         Pipeline->GetPipelineState((int)Id, &Value);
-    return (unsigned long)Value;
+    return (uint32_t)Value;
 }
 
 inline void PipeSetWorld12(IRenderPipeline* Pipeline, const float* M12)
@@ -385,18 +386,18 @@ inline int FileSystemOpenNode(void* FileSystem, const char* Name)
     return AsFileSystem(FileSystem)->OpenNode(Name);
 }
 
-inline int FileSystemClose(void* FileSystem, unsigned long Handle)
+inline int FileSystemClose(void* FileSystem, uint32_t Handle)
 {
     return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->CloseFile(Handle) : 0;
 }
 
-inline int FileSystemRead(void* FileSystem, unsigned long Handle, void* Buffer,
-                          unsigned long Size, unsigned long* BytesRead)
+inline int FileSystemRead(void* FileSystem, uint32_t Handle, void* Buffer,
+                          uint32_t Size, uint32_t* BytesRead)
 {
     return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->Read(Handle, Buffer, Size, BytesRead, 0) : 0;
 }
 
-inline unsigned long FileSystemGetSize(void* FileSystem, unsigned long Handle)
+inline uint32_t FileSystemGetSize(void* FileSystem, uint32_t Handle)
 {
     return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->GetSize(Handle, 0) : 0;
 }
@@ -414,13 +415,13 @@ inline int FileSystemFindNext(void* FileSystem, int Handle, WIN32_FIND_DATAA* Fi
 {
     if (FileSystem == nullptr)
         return 0;
-    return AsFileSystem(FileSystem)->FindNext((unsigned long)Handle,
+    return AsFileSystem(FileSystem)->FindNext((uint32_t)Handle,
                               FindData);
 }
 
 inline int FileSystemFindClose(void* FileSystem, int Handle)
 {
-    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->FindClose((unsigned long)Handle) : 0;
+    return (FileSystem != nullptr) ? AsFileSystem(FileSystem)->FindClose((uint32_t)Handle) : 0;
 }
 
 inline int FileSystemOpenByDesc(void* FileSystem, void* Desc)
@@ -432,24 +433,24 @@ inline int FileSystemOpenByDesc(void* FileSystem, void* Desc)
 
 // RS/TSS table walk:
 // first dword = start state/type; [+4]=value; [+8]=next; stride 8; stop at next==0.
-inline void ApplyStateTable(IRenderPipeline* Pipeline, const unsigned long* Table,
+inline void ApplyStateTable(IRenderPipeline* Pipeline, const uint32_t* Table,
                             bool bTextureStage,
-                            unsigned long Stage)
+                            uint32_t Stage)
 {
     if (Pipeline == nullptr || Table == nullptr)
         return;
-    unsigned long State = Table[0];
-    unsigned long Index = 0;
+    uint32_t State = Table[0];
+    uint32_t Index = 0;
     if (State == 0)
         return;
     while (true)
     {
-        const unsigned long Value = Table[Index + 1];
+        const uint32_t Value = Table[Index + 1];
         if (bTextureStage)
             PipeSetTss(Pipeline, Stage, State, Value);
         else
             PipeSetRs(Pipeline, (D3DRENDERSTATETYPE)State, Value);
-        const unsigned long Next = Table[Index + 2];
+        const uint32_t Next = Table[Index + 2];
         if (Next == 0)
             break;
         State = Next;
@@ -463,9 +464,13 @@ inline bool MatchSimplePattern(const char* Pattern, const char* Text)
     return FMaterialRegex::Search(Expression.get(), Text);
 }
 
+// Retail descriptor size (5 DWORD fields). Descriptors are a wire protocol between modules: the Size
+// field is compared against this literal, not sizeof() of the (wider, LP64) C++ struct.
+static const uint32_t kRetailAggDescSize = 0x14;
+
 struct FSystemAggDesc
 {
-    unsigned long Size;
+    uint32_t Size;
     const char* Name;
     IDAComponent* Outer;
     IDAComponent** InnerOut;
@@ -487,7 +492,7 @@ inline void InitializeShadingFileDesc(FFileSystemDesc* Desc, const char* Path,
     Desc->Field30 = 0xFFFFFFFF;
 }
 
-inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, unsigned long Size)
+inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, uint32_t Size)
 {
     if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr)
         return false;
@@ -496,17 +501,17 @@ inline bool ReadNamedBytes(void* FileSystem, const char* Name, void* Buffer, uns
     const int Handle = FileSystemOpenByDesc(FileSystem, &Desc);
     if (Handle == -1)
         return false;
-    unsigned long BytesRead = 0;
+    uint32_t BytesRead = 0;
     const int ReadOk =
-        FileSystemRead(FileSystem, (unsigned long)Handle, Buffer, Size, &BytesRead);
-    FileSystemClose(FileSystem, (unsigned long)Handle);
+        FileSystemRead(FileSystem, (uint32_t)Handle, Buffer, Size, &BytesRead);
+    FileSystemClose(FileSystem, (uint32_t)Handle);
     // FUN_06eb3450 treats a zero Read result as failure even if a provider
     // happens to report the requested byte count; preserve that contract.
     return ReadOk != 0 && BytesRead == Size;
 }
 
-inline int FileSystemWrite(void* FileSystem, unsigned long Handle, const void* Buffer,
-                           unsigned long Size, unsigned long* BytesWritten)
+inline int FileSystemWrite(void* FileSystem, uint32_t Handle, const void* Buffer,
+                           uint32_t Size, uint32_t* BytesWritten)
 {
     if (FileSystem == nullptr)
         return 0;
@@ -514,7 +519,7 @@ inline int FileSystemWrite(void* FileSystem, unsigned long Handle, const void* B
 }
 
 inline bool WriteNamedBytes(void* FileSystem, const char* Name, const void* Buffer,
-                            unsigned long Size)
+                            uint32_t Size)
 {
     if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr)
         return false;
@@ -526,25 +531,25 @@ inline bool WriteNamedBytes(void* FileSystem, const char* Name, const void* Buff
     const int Handle = FileSystemOpenByDesc(FileSystem, &Desc);
     if (Handle == -1)
         return false;
-    unsigned long BytesWritten = 0;
-    const int WriteOk = FileSystemWrite(FileSystem, (unsigned long)Handle, Buffer,
+    uint32_t BytesWritten = 0;
+    const int WriteOk = FileSystemWrite(FileSystem, (uint32_t)Handle, Buffer,
                                         Size, &BytesWritten);
-    FileSystemClose(FileSystem, (unsigned long)Handle);
+    FileSystemClose(FileSystem, (uint32_t)Handle);
     return WriteOk != 0 && BytesWritten == Size;
 }
 
 // UTF +0x7C OpenByDesc is the retail no-IDataBuffer stub. Named leaves: OpenNode + Read(0) + "..".
-inline unsigned long ReadUtfNamedLeaf(void* FileSystem, const char* Name, void* Buffer,
-                                      unsigned long MaxBytes)
+inline uint32_t ReadUtfNamedLeaf(void* FileSystem, const char* Name, void* Buffer,
+                                      uint32_t MaxBytes)
 {
     if (FileSystem == nullptr || Name == nullptr || Buffer == nullptr || MaxBytes == 0)
         return 0;
     if (FileSystemOpenNode(FileSystem, Name) == 0)
         return 0;
-    unsigned long Size = FileSystemGetSize(FileSystem, 0);
+    uint32_t Size = FileSystemGetSize(FileSystem, 0);
     if (Size > MaxBytes)
         Size = MaxBytes;
-    unsigned long BytesRead = 0;
+    uint32_t BytesRead = 0;
     int ReadOk = 0;
     if (Size != 0)
         ReadOk = FileSystemRead(FileSystem, 0, Buffer, Size, &BytesRead);
@@ -558,14 +563,14 @@ struct FTexBlock
 {
     const char* Name;           // +0
     int TextureId;              // +4
-    unsigned long Handle;       // +8  TexLib +0x70 writes 5 dwords from here
+    uint32_t Handle;       // +8  TexLib +0x70 writes 5 dwords from here
     float Uv0;                  // +C
     float Uv1;                  // +10
     float Uv2;                  // +14
     float Uv3;                  // +18
-    unsigned long Flags;        // +1C
-    unsigned long AddressU;     // +20
-    unsigned long AddressV;     // +24
+    uint32_t Flags;        // +1C
+    uint32_t AddressU;     // +20
+    uint32_t AddressV;     // +24
     unsigned char bSkipResolve; // +28
     unsigned char Pad29[3];
 };
@@ -575,7 +580,7 @@ static_assert(sizeof(FTexBlock) == 0x2C, "FTexBlock stride 0x2C");
 // Serialized frame first word selects a canonical child, never a GPU handle.
 struct FTextureFrame
 {
-    unsigned long ChildIndex;
+    uint32_t ChildIndex;
     float Uv[4];
 };
 static_assert(sizeof(FTextureFrame) == 0x14, "Texture frame file payload");
@@ -585,8 +590,8 @@ static_assert(sizeof(FTextureFrame) == 0x14, "Texture frame file payload");
 struct FTextureEntry
 {
     int RefCount;
-    unsigned long GpuHandle; // retail canonical record+8
-    unsigned long Crc;
+    uint32_t GpuHandle; // retail canonical record+8
+    uint32_t Crc;
     bool bHasName; // Distinguish retail null name from an allocated empty string.
     std::string FullName;
     char Name[128]; // Compatibility name mirror, identity uses FullName.
@@ -668,22 +673,22 @@ struct FMaterialMapRule
 
 struct FMaterialGroup
 {
-    unsigned long Id;
+    uint32_t Id;
     // Retail duplicates group names into heap storage; keep native ownership
     // dynamic so SetGroupName does not truncate valid long names.
     std::string Name;
     bool bHasName = false;
-    std::vector<unsigned long> Members;
+    std::vector<uint32_t> Members;
 };
 
 struct FCrcSlot : FMaterialLibraryRecord
 {
-    unsigned long Crc;
+    uint32_t Crc;
 };
 
 struct FBatchRule
 {
-    unsigned long Kind = 0;
+    uint32_t Kind = 0;
     std::string Pattern;
     // Destruction is compiled program before original pattern, as in 8f20/9080.
     std::unique_ptr<FMaterialRegex> Expression;

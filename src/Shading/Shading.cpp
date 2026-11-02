@@ -45,13 +45,13 @@ namespace
             return GR_OK;
         }
 
-        unsigned long DACOM_API AddRef() override { return ++RefCount; }
+        uint32_t DACOM_API AddRef() override { return ++RefCount; }
 
-        unsigned long DACOM_API Release() override
+        uint32_t DACOM_API Release() override
         {
             if (RefCount > 0)
                 --RefCount;
-            const unsigned long Next = RefCount;
+            const uint32_t Next = RefCount;
             if (Next == 0)
             {
                 RefCount = 1;
@@ -66,7 +66,7 @@ namespace
             if (Spec.Kind == KindMaterialAnimation)
             {
                 FMaterialAggregateDesc* AnimationDesc = (FMaterialAggregateDesc*)Desc;
-                if (AnimationDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                if (AnimationDesc->Size != kRetailAggDescSize ||
                     std::strcmp(AnimationDesc->NameAt4, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -89,7 +89,7 @@ namespace
             if (Spec.Kind == KindMaterialBatcher)
             {
                 FMaterialAggregateDesc* BatcherDesc = (FMaterialAggregateDesc*)Desc;
-                if (BatcherDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                if (BatcherDesc->Size != kRetailAggDescSize ||
                     std::strcmp(BatcherDesc->NameAt4, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -123,7 +123,7 @@ namespace
             if (Spec.Kind == KindMaterialLibrary)
             {
                 FMaterialAggregateDesc* LibraryDesc = (FMaterialAggregateDesc*)Desc;
-                if (LibraryDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                if (LibraryDesc->Size != kRetailAggDescSize ||
                     std::strcmp(LibraryDesc->NameAt4, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -156,7 +156,7 @@ namespace
             if (Spec.Kind == KindTextureLibrary)
             {
                 FSystemAggDesc* TextureDesc = (FSystemAggDesc*)Desc;
-                if (TextureDesc->Size != sizeof(FSystemAggDesc) ||
+                if (TextureDesc->Size != kRetailAggDescSize ||
                     std::strcmp(TextureDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -190,7 +190,7 @@ namespace
             if (Spec.Kind == KindMaterialType)
             {
                 FMaterialAggregateDesc* MaterialDesc = (FMaterialAggregateDesc*)Desc;
-                if (MaterialDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                if (MaterialDesc->Size != kRetailAggDescSize ||
                     std::strcmp(MaterialDesc->NameAt4, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -221,7 +221,7 @@ namespace
             if (Spec.Kind == KindBatchedMaterial)
             {
                 FMaterialAggregateDesc* BatchedDesc = (FMaterialAggregateDesc*)Desc;
-                if (BatchedDesc->Size != sizeof(FMaterialAggregateDesc) ||
+                if (BatchedDesc->Size != kRetailAggDescSize ||
                     std::strcmp(BatchedDesc->NameAt4, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -253,7 +253,7 @@ namespace
 
         const char* Name() const { return Spec.Name; }
 
-        unsigned long RefCount;
+        uint32_t RefCount;
         FComponentSpec Spec;
     };
 
@@ -319,21 +319,21 @@ namespace
     {
         // 06ecf446..f48c: bd20,83f0,6cf0,3dc0,d140,d280,d0a0,d1e0,
         // 5c20,d050,d190,d0f0,d230,8590,85e0.
-        static const unsigned long First[] = {1, 2, 3, 4, 8, 12, 6, 10, 13, 5, 9, 7, 11, 14, 15};
-        for (unsigned long Index = 0; Index < sizeof(First) / sizeof(First[0]); ++Index)
+        static const uint32_t First[] = {1, 2, 3, 4, 8, 12, 6, 10, 13, 5, 9, 7, 11, 14, 15};
+        for (uint32_t Index = 0; Index < sizeof(First) / sizeof(First[0]); ++Index)
             RegisterMaterialComponent(G_Specs[First[Index]]);
         ActivateMaterialGlobalRecord(2); // 06ecf491..f52b
         ActivateMaterialGlobalRecord(1); // 06ecf52d..f580
 
         // 06ecf582..f596: 1000,c210,c260,cdc0,a3b0.
-        static const unsigned long Second[] = {16, 17, 18, 19, 20};
-        for (unsigned long Index = 0; Index < sizeof(Second) / sizeof(Second[0]); ++Index)
+        static const uint32_t Second[] = {16, 17, 18, 19, 20};
+        for (uint32_t Index = 0; Index < sizeof(Second) / sizeof(Second[0]); ++Index)
             RegisterMaterialComponent(G_Specs[Second[Index]]);
         ActivateMaterialGlobalRecord(3); // 06ecf59b..f5f0
 
         // 06ecf5f2..f601: 7b40,6620,ac50,9210.
-        static const unsigned long Third[] = {21, 22, 24, 23};
-        for (unsigned long Index = 0; Index < sizeof(Third) / sizeof(Third[0]); ++Index)
+        static const uint32_t Third[] = {21, 22, 24, 23};
+        for (uint32_t Index = 0; Index < sizeof(Third) / sizeof(Third[0]); ++Index)
             RegisterMaterialComponent(G_Specs[Third[Index]]);
         ActivateMaterialGlobalRecord(0); // 06ecf606..f650
         RegisterMaterialComponent(G_Specs[25]); // 06ecf652 -> 47a0

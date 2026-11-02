@@ -8,6 +8,7 @@
 // Declared in common_cequip.h; helpers shared with the sibling TUs are in
 // common_cequip_internal.h (namespace CmnCequip).
 #include "common_cequip.h"
+#include "fl/handles.h"
 #include "x86math.h"
 
 #include "common_animdb.h"  // AnimDB::Add/Rem (common_animdb.cpp)
@@ -143,9 +144,9 @@ bool CAttachedEquip::Connect(char const* HpName)
     if (!CExternalEquip::Connect(HpName))                                    // 062932a9
         return false;
 
-    unsigned long const HpCrc = DACOM_CRC::GetCRC32(HpName);                 // 062932b7
+    uint32_t const HpCrc = DACOM_CRC::GetCRC32(HpName);                 // 062932b7
     CObject* const Parent = (CObject*)(
-        DALib::Engine->GetInstanceUserData((void*)(ConnectionIndex)));   // 062932d0
+        DALib::Engine->GetInstanceUserData((void*)fl::HandleToPtr((ConnectionIndex))));   // 062932d0
     // 062932d6..062932f6: a parent part (+0x58) whose hardpoint id list (std::find over the
     // vector at part+0x24/+0x28) holds the CRC makes this a non-physical attachment.
     PhyArch::Part const* const Part = Parent->PhyPart;
@@ -209,7 +210,7 @@ void CAttachedEquip::Disconnect()
     CExternalEquip::Disconnect();
 }
 
-long CAttachedEquip::GetRootIndex() const
+int32_t CAttachedEquip::GetRootIndex() const
 {
     if (!IsConnected())
         return -1;
@@ -237,8 +238,8 @@ void CAttachedEquip::ComputeBoundingSphere(float& OutRadius, Vector& OutCenter) 
     // Listing 0x06293740..0x0629376f: IEngine::GetInstanceExtent (+0x88) of the root instance.
     // The three arguments (0, &OutRadius, &OutCenter) are pushed before the 0-arg
     // GetRootIndex() vcall (+0x84) and stay on the stack for the engine call.
-    long Root = GetRootIndex();
-    DALib::Engine->GetInstanceExtent((void*)(Root), 0, &OutRadius,
+    int32_t Root = GetRootIndex();
+    DALib::Engine->GetInstanceExtent((void*)fl::HandleToPtr((Root)), 0, &OutRadius,
                                      &OutCenter.x);
 }
 
@@ -260,8 +261,8 @@ bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
         bBoundsValid = 1;
         ComputeBoundingSphere(BoundRadius, BoundCenter);
     }
-    long Root = Attachment->GetRootIndex();
-    float* Xform = DALib::Engine->GetInstanceTransform((void*)(Root));
+    int32_t Root = Attachment->GetRootIndex();
+    float* Xform = DALib::Engine->GetInstanceTransform((void*)fl::HandleToPtr((Root)));
     Acquire3DMathEngine()->TransformXform((FVector&)(World),
                                           *(FTransform const*)Xform,
                                           (FVector const&)(BoundCenter));
@@ -293,7 +294,7 @@ CObject* CAttachedEquip::GetPhysicsOwner() const
     return Attachment->GetPhysicsOwner();
 }
 
-bool CAttachedEquip::IsInstOnEquip(long InstIndex) const
+bool CAttachedEquip::IsInstOnEquip(int32_t InstIndex) const
 {
     // Common.dll.c 0x336a0. See header comment: retail calls a 0-arg self-virtual twice at the
     // same vtable slot returning a long, compared/used exactly like GetRootIndex() would be.

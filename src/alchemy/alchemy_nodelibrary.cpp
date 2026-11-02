@@ -39,13 +39,13 @@ namespace AlchemyImpl
         };
     }
 
-    IDAComponent* FNodePrototypeRegistry::Find(unsigned long Hash)
+    IDAComponent* FNodePrototypeRegistry::Find(uint32_t Hash)
     {
         FPrototypeMap::iterator Entry = Entries_->find(Hash);
         return Entry == Entries_->end() ? nullptr : Entry->second.Component;
     }
 
-    GENRESULT FNodePrototypeRegistry::FindWithRef(unsigned long Hash, IDAComponent** Out)
+    GENRESULT FNodePrototypeRegistry::FindWithRef(uint32_t Hash, IDAComponent** Out)
     {
         FPrototypeMap::iterator Entry = Entries_->find(Hash);
         if (Entry == Entries_->end())
@@ -56,9 +56,9 @@ namespace AlchemyImpl
     }
 
     GENRESULT FNodePrototypeRegistry::Insert(IFxNodeLibrary* Library, const char* Name,
-                                             IDAComponent* Node, unsigned long* OutHash)
+                                             IDAComponent* Node, uint32_t* OutHash)
     {
-        const unsigned long Hash = Library->HashNodeName(Name);
+        const uint32_t Hash = Library->HashNodeName(Name);
         FAlchemyComponentReference Existing;
         Library->NodeLibSlot12(Hash, &Existing.Component);
         if (Existing.Component != nullptr)
@@ -126,7 +126,7 @@ namespace AlchemyImpl
         return Next;
     }
 
-    GENRESULT FNodePrototypeRegistry::Remove(unsigned long Hash)
+    GENRESULT FNodePrototypeRegistry::Remove(uint32_t Hash)
     {
         FPrototypeMap::iterator Entry = Entries_->find(Hash);
         if (Entry == Entries_->end() || Entry->first == 0)
@@ -224,7 +224,7 @@ namespace AlchemyImpl
 
         FAleChunk Chunk;
         Chunk.OpenChunk(Filesys, kNodeLibName, 0);
-        unsigned long VersionBits = 0;
+        uint32_t VersionBits = 0;
         int Count = 0;
         if (Chunk.ReadBytes(&VersionBits, 4) < 0)
         {
@@ -249,7 +249,7 @@ namespace AlchemyImpl
             FLoadedInterfaceReference<IDAComponent> Created;
             FLoadedInterfaceReference<IGenericFx> Fx;
             AGGDESC Desc;
-            Desc.size = sizeof(Desc);
+            Desc.size = 8;   // retail AGGDESC: {size, name} = 8 bytes (consumers compare the literal)
             Desc.interface_name = Name;
             Result = DACOM_Acquire()->CreateInstance(
                 &Desc, reinterpret_cast<void**>(&Created.Value));
@@ -286,7 +286,7 @@ namespace AlchemyImpl
                       "C:\\work\\builds\\dalibs\\dalibs-build\\build\\Src\\Alchemy\\FxNodeLibrary.cpp",
                       0x3d8, "This node has empty name. Alchemy give new name for this node.");
                 CurrentName = "unnamed";
-                unsigned long Suffix = 0;
+                uint32_t Suffix = 0;
                 while (Entries_->find(Library->HashNodeName(CurrentName)) != Entries_->end())
                 {
                     // The inline loader starts from the fixed literal "unnamed":
@@ -330,7 +330,7 @@ namespace AlchemyImpl
         return GR_INTERFACE_UNSUPPORTED;
     }
 
-    unsigned long DACOM_API FFxNodeLibrary::Release()
+    uint32_t DACOM_API FFxNodeLibrary::Release()
     {
         // FUN_0622b0a0 (alchemy.dll.txt:88728-88753, wired as the standalone
         // "FxNodeLibrary" component's outer vtable slot 2 / Release,
@@ -377,7 +377,7 @@ namespace AlchemyImpl
         Chunk.DeleteNode(kNodeLibName);
         Chunk.OpenNode(kNodeLibName);
         Chunk.OpenChunk(Filesys, kNodeLibName, 1);
-        const unsigned long VersionBits = kAleVersion11Bits;
+        const uint32_t VersionBits = kAleVersion11Bits;
         Chunk.WriteBytes(&VersionBits, 4);
         Chunk.WriteBytes(NodeRegistry_.CountAddress(), 4);
         IDAComponent* Node = NodeRegistry_.First();
@@ -392,12 +392,12 @@ namespace AlchemyImpl
     }
 
     GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot6(const char* Name, IDAComponent* Node,
-                                                       unsigned long* OutHash)
+                                                       uint32_t* OutHash)
     {
         return InsertNodeByName(Name, Node, OutHash);
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot7(unsigned long Hash)
+    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot7(uint32_t Hash)
     {
         return RemoveNodeByHash(Hash);
     }
@@ -449,7 +449,7 @@ namespace AlchemyImpl
         return GR_OK;
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot11(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot11(uint32_t Hash, IDAComponent** Out)
     {
         IDAComponent* Prototype = FindNodeEntry(Hash);
         if (Prototype == nullptr)
@@ -457,23 +457,23 @@ namespace AlchemyImpl
         return InstantiateFromNodeLibPrototype(Prototype, Out);
     }
 
-    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot12(unsigned long Hash, IDAComponent** Out)
+    GENRESULT DACOM_API FFxNodeLibrary::NodeLibSlot12(uint32_t Hash, IDAComponent** Out)
     {
         return NodeRegistry_.FindWithRef(Hash, Out);
     }
 
-    IDAComponent* FFxNodeLibrary::FindNodeEntry(unsigned long Hash)
+    IDAComponent* FFxNodeLibrary::FindNodeEntry(uint32_t Hash)
     {
         return NodeRegistry_.Find(Hash);
     }
 
     GENRESULT FFxNodeLibrary::InsertNodeByName(const char* Name, IDAComponent* Node,
-                                             unsigned long* OutHash)
+                                             uint32_t* OutHash)
     {
         return NodeRegistry_.Insert(this, Name, Node, OutHash);
     }
 
-    GENRESULT FFxNodeLibrary::RemoveNodeByHash(unsigned long Hash)
+    GENRESULT FFxNodeLibrary::RemoveNodeByHash(uint32_t Hash)
     {
         return NodeRegistry_.Remove(Hash);
     }

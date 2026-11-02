@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_psys.h"
+#include "fl/handles.h"
 
 #include "alchemy_float_forward.h"
 #include "alchemy.h"
@@ -182,7 +183,7 @@ void FThornPsys::Stop()
 // FUN_00450870.
 void* FThornPsys::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // LAB_00453e50 -- ADD ECX,0x6c; JMP FUN_005574d0.
@@ -248,5 +249,5 @@ void FThornPlayerEnginePsys::Stop()
 // LAB_00454140 -- MOV EAX,0xfffffff9: not -1, the "not implemented" code.
 void* FThornPlayerEnginePsys::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(kThornSlotNotImplemented));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(kThornSlotNotImplemented)));
 }

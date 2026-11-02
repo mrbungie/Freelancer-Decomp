@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "gf_thorn_camera.h"
+#include "fl/handles.h"
 
 #include "dacom.h"
 #include "gf_script.h"
@@ -208,7 +209,7 @@ void FThornCamera::Stop()
 // FUN_00450870 -- OR EAX,-1 (shared by /OPT:ICF with every "-1" getter of the exe).
 void* FThornCamera::GetEngineInstance()
 {
-    return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+    return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
 }
 
 // ---------------------------------------------------------------------------------------
@@ -333,7 +334,7 @@ void* FThornCameraReference::GetEngineInstance()
     if (Target == nullptr)
     {
         ReportInvalidReference(Name, 0x1ff);
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
     return Target->GetEngineInstance();
 }

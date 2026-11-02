@@ -6,6 +6,7 @@
 
 // CEqObj (retail CEqObj.cpp) and CEqObj::DockAnimInfo.
 #include "common_cobject.h"
+#include "fl/handles.h"
 #include "x86math.h"
 
 #include "common_cobjdb.h"
@@ -881,7 +882,7 @@ bool CEqObj::get_sub_obj_relative_health(unsigned short SubObjId, float& Out) co
     return false;
 }
 
-long CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
+int32_t CEqObj::sub_obj_id_to_inst(unsigned short SubObjId) const
 {
     // Common.dll.c 0x4b990 (79252-79291). See class-comment on this override's declaration
     // re: reusing CAttachedEquip::GetRootIndex() for the retail vtable+0x84 slot.
@@ -1065,7 +1066,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
 
     I3DMathEngine* const Math = Acquire3DMathEngine();     // DAT_063fc2e4 cache
     FTransform const& Xform = (FTransform const&)Orientation;   // this+0x08
-    void* const Instance = (void*)EngineInstanceId;
+    void* const Instance = (void*)fl::HandleToPtr(EngineInstanceId);
 
     // 062abe03..062abebe: root extent (IEngine +0x88, flags 1) -> radius R0 and local centre;
     // TransformXform (+0x28) by this+0x08 -> world centre W0; the AABB starts as W0 +- R0
@@ -1090,18 +1091,18 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     // min only when min < value, TEST AH,0x41 / JZ keeps a max only when max > value, NaN
     // replaces.
     std::vector<FChildSphere> Children;
-    for (long Child = (long)DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle);
+    for (int32_t Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle));
          Child != -1;
-         Child = (long)DALib::Engine->GetRelatedInstance(Instance, 0, (void*)Child))
+         Child = (int32_t)fl::PtrToHandle(DALib::Engine->GetRelatedInstance(Instance, 0, (void*)fl::HandleToPtr(Child))))
     {
         if (inst_to_subobj_id(Child) != SUBOBJ_ID_ROOT)
             continue;
 
         float ChildRadius;
         Vector ChildLocal;
-        DALib::Engine->GetInstanceExtent((void*)Child, 1, &ChildRadius, (float*)&ChildLocal);
+        DALib::Engine->GetInstanceExtent((void*)fl::HandleToPtr(Child), 1, &ChildRadius, (float*)&ChildLocal);
         FTransform const& ChildXform =
-            *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)Child);
+            *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)fl::HandleToPtr(Child));
         FChildSphere Sphere;
         Math->TransformXform((FVector&)Sphere.Center, ChildXform, (FVector const&)ChildLocal);
         Sphere.Radius = ChildRadius;
@@ -1387,7 +1388,7 @@ bool CEqObj::set_sub_obj_hit_pts(unsigned short SubObjId, float HitPts)
     return false;
 }
 
-unsigned short CEqObj::inst_to_subobj_id(long Instance) const
+unsigned short CEqObj::inst_to_subobj_id(int32_t Instance) const
 {
     // Common.dll.c 0x4b940: the root engine instance always maps to SubObjId 1; otherwise
     // try the equip manager's then the arch-group manager's own InstToSubObjID, falling
@@ -1420,7 +1421,7 @@ void CEqObj::flush_animations()
         if (It->AnimChannel != -1)
         {
             AnimDB::Rem(It->AnimChannel);
-            DALib::Anim->DestroyScript((void*)It->AnimChannel);
+            DALib::Anim->DestroyScript((void*)fl::HandleToPtr(It->AnimChannel));
         }
     }
     DockingPoints.clear();
@@ -1442,7 +1443,7 @@ void CEqObj::update_docking_animations(float Dt)
             continue;
 
         float const Duration = DALib::Anim->GetStoredDuration(Entry.AnimChannel);
-        float const Position = DALib::Anim->GetScriptDuration((void*)Entry.AnimChannel);
+        float const Position = DALib::Anim->GetScriptDuration((void*)fl::HandleToPtr(Entry.AnimChannel));
 
         if (Entry.bActive)
         {
@@ -1515,7 +1516,7 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
             // 0xc8 = 0639bf24) with event 4 for a cargo equip (Type +0x14 == 0x10000), else 3,
             // and the zero-extended SubObjId as the context.
             if ((int)Damage.Cause == 0x14)
-                notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
+                notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3), (void*)fl::HandleToPtr((unsigned)Entry.SubObjId));
 
             CAttachedEquip* Attached = CAttachedEquip::cast(Equip);
             if (Attached != nullptr)

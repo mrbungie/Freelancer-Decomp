@@ -131,10 +131,10 @@ namespace
     static const char G_PersistQuatFmt[] = "{%f,%f,%f,%f}, ";
     static const char G_PersistDigits[] = "0123456789.";
     static const char G_PersistNumberChars[] = "-0123456789.";
-    static const unsigned long G_PersistPrefixBytes = 10;
-    static const unsigned long G_PersistVec3Bytes = 36;       // LAB_06f34ca0: count*9*4
-    static const unsigned long G_PersistOrientVec3Bytes = 40; // LAB_06f356c0: count*5*8
-    static const unsigned long G_PersistQuatBytes = 51;       // LAB_06f356c0: count*0x33
+    static const uint32_t G_PersistPrefixBytes = 10;
+    static const uint32_t G_PersistVec3Bytes = 36;       // LAB_06f34ca0: count*9*4
+    static const uint32_t G_PersistOrientVec3Bytes = 40; // LAB_06f356c0: count*5*8
+    static const uint32_t G_PersistQuatBytes = 51;       // LAB_06f356c0: count*0x33
 
     // FUN_06f34a10 (Needed=3) / FUN_06f34ae0 (Needed=4).
     bool ParsePersistFloats(const char** Cursor, float* Out, int Needed)
@@ -525,9 +525,9 @@ namespace
             return Outer_->QueryInterface(Iid, Out);
         }
 
-        unsigned long DACOM_API AddRef() override { return Outer_->AddRef(); }
+        uint32_t DACOM_API AddRef() override { return Outer_->AddRef(); }
 
-        unsigned long DACOM_API Release() override { return Outer_->Release(); }
+        uint32_t DACOM_API Release() override { return Outer_->Release(); }
 
         // LAB_06f377c0 (thorn.dll.txt:46136-46227), the embedded inner
         // unknown's NON-delegating QueryInterface: walks the {IID, facet
@@ -576,7 +576,7 @@ namespace
             return SetPointInternal(static_cast<int>(Index), OutPoint);
         }
 
-        GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, unsigned long Count) override
+        GENRESULT DACOM_API Slot4LoadPoints(const float* Pts, uint32_t Count) override
         {
             return LoadPoints(Pts, static_cast<int>(Count));
         }
@@ -618,11 +618,11 @@ namespace
 
         // LAB_06f34930 -> FUN_06f224f0: return inner+0x58 (LastLive).
         // FUN_06f22500 sets it to N+1 for a closed path, N for an open path.
-        unsigned long DACOM_API Slot5() override
+        uint32_t DACOM_API Slot5() override
         {
             if (!bInnerAllocated_)
                 return 0;
-            return static_cast<unsigned long>(LastLive_);
+            return static_cast<uint32_t>(LastLive_);
         }
 
         // FUN_06f34990 / FUN_06f349d0: wrapper-level failure is -1; the
@@ -997,14 +997,14 @@ namespace
             return GR_OK;
         }
 
-        unsigned long PersistEstimateSize() const
+        uint32_t PersistEstimateSize() const
         {
-            const unsigned long PositionCount = bInnerAllocated_
-                ? static_cast<unsigned long>(LastLive_) : 0ul;
+            const uint32_t PositionCount = bInnerAllocated_
+                ? static_cast<uint32_t>(LastLive_) : 0ul;
             if (bOrientation_)
             {
-                const unsigned long OrientationCount = bInnerAllocated_
-                    ? static_cast<unsigned long>(LastLive_) : 0ul;
+                const uint32_t OrientationCount = bInnerAllocated_
+                    ? static_cast<uint32_t>(LastLive_) : 0ul;
                 return PositionCount * G_PersistOrientVec3Bytes
                     + OrientationCount * G_PersistQuatBytes + G_PersistPrefixBytes;
             }
@@ -1106,11 +1106,11 @@ namespace
             return GR_OK;
         }
 
-        GENRESULT SavePersist(char* Buffer, unsigned long Size)
+        GENRESULT SavePersist(char* Buffer, uint32_t Size)
         {
             // FUN_06f34bc0: ICRSpline slot 5 = LastLive, then persist slot 5 size check.
-            const unsigned long SavedCount = Slot5();
-            const unsigned long RequiredSize = PersistEstimateSize();
+            const uint32_t SavedCount = Slot5();
+            const uint32_t RequiredSize = PersistEstimateSize();
             if (SavedCount == 0 || RequiredSize > Size)
                 return GR_GENERIC;
 
@@ -1118,7 +1118,7 @@ namespace
             const int Used =
                 sprintf(Buffer, G_PersistFlagFmt, bClosedToken ? G_PersistClosed : G_PersistOpen);
 
-            unsigned long Offset = static_cast<unsigned long>(Used);
+            uint32_t Offset = static_cast<uint32_t>(Used);
 
             // FUN_06f22500(inner, 0) Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ force OPEN ghosts, then emit SavedCount points via slot 6.
             bClosed_ = false;
@@ -1136,7 +1136,7 @@ namespace
                 const int VecWrote =
                     sprintf(Buffer + Offset, G_PersistVec3Fmt, PointX, PointY, PointZ);
 
-                Offset += static_cast<unsigned long>(VecWrote);
+                Offset += static_cast<uint32_t>(VecWrote);
 
                 if (bOrientation_)
                 {
@@ -1149,7 +1149,7 @@ namespace
                     const int QuatWrote =
                         sprintf(Buffer + Offset, G_PersistQuatFmt, QuatW, QuatX, QuatY, QuatZ);
 
-                    Offset += static_cast<unsigned long>(QuatWrote);
+                    Offset += static_cast<uint32_t>(QuatWrote);
                 }
 
                 if (Offset >= Size)
@@ -1211,13 +1211,13 @@ namespace
         // Slot 3, FUN_06f34cc0 (position).
         GENRESULT DACOM_API Slot3Load(const char* Text) override { return LoadPersist(Text); }
         // Slot 4, FUN_06f34bc0 (position) / FUN_06f35580 (orientation).
-        GENRESULT DACOM_API Slot4Save(char* Buffer, unsigned long Size) override
+        GENRESULT DACOM_API Slot4Save(char* Buffer, uint32_t Size) override
         {
             return SavePersist(Buffer, Size);
         }
         // Slot 5, LAB_06f34ca0 (position: this -= 8, ICRSpline slot 5 count * 0x24 + 10,
         // RET 4, no test) / LAB_06f356c0 (orientation).
-        unsigned long DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
+        uint32_t DACOM_API Slot5EstimateSize() override { return PersistEstimateSize(); }
 
     private:
         // The real core owns Points, Quats, Times and individual sample rows.

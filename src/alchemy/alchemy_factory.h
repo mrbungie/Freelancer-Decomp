@@ -40,7 +40,7 @@ namespace AlchemyImpl
     struct FComponentSpec
     {
         const char* Name;
-        unsigned long RequiredSize;
+        uint32_t RequiredSize;
         EComponentKind Kind;
         const char* PrimaryIid;
     };
@@ -53,15 +53,15 @@ namespace AlchemyImpl
         explicit FComponentFactory(const FComponentSpec& Spec) : RefCount_(1), Spec_(Spec) {}
 
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override { return ++RefCount_; }
-        unsigned long DACOM_API Release() override;
+        uint32_t DACOM_API AddRef() override { return ++RefCount_; }
+        uint32_t DACOM_API Release() override;
 
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override;
 
         const char* Name() const { return Spec_.Name; }
 
     private:
-        unsigned long RefCount_;
+        uint32_t RefCount_;
         FComponentSpec Spec_;
     };
 

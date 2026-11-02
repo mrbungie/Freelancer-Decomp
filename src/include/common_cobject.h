@@ -46,7 +46,7 @@ struct IObjDB;
 struct FPartMapEntry
 {
     unsigned PartId;                    // +0x00
-    long EngineInstanceId;              // +0x04
+    int32_t EngineInstanceId;              // +0x04
     unsigned char bShieldPart;          // +0x08 (+0x09..+0x0b: alignment, no reader)
 };
 static_assert(sizeof(FPartMapEntry) == 0xc, "FPartMapEntry is 0xc bytes");
@@ -62,22 +62,22 @@ namespace Archetype
 // get_transform → this+8 (3×3 then pos). CObject thiscall open starts at slot 19.
 struct IEngineInstance
 {
-    virtual void DACOM_API initialize_instance(long Inst) = 0;                         // +0x00
-    virtual void DACOM_API create_instance(long Inst) = 0;                             // +0x04 RET
-    virtual void DACOM_API destroy_instance(long Inst) = 0;                            // +0x08
-    virtual void DACOM_API set_position(long Inst, Vector const& Pos) = 0;             // +0x0C
-    virtual Vector const& DACOM_API get_position(long Inst) const = 0;                 // +0x10
-    virtual void DACOM_API set_orientation(long Inst, Matrix const& Orient) = 0;       // +0x14
-    virtual Matrix const& DACOM_API get_orientation(long Inst) const = 0;              // +0x18
-    virtual void DACOM_API set_transform(long Inst, Transform const& Xform) = 0;       // +0x1C
-    virtual Transform const& DACOM_API get_transform(long Inst) const = 0;             // +0x20 IEngine+0xa0
-    virtual void DACOM_API get_centered_radius(long Inst, float* OutRadius,
+    virtual void DACOM_API initialize_instance(int32_t Inst) = 0;                         // +0x00
+    virtual void DACOM_API create_instance(int32_t Inst) = 0;                             // +0x04 RET
+    virtual void DACOM_API destroy_instance(int32_t Inst) = 0;                            // +0x08
+    virtual void DACOM_API set_position(int32_t Inst, Vector const& Pos) = 0;             // +0x0C
+    virtual Vector const& DACOM_API get_position(int32_t Inst) const = 0;                 // +0x10
+    virtual void DACOM_API set_orientation(int32_t Inst, Matrix const& Orient) = 0;       // +0x14
+    virtual Matrix const& DACOM_API get_orientation(int32_t Inst) const = 0;              // +0x18
+    virtual void DACOM_API set_transform(int32_t Inst, Transform const& Xform) = 0;       // +0x1C
+    virtual Transform const& DACOM_API get_transform(int32_t Inst) const = 0;             // +0x20 IEngine+0xa0
+    virtual void DACOM_API get_centered_radius(int32_t Inst, float* OutRadius,
                                                Vector* OutCenter) const = 0;           // +0x24
-    virtual void DACOM_API set_centered_radius(long Inst, float Radius,
+    virtual void DACOM_API set_centered_radius(int32_t Inst, float Radius,
                                                Vector const& Center) = 0;              // +0x28
-    virtual void DACOM_API set_instance_flags(long Inst, unsigned long Flags) = 0;     // +0x2C
-    virtual unsigned long DACOM_API get_instance_flags(long Inst) const = 0;           // +0x30
-    virtual bool DACOM_API joint_changed(long Inst) = 0;                               // +0x34 false
+    virtual void DACOM_API set_instance_flags(int32_t Inst, uint32_t Flags) = 0;     // +0x2C
+    virtual uint32_t DACOM_API get_instance_flags(int32_t Inst) const = 0;           // +0x30
+    virtual bool DACOM_API joint_changed(int32_t Inst) = 0;                               // +0x34 false
 };
 
 // EngineObject ctor 0xa98a0. Prefix of every CObject. sizeof 0x4c. Retail spells it a struct
@@ -91,22 +91,22 @@ public:
     virtual ~EngineObject();
 
 private:
-    virtual void DACOM_API initialize_instance(long Inst);
-    virtual void DACOM_API create_instance(long Inst);
-    virtual void DACOM_API destroy_instance(long Inst);
-    virtual void DACOM_API set_position(long Inst, Vector const& Pos);
-    virtual Vector const& DACOM_API get_position(long Inst) const;
-    virtual void DACOM_API set_orientation(long Inst, Matrix const& Orient);
-    virtual Matrix const& DACOM_API get_orientation(long Inst) const;
-    virtual void DACOM_API set_transform(long Inst, Transform const& Xform);
-    virtual Transform const& DACOM_API get_transform(long Inst) const;
-    virtual void DACOM_API get_centered_radius(long Inst, float* OutRadius,
+    virtual void DACOM_API initialize_instance(int32_t Inst);
+    virtual void DACOM_API create_instance(int32_t Inst);
+    virtual void DACOM_API destroy_instance(int32_t Inst);
+    virtual void DACOM_API set_position(int32_t Inst, Vector const& Pos);
+    virtual Vector const& DACOM_API get_position(int32_t Inst) const;
+    virtual void DACOM_API set_orientation(int32_t Inst, Matrix const& Orient);
+    virtual Matrix const& DACOM_API get_orientation(int32_t Inst) const;
+    virtual void DACOM_API set_transform(int32_t Inst, Transform const& Xform);
+    virtual Transform const& DACOM_API get_transform(int32_t Inst) const;
+    virtual void DACOM_API get_centered_radius(int32_t Inst, float* OutRadius,
                                                Vector* OutCenter) const;
-    virtual void DACOM_API set_centered_radius(long Inst, float NewRadius,
+    virtual void DACOM_API set_centered_radius(int32_t Inst, float NewRadius,
                                                Vector const& Center);
-    virtual void DACOM_API set_instance_flags(long Inst, unsigned long Flags);
-    virtual unsigned long DACOM_API get_instance_flags(long Inst) const;
-    virtual bool DACOM_API joint_changed(long Inst);
+    virtual void DACOM_API set_instance_flags(int32_t Inst, uint32_t Flags);
+    virtual uint32_t DACOM_API get_instance_flags(int32_t Inst) const;
+    virtual bool DACOM_API joint_changed(int32_t Inst);
     // Listing 0xa99b0 / 0xa99f0. Base-level defaults: always the zero vector (retail backs
     // these with a lazily-constructed function-local static; a plain static works here since
     // Vector is POD). Distinct overload from CObject::get_velocity()/get_angular_velocity()
@@ -117,10 +117,10 @@ private:
     // +0x44 get_angular_velocity, +0x48 set_angular_velocity -- 19 slots, so CObject's own
     // first new virtual (open) lands at +0x4c. Both setters are the shared empty body
     // .text:062a8910 (`RET 0xc`).
-    virtual Vector const& DACOM_API get_velocity(long Inst) const;
-    virtual void DACOM_API set_velocity(long Inst, Vector const& Vel);
-    virtual Vector const& DACOM_API get_angular_velocity(long Inst) const;
-    virtual void DACOM_API set_angular_velocity(long Inst, Vector const& AngVel);
+    virtual Vector const& DACOM_API get_velocity(int32_t Inst) const;
+    virtual void DACOM_API set_velocity(int32_t Inst, Vector const& Vel);
+    virtual Vector const& DACOM_API get_angular_velocity(int32_t Inst) const;
+    virtual void DACOM_API set_angular_velocity(int32_t Inst, Vector const& AngVel);
 
 public:
     // Thiscall listing 0x1cb10 / 0x1cb30 / 0x1cb50 / 0x1caf0 / 0x1cb70.
@@ -133,7 +133,7 @@ public:
     // .text:06356500: LEA EAX,[this+0x2c].
     Vector const& get_position() const;
     // .text:062d1ad0: MOV EAX,[this+0x4].
-    long get_index() const;
+    int32_t get_index() const;
     // Retail returns a const-qualified float: ?get_radius@EngineObject@@QBE?BMXZ.
     float const get_radius() const;
     void update_tree() const;
@@ -143,7 +143,7 @@ public:
     Vector WorldPosition; // +0x2c
     float Radius;         // +0x38
     Vector RadiusCenter;  // +0x3c  get/set_centered_radius (formerly ExtentsMin)
-    unsigned long InstanceFlags; // +0x48  get/set_instance_flags 06309a90/06309aa0 (formerly Pad48)
+    uint32_t InstanceFlags; // +0x48  get/set_instance_flags 06309a90/06309aa0 (formerly Pad48)
 
 private:
     // Listing 0x1cb80. Retail dispatches through this object's own vtable slot +0x28
@@ -227,11 +227,11 @@ protected:
 public:
     // Listing 0x4f610 stdcall. Clears this+4; refcount==1 → dtor slot +0x38 (delete this).
     // Not FindChild / IVP. EngBase FreeOwnedTransform CallRelease still 1-arg.
-    virtual void DACOM_API destroy_instance(long Inst);
+    virtual void DACOM_API destroy_instance(int32_t Inst);
 
     static CObject* __cdecl Alloc(Class ObjectClass);
     static int __cdecl Count(Class ObjectClass);
-    static CObject* __cdecl Find(long EngineInstanceId, Class ObjectClass);
+    static CObject* __cdecl Find(int32_t EngineInstanceId, Class ObjectClass);
     static CObject* __cdecl Find(unsigned const& Id, Class ObjectClass);
     static CObject* __cdecl FindFirst(Class ObjectClass);
     static CObject* __cdecl FindNext();
@@ -286,7 +286,7 @@ public:
     // NOT virtual in retail, matching the is_shield_part/inst_to_part/flag_part_as_shield
     // style further below. It has no slot in CObject's own named vtable (??_7CObject@@6B@,
     // Common.dll.txt 557774+), which ends at +0x7c (beam_object).
-    long part_to_inst(unsigned PartId) const;
+    int32_t part_to_inst(unsigned PartId) const;
     // Listing 0x1d0b0. IVP moment-of-inertia, or zero vector without a physics body.
     Vector get_moment_of_inertia() const;
     // Listing 0x1d0e0. No-op without a physics body.
@@ -294,7 +294,7 @@ public:
     // Listing 0x1d100. No-op without a physics body.
     void add_impulse(Vector const& Impulse, Vector const& Point);
     // Listing 0x1d220. Reverse lookup of part_to_inst: engine instance -> part index, or 0.
-    unsigned inst_to_part(long EngineInst) const;
+    unsigned inst_to_part(int32_t EngineInst) const;
     // Listing 0x1d250. True if the PartMap entry for PartId has its shield-part byte set.
     bool is_shield_part(unsigned PartId) const;
     // Common.dll.c 80718-80736 (0x4d4c0). Same PartMap scan as is_shield_part, but sets the
@@ -311,8 +311,8 @@ public:
     // .text:062adbc0 / .text:062adc40. Per-size Heap pools (0x9c, 0xf0, 0x104, 0x120, 0x1ec,
     // 0x2dc; every other size goes to malloc/free). noexcept so a new-expression checks the
     // result for null before running the constructor, as retail's CObject::Alloc does.
-    static void* operator new(unsigned int Size) noexcept;
-    static void operator delete(void* Ptr, unsigned int Size);
+    static void* operator new(size_t Size) noexcept;
+    static void operator delete(void* Ptr, size_t Size);
 
     // Retail exports no CObject::operator= (VC6 only emitted the implicit one on use, and
     // nothing assigns a CObject).
@@ -585,7 +585,7 @@ public:
         }
     };
     std::set<CacheString, FCacheStringLess> AttachedDamageObjs; // +0xbc
-    unsigned char PadBcSet[0x14 - sizeof(std::set<CacheString, FCacheStringLess>)]; // keeps +0xd0
+    unsigned char PadBcSet[(0x14 > sizeof(std::set<CacheString, FCacheStringLess>)) ? (0x14 - sizeof(std::set<CacheString, FCacheStringLess>)) : 1]; // keeps +0xd0
     // +0xd0 / +0xdc: already identified and consumed elsewhere in this port (predates this
     // pass) as the lazily-cached center-of-mass/radius pair -- CSimple::cache_physical_props
     // (common_csimple.cpp, Common.dll.c 0x55ed0) writes both via raw `this+0xd0`/`this+0xdc`
@@ -982,7 +982,7 @@ public:
     struct CreateParms : CSimple::CreateParms
     {
         unsigned Pad58;              // +0x58 (matches CProjectile::CreateParms's own pad)
-        unsigned long AsteroidId;    // +0x5c -> this+0xe8
+        uint32_t AsteroidId;    // +0x5c -> this+0xe8
         // The id of the owning asteroid cube: the cube's populate fills it (.text:062a6331)
         // and init() copies it to this+0xec (.text:062a290a).
         unsigned CubeId;             // +0x60 -> this+0xec  formerly FieldE4Value
@@ -1026,7 +1026,7 @@ public:
     Archetype::Asteroid const* asteroidarch() const;
     // Retail's four accessors are non-const (?get_asteroid_id@CAsteroid@@QAEKXZ etc.):
     // .text:062a22b0 / 062a22c0 / 062a22d0 / 062a22e0.
-    unsigned long get_asteroid_id();
+    uint32_t get_asteroid_id();
     bool is_mine();
     bool is_instant_kill();
     CmnAsteroid::CAsteroidField const* get_owner_field();
@@ -1035,7 +1035,7 @@ public:
     void set_system(unsigned int SystemId);
 
     unsigned char OpaqueE4[4];      // +0xe4 unidentified; only ever bulk-copied (copy ctor)
-    unsigned long AsteroidId;       // +0xe8
+    uint32_t AsteroidId;       // +0xe8
     unsigned CubeId;                // +0xec  owning cube's id (CreateParms::CubeId); formerly FieldECValue
     bool bMine;                     // +0xf0
     bool bInstantKill;              // +0xf1
@@ -1299,9 +1299,9 @@ public:
     // .text:062a0120: Arch->Id (word at CollisionGroup+0x04), no null check.
     unsigned short GetID() const;
     // Common.dll.c 0x402a0. -1 once State==3 (destroyed), else RootIndex.
-    long GetRootIndex() const;
+    int32_t GetRootIndex() const;
     // Common.dll.c 0x402b0. False once State==3; else IsDescendant(RootIndex, InstIndex).
-    bool IsInstInGroup(long InstIndex) const;
+    bool IsInstInGroup(int32_t InstIndex) const;
     // Common.dll.c 0x40300. Out=(0,0,0); false once State==3 or RootIndex==-1; else
     // Out=PhySys::GetVelocity(Owner), true.
     bool GetVelocity(Vector& Out) const;
@@ -1317,7 +1317,7 @@ public:
     // re-scales it).
     bool GetRadius(float& Out) const;
     // Common.dll.c 0x40690. -1 once State==3; else Hierarchy::GetDepth(RootIndex, InstIndex).
-    int InstDepthInGroup(long InstIndex) const;
+    int InstDepthInGroup(int32_t InstIndex) const;
     float GetHitPoints() const;
     void SetHitPoints(float NewHitPts);
     // .text:062a0200: the exact FILD value stays in ST0 and retail consumers use it there
@@ -1470,7 +1470,7 @@ public:
     // Common.dll.c 0x62a1600. Finds the group whose InstDepthInGroup(InstIndex) is smallest
     // (nearest ancestor) among all groups where it isn't -1, returns that group's GetID(), or 0
     // if InstIndex==-1 or no group contains it.
-    unsigned short InstToSubObjID(long InstIndex) const;
+    unsigned short InstToSubObjID(int32_t InstIndex) const;
 
 protected:
     // Common.dll.c 0x62a1c10. Retail's DestroyDeadGroup(CArchGroup&) thunk: DestroyLowerGroups then Destroy.
@@ -1670,7 +1670,7 @@ public:
     // vtable+0x84 -- the same slot already identified as GetRootIndex()-equivalent by
     // CAttachedEquip::IsInstOnEquip's own class comment (common_cequip.h), reused here rather
     // than re-deriving it. ArchGroup and SubObjId==1 (EngineInstanceId) branches are direct.
-    virtual long sub_obj_id_to_inst(unsigned short SubObjId) const;
+    virtual int32_t sub_obj_id_to_inst(unsigned short SubObjId) const;
     // Common.dll.c 0x4c240 (79688-79721). Retail allocates a 0x1cc-byte IBehaviorManager via
     // FUN_062d2220(Owner), which binds Owner into the manager's +0xf0 watcher (the same
     // sub-object disconnect(IObjRW*) above refers to) and builds its PathfindManager; the
@@ -1772,7 +1772,7 @@ public:
     // Common.dll.c 0x4b940 (?inst_to_subobj_id@CEqObj@@UBEGJ@Z). Engine instance handle ->
     // SubObjId: the root instance (EngineInstanceId) always yields 1; otherwise tries
     // EquipManager.InstToSubObjID() then ArchGroups.InstToSubObjID(), falling back to 1.
-    virtual unsigned short inst_to_subobj_id(long Instance) const;
+    virtual unsigned short inst_to_subobj_id(int32_t Instance) const;
 
 protected:
     // Common.dll.c 0x4bbe0, ?link_shields@CEqObj@@MAEXXZ: protected VIRTUAL in retail, the
@@ -2061,7 +2061,7 @@ public:
 
     static float const JETTISON_CLEARANCE_TIME;
     // Listing 0x52310. Returns renderable subtarget index.
-    long get_renderable_subtarget() const;
+    int32_t get_renderable_subtarget() const;
 
     bool is_cruise_active() const;
     bool is_using_tradelane() const;
@@ -2522,7 +2522,7 @@ static_assert(sizeof(CSolar) == 0x1ec, "CSolar sizeof 0x1ec (CObject::Alloc take
 // against that root instance. An object with no instance (-1) is its own root.
 COMMON_API CObject* __cdecl GetRoot(CObject const* Obj);
 
-COMMON_API bool __cdecl IsDescendant(long ParentInst, long ChildInst);
+COMMON_API bool __cdecl IsDescendant(int32_t ParentInst, int32_t ChildInst);
 
 namespace Hierarchy
 {
@@ -2530,26 +2530,26 @@ namespace Hierarchy
     // hops until it reaches ParentInst (returns the hop count, 0 if already equal) or falls off
     // the chain at -1 (returns -1). Same parent-walk as IsDescendant, but counting instead of
     // just testing membership.
-    COMMON_API int __cdecl GetDepth(long ParentInst, long ChildInst);
+    COMMON_API int __cdecl GetDepth(int32_t ParentInst, int32_t ChildInst);
 }
-COMMON_API bool __cdecl HardpointPosition(long Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient);
-COMMON_API bool __cdecl HardpointPositionA(long Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient);
-COMMON_API void __cdecl CompoundInstanceAnalyze(long Instance, void (__cdecl* Callback)(long, void*), void* Context);
-COMMON_API int __cdecl CompoundInstanceCount(long Instance);
+COMMON_API bool __cdecl HardpointPosition(int32_t Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient);
+COMMON_API bool __cdecl HardpointPositionA(int32_t Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient);
+COMMON_API void __cdecl CompoundInstanceAnalyze(int32_t Instance, void (__cdecl* Callback)(int32_t, void*), void* Context);
+COMMON_API int __cdecl CompoundInstanceCount(int32_t Instance);
 
 // Common.dll.txt:063035c0, ?CompoundInstanceList@@YAXJPAHPAPAJ@Z. Writes the instance and
 // every descendant into a freshly allocated array (raw operator new, Count * sizeof(long)),
 // with the count in OutCount. The caller owns the array.
-COMMON_API void __cdecl CompoundInstanceList(long Instance, int* OutCount, long** OutArray);
+COMMON_API void __cdecl CompoundInstanceList(int32_t Instance, int* OutCount, int32_t** OutArray);
 
 // Common.dll.txt:06303720, ?CompoundInstanceFindFirstName@@YAJJPBD@Z. First instance in the
 // compound (the root included) whose engine name matches Name case-insensitively, or -1.
-COMMON_API long __cdecl CompoundInstanceFindFirstName(long Instance, char const* Name);
+COMMON_API int32_t __cdecl CompoundInstanceFindFirstName(int32_t Instance, char const* Name);
 
 // Common.dll.txt:0630e750, ?FindChild@@YAJJPBD@Z. Depth-first search of Instance's engine
 // children for the first one whose name matches Name (_stricmp, a null name reads as "");
 // -1 if none. Called by CArchGroup::CArchGroup for its RootIndex.
-COMMON_API long __cdecl FindChild(long Instance, char const* Name);
+COMMON_API int32_t __cdecl FindChild(int32_t Instance, char const* Name);
 
 // Common.dll.txt:062a8920, ?ToggleIceCap@@YAX_N@Z (ordinal 2058). The retail body is a bare
 // RET: the export survives, the feature it once toggled does not. Nothing in Common.dll,

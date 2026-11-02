@@ -365,7 +365,7 @@ DeviceTRC::WinFont DeviceTRC::mFont[256];
 struct FStandardFontStyle
 {
     char const* Name;           // +0x00
-    unsigned long Size;         // +0x04
+    uint32_t Size;         // +0x04
     unsigned char bBold;        // +0x08
     unsigned char bItalic;      // +0x09
     unsigned char bUnderline;   // +0x0A
@@ -392,7 +392,7 @@ static struct FDefaultStandardFontsInit
         static const char* const Names[4] = {
             "Vibrocentric", "Vibrocentric", "Arial Unicode MS", "Arial Unicode MS"
         };
-        static const unsigned long Sizes[4] = { 16, 18, 22, 26 };
+        static const uint32_t Sizes[4] = { 16, 18, 22, 26 };
         for (int i = 0; i < GMaxFontIndices; ++i)
         {
             const int Pattern = (i + 2) % 4;

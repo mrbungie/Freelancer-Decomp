@@ -85,8 +85,8 @@ static const int kBatchedSlot18 = 18; // +0x48
 // The pipeline is IRenderPipeline (rp8.dll), so these are ordinary virtual calls now --
 // the kPipeline* slot numbers above are kept only as the documented offset map, and the
 // arity of each one is whatever src/include/render/IRenderPipeline.h declares.
-inline GENRESULT PipelineQueryDeviceAbility(IRenderPipeline* Pipeline, unsigned long Index,
-                                            unsigned long* Out)
+inline GENRESULT PipelineQueryDeviceAbility(IRenderPipeline* Pipeline, uint32_t Index,
+                                            uint32_t* Out)
 {
     return Pipeline->QueryDeviceAbility(static_cast<unsigned int>(Index), Out);
 }
@@ -96,8 +96,8 @@ inline GENRESULT PipelineSetModelview(IRenderPipeline* Pipeline, const float* Ma
     return Pipeline->SetModelview(Matrix12);
 }
 
-inline GENRESULT PipelineDrawPrimitiveVb(IRenderPipeline* Pipeline, unsigned long Prim, void* Vb,
-                                          unsigned long StartVertex, unsigned long Count,
+inline GENRESULT PipelineDrawPrimitiveVb(IRenderPipeline* Pipeline, uint32_t Prim, void* Vb,
+                                          uint32_t StartVertex, uint32_t Count,
                                           void* Unused)
 {
     return Pipeline->DrawPrimitiveVb(Prim, Vb, static_cast<unsigned int>(StartVertex),
@@ -108,10 +108,10 @@ inline GENRESULT PipelineDrawPrimitiveVb(IRenderPipeline* Pipeline, unsigned lon
 // eight dwords, and every retail caller pushes eight (shading.dll 0x06eb328a, 0x06eb3c0f,
 // 0x06eb5915, 0x06eba8ff all open with PUSH 0x0). This wrapper used to push seven, leaving
 // the __stdcall stack four bytes short on every indexed draw that went through it.
-inline GENRESULT PipelineDrawIndexedPrimitiveVb(IRenderPipeline* Pipeline, unsigned long Prim,
-                                                 void* Vb, unsigned long StartVertex,
-                                                 unsigned long VertCount, void* Indices,
-                                                 unsigned long IndexCount)
+inline GENRESULT PipelineDrawIndexedPrimitiveVb(IRenderPipeline* Pipeline, uint32_t Prim,
+                                                 void* Vb, uint32_t StartVertex,
+                                                 uint32_t VertCount, void* Indices,
+                                                 uint32_t IndexCount)
 {
     return Pipeline->DrawIndexedPrimitiveVb(Prim, Vb, static_cast<unsigned int>(StartVertex),
                                             static_cast<unsigned int>(VertCount), Indices,
@@ -135,7 +135,7 @@ inline GENRESULT PipelineGetMaterial(IRenderPipeline* Pipeline, D3DMATERIAL8* Bl
 }
 
 inline GENRESULT PipelineSetRenderState(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State,
-                                         unsigned long Value)
+                                         uint32_t Value)
 {
     return Pipeline->SetRenderState(State, (int)Value);
 }
@@ -143,36 +143,36 @@ inline GENRESULT PipelineSetRenderState(IRenderPipeline* Pipeline, D3DRENDERSTAT
 // The int / unsigned long bridge is the port's (the declared slot takes int*); retail passes
 // the caller's out pointer straight through.
 inline GENRESULT PipelineGetRenderState(IRenderPipeline* Pipeline, D3DRENDERSTATETYPE State,
-                                         unsigned long* Out)
+                                         uint32_t* Out)
 {
     int Value = 0;
     const GENRESULT Result = Pipeline->GetRenderState(State, &Value);
-    *Out = static_cast<unsigned long>(Value);
+    *Out = static_cast<uint32_t>(Value);
     return Result;
 }
 
 // No null test: every retail SetTextureStageState site calls [vtable+0xF8] straight through
 // the pipeline pointer (Freelancer.exe 0x0050b31c/0x0050b358/0x0050b37a, flmaterials.dll's
 // bind paths). Callers own the pipeline's validity, exactly as in retail.
-inline GENRESULT PipelineSetTextureStageState(IRenderPipeline* Pipeline, unsigned long Stage,
-                                               unsigned long Type, unsigned long Value)
+inline GENRESULT PipelineSetTextureStageState(IRenderPipeline* Pipeline, uint32_t Stage,
+                                               uint32_t Type, uint32_t Value)
 {
     return Pipeline->SetTextureStageState(static_cast<int>(Stage), static_cast<int>(Type),
                                          static_cast<int>(Value));
 }
 
-inline GENRESULT PipelineGetTextureStageState(IRenderPipeline* Pipeline, unsigned long Stage,
-                                               unsigned long Type, unsigned long* Out)
+inline GENRESULT PipelineGetTextureStageState(IRenderPipeline* Pipeline, uint32_t Stage,
+                                               uint32_t Type, uint32_t* Out)
 {
     int Value = 0;
     const GENRESULT Result =
         Pipeline->GetTextureStageState(static_cast<int>(Stage), static_cast<int>(Type), &Value);
-    *Out = static_cast<unsigned long>(Value);
+    *Out = static_cast<uint32_t>(Value);
     return Result;
 }
 
-inline GENRESULT PipelineSetTextureStageTexture(IRenderPipeline* Pipeline, unsigned long Stage,
-                                                 unsigned long Handle)
+inline GENRESULT PipelineSetTextureStageTexture(IRenderPipeline* Pipeline, uint32_t Stage,
+                                                 uint32_t Handle)
 {
     return Pipeline->SetTextureStageTexture(static_cast<int>(Stage),
                                            reinterpret_cast<void*>(Handle));
@@ -181,7 +181,7 @@ inline GENRESULT PipelineSetTextureStageTexture(IRenderPipeline* Pipeline, unsig
 // Slot 64's second argument is the 4x4 UV matrix, not a flags dword: flmaterials.dll
 // 0x066f9e3e and 0x067001e3 both push the address of a 0x40-byte stack buffer that the
 // preceding MatAnim slot 6 call just filled.
-inline GENRESULT PipelineSetTextureStageTransform(IRenderPipeline* Pipeline, unsigned long Stage,
+inline GENRESULT PipelineSetTextureStageTransform(IRenderPipeline* Pipeline, uint32_t Stage,
                                                    const float* Matrix16)
 {
     return Pipeline->SetTextureStageTransform(static_cast<int>(Stage), Matrix16);
@@ -196,10 +196,10 @@ inline GENRESULT PipelineVerifyState(IRenderPipeline* Pipeline)
 // Then [+4]=value, [+8]=next, stride 8, stop when next==0.
 // Retail inlines this loop at every site (Freelancer.exe 0x0050b366..0x0050b388) with no test
 // of the pipeline or the table pointer; the tables are constants in .rdata.
-inline void PipelineApplyRsTable(IRenderPipeline* Pipeline, const unsigned long* Table)
+inline void PipelineApplyRsTable(IRenderPipeline* Pipeline, const uint32_t* Table)
 {
-    unsigned long State = Table[0];
-    const unsigned long* Cursor = Table;
+    uint32_t State = Table[0];
+    const uint32_t* Cursor = Table;
     while (State != 0)
     {
         PipelineSetRenderState(Pipeline, (D3DRENDERSTATETYPE)State, Cursor[1]);
@@ -208,11 +208,11 @@ inline void PipelineApplyRsTable(IRenderPipeline* Pipeline, const unsigned long*
     }
 }
 
-inline void PipelineApplyTssTable(IRenderPipeline* Pipeline, unsigned long Stage,
-                                  const unsigned long* Table)
+inline void PipelineApplyTssTable(IRenderPipeline* Pipeline, uint32_t Stage,
+                                  const uint32_t* Table)
 {
-    unsigned long Type = Table[0];
-    const unsigned long* Cursor = Table;
+    uint32_t Type = Table[0];
+    const uint32_t* Cursor = Table;
     while (Type != 0)
     {
         PipelineSetTextureStageState(Pipeline, Stage, Type, Cursor[1]);

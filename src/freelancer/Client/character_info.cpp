@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "character_info.h"
+#include "fl/handles.h"
 
 #include "DALib.h"              // DALib::Anim
 #include "common_id.h"          // CreateID
@@ -25,7 +26,7 @@ namespace
     // The "no script" value of +0x2c (the ctor's MOV [EDI+0x2c],-1 and every CMP ...,-1).
     void* NoAnimScript()
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(-1));
+        return static_cast<void*>(fl::HandleToPtr(static_cast<uint32_t>(-1)));
     }
 
     // FUN_00435100's stack record for the enumeration callback: 0x00435261..0x00435274 stores

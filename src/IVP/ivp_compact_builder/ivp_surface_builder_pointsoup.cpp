@@ -456,7 +456,7 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_le
 {
     const int32_t NInput = Points->n_elems;
     IVP_U_Vector<IVP_U_Float_Point> Reduced(
-        NInput != 0 ? static_cast<IVP_U_Float_Point**>(malloc(static_cast<size_t>(NInput) * 4)) : nullptr, NInput);
+        NInput != 0 ? static_cast<IVP_U_Float_Point**>(malloc(static_cast<size_t>(NInput) * sizeof(void*))) : nullptr, NInput);
     double* const Coords = static_cast<double*>(calloc(static_cast<size_t>(Points->n_elems) * 4, 8));
     {
         FPointsoupPointHash Hash(0x400);
@@ -760,7 +760,7 @@ void FLedgeConvexHullBuilder::BuildHull()
                 const uint8_t* Point = LedgeEdgePoint(Ledge, Triangle, K);
                 if (PointHash.Find(Point) != 0)
                     continue;
-                PointHash.Add(Point, reinterpret_cast<unsigned>(Point));
+                PointHash.Add(Point, static_cast<unsigned>(reinterpret_cast<intptr_t>(Point)));
 
                 const IVP_U_Float_Point* Source = reinterpret_cast<const IVP_U_Float_Point*>(Point);
                 IVP_U_Float_Point* Copy = static_cast<IVP_U_Float_Point*>(::operator new(0x10));
@@ -819,13 +819,13 @@ void FLedgeConvexHullBuilder::MarkVirtualFeatures()
 
             const int32_t TriangleKey[3] = { Index[0], Index[1], Index[2] };
             if (TriangleHash.Find(TriangleKey) == 0)
-                TriangleHash.Add(TriangleKey, reinterpret_cast<unsigned>(Triangle));
+                TriangleHash.Add(TriangleKey, static_cast<unsigned>(reinterpret_cast<intptr_t>(Triangle)));
 
             for (int32_t K = 0; K < 3; ++K)
             {
                 const int32_t EdgeKey[2] = { Index[K], Index[(K + 1) % 3] };
                 if (EdgeHash.Find(EdgeKey) == 0)
-                    EdgeHash.Add(EdgeKey, reinterpret_cast<unsigned>(Triangle));
+                    EdgeHash.Add(EdgeKey, static_cast<unsigned>(reinterpret_cast<intptr_t>(Triangle)));
             }
         }
     }

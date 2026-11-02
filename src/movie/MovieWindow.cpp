@@ -244,10 +244,10 @@ static unsigned int const GPowersOfThree[16] =
 };
 
 // 0x06ac8910. RET 0x14. Same arity as AddLimbs. Chosen when the mark bytes match.
-long __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall Movie_SubtractLimbsWide(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
 
 // 0x06ac8500.
-long __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
+int32_t __stdcall AddLimbs(unsigned int* Left, int LeftCount, unsigned int* Right, int RightCount, int Sum);
 
 static void CopyOrZeroBytes(unsigned int* Dest, unsigned int* Source, unsigned int ByteCount, int FillZero)
 {
@@ -307,7 +307,7 @@ int __stdcall Movie_ExponentiateLimb(unsigned int* Base, unsigned int Exponent, 
         return 0;
     }
 
-    unsigned long BitIndex = 0;
+    uint32_t BitIndex = 0;
     _BitScanReverse(&BitIndex, Exponent);
     unsigned int Shift = BitIndex + 1u - 2u;
     unsigned int Top = Exponent >> Shift;

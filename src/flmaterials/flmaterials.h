@@ -77,11 +77,11 @@ IMaterial* FlmCreateMaterial(const FMaterialSpec& Spec);
 GENRESULT FlmCreateAppearanceInstance(FAggDesc18* Desc, void** Instance);
 
 // VisibleCounter slot 10 / IFLAppearance slot 13 (DAT_067045B4 / B8 / BC).
-extern unsigned long G_VisibleCounterA;
-extern unsigned long G_VisibleCounterB;
-extern unsigned long G_VisibleCounterC;
+extern uint32_t G_VisibleCounterA;
+extern uint32_t G_VisibleCounterB;
+extern uint32_t G_VisibleCounterC;
 void FlmVisibleCounterReset();
-void FlmVisibleCounterCopy(unsigned long* Out3);
+void FlmVisibleCounterCopy(uint32_t* Out3);
 
 // Borrowed engine outer component cached by FLAppearance initialization.
 extern IDAComponent* G_FlmEngineOuter;
@@ -101,8 +101,8 @@ public:
     void ConfigureAggregation(FMaterialAggregateDesc* Desc);
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API AddRef() override;
-    unsigned long DACOM_API Release() override;
+    uint32_t DACOM_API AddRef() override;
+    uint32_t DACOM_API Release() override;
 
     GENRESULT DACOM_API Initialize(IDAComponent* Outer) override;
     GENRESULT DACOM_API LoadFromFileSystem(void* FileSystem) override;
@@ -111,30 +111,30 @@ public:
     GENRESULT DACOM_API ResolveTextures(float Delta) override;
     GENRESULT DACOM_API Bind(void* Context) override;
     GENRESULT DACOM_API Teardown(void* Context) override;
-    GENRESULT DACOM_API Submit(void* Context, unsigned long PrimType, unsigned long Start,
-                               unsigned long Count, unsigned long IbStart, unsigned long IndexSpan,
-                               unsigned long Flags) override;
+    GENRESULT DACOM_API Submit(void* Context, uint32_t PrimType, uint32_t Start,
+                               uint32_t Count, uint32_t IbStart, uint32_t IndexSpan,
+                               uint32_t Flags) override;
     GENRESULT DACOM_API SetName(const char* Name) override;
-    GENRESULT DACOM_API GetName(char* Out, unsigned long Size) override;
-    GENRESULT DACOM_API CopyClassName(char* Out, unsigned long Size) override;
+    GENRESULT DACOM_API GetName(char* Out, uint32_t Size) override;
+    GENRESULT DACOM_API CopyClassName(char* Out, uint32_t Size) override;
     GENRESULT DACOM_API GetPassCount(int* Out) override;
-    GENRESULT DACOM_API GetRenderFlags(unsigned long* Out) override;
-    GENRESULT DACOM_API GetParameterCount(unsigned long* OutCount) override;
-    GENRESULT DACOM_API GetParameterDescriptor(unsigned long Index, void* OutDesc) override;
-    GENRESULT DACOM_API GetParameterValue(unsigned long Index, void* InOutDesc) override;
-    GENRESULT DACOM_API SetParameterValue(unsigned long Index, void* Value) override;
+    GENRESULT DACOM_API GetRenderFlags(uint32_t* Out) override;
+    GENRESULT DACOM_API GetParameterCount(uint32_t* OutCount) override;
+    GENRESULT DACOM_API GetParameterDescriptor(uint32_t Index, void* OutDesc) override;
+    GENRESULT DACOM_API GetParameterValue(uint32_t Index, void* InOutDesc) override;
+    GENRESULT DACOM_API SetParameterValue(uint32_t Index, void* Value) override;
     const char* __thiscall ClassName() override;
     void* __thiscall ScalarDeletingDestructor(unsigned char bDelete) override;
     GENRESULT __thiscall InitializeFromDescriptor(void* Arg) override;
     GENRESULT __thiscall ApplyInitialRenderStates(void* Arg) override;
     GENRESULT __thiscall Setup() override;
-    bool __thiscall ValueWithinDeclaredRange(unsigned long Index, void* Entry, void* Value) override;
-    GENRESULT __thiscall StoreParameterValue(unsigned long Index, void* Entry, void* Value) override;
-    unsigned long __thiscall GetParameterTable(void** OutBase) override;
-    void* __thiscall GetParameterAddress(unsigned long Index) override;
+    bool __thiscall ValueWithinDeclaredRange(uint32_t Index, void* Entry, void* Value) override;
+    GENRESULT __thiscall StoreParameterValue(uint32_t Index, void* Entry, void* Value) override;
+    uint32_t __thiscall GetParameterTable(void** OutBase) override;
+    void* __thiscall GetParameterAddress(uint32_t Index) override;
     GENRESULT DACOM_API InnerQueryInterface(const char* Iid, void** Out) override;
-    unsigned long DACOM_API InnerAddRef() override;
-    unsigned long DACOM_API InnerRelease() override;
+    uint32_t DACOM_API InnerAddRef() override;
+    uint32_t DACOM_API InnerRelease() override;
 
 private:
     void BindUnknown(const char* Why);
@@ -151,24 +151,24 @@ private:
     void BindExclusion();
     void BindEnvMap(void* Context);
     GENRESULT BindShadow(void* Context);
-    GENRESULT DrawShadow(void* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
-                         unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags);
+    GENRESULT DrawShadow(void* Context, uint32_t Prim, uint32_t Start, uint32_t Count,
+                         uint32_t IbStart, uint32_t IndexSpan, uint32_t Flags);
     void BindEngineGlow(void* Context);
     void BindVisibleCounter();
     void BindBackdrop(void* Context);
     GENRESULT TeardownBackdrop(void* Context);
-    GENRESULT DrawBackdrop(void* Context, unsigned long Prim, unsigned long Start, unsigned long Count,
-                           unsigned long IbStart, unsigned long IndexSpan, unsigned long Flags);
+    GENRESULT DrawBackdrop(void* Context, uint32_t Prim, uint32_t Start, uint32_t Count,
+                           uint32_t IbStart, uint32_t IndexSpan, uint32_t Flags);
     void BindPlanetWater(void* Context);
     GENRESULT ShadowCandidateDispatch(void* Context);
     void TeardownCandidateIgnoringResult(void* Context);
-    GENRESULT SubmitCandidateGeometry(void* Context, unsigned long PrimType,
-                                     unsigned long Start, unsigned long Count,
-                                     unsigned long IbStart, unsigned long IndexSpan,
-                                     unsigned long Flags);
+    GENRESULT SubmitCandidateGeometry(void* Context, uint32_t PrimType,
+                                     uint32_t Start, uint32_t Count,
+                                     uint32_t IbStart, uint32_t IndexSpan,
+                                     uint32_t Flags);
 
-    void ApplyTssFromTextureBlock(unsigned long Stage, const unsigned long* Block);
-    unsigned long TextureHandleAt(const unsigned long* Block) const;
+    void ApplyTssFromTextureBlock(uint32_t Stage, const uint32_t* Block);
+    uint32_t TextureHandleAt(const uint32_t* Block) const;
     bool ContextWantsColorVertex(void* Context) const;
     float CompareField2C() const;
 
@@ -177,9 +177,9 @@ private:
     public:
         explicit FInner(FMaterialImpl* Owner) : RefCount(1), Owner(Owner) {}
         GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
-        unsigned long DACOM_API AddRef() override;
-        unsigned long DACOM_API Release() override;
-        unsigned long RefCount;
+        uint32_t DACOM_API AddRef() override;
+        uint32_t DACOM_API Release() override;
+        uint32_t RefCount;
         FMaterialImpl* Owner;
     };
 
@@ -193,7 +193,7 @@ private:
     IVertexBufferManager* VertexBufferManager_;
     IRPDraw* RpDraw_;
     IMaterialLibrary* MaterialLibrary_;
-    unsigned long* TextureBlock_;
+    uint32_t* TextureBlock_;
     float MaterialBlock_[17];
     unsigned char Flag64_;
     unsigned char Flag65_;
@@ -207,41 +207,41 @@ private:
     // Nomad Slot28 index 0 returns a three-float Diffuse Color span at retail +0x74.
     // Keep it separate from the Wire-only color and packed-state members.
     float NomadDiffuseColor_[3];
-    unsigned long HudAnimFlag_;
+    uint32_t HudAnimFlag_;
     IImaInstance* MatAnim_;
-    unsigned long EnvMapFlag_;
+    uint32_t EnvMapFlag_;
     // Stage texture handle resolved by BindEnvMap and reused by Submit.
-    unsigned long EnvMapResolvedHandle_;
+    uint32_t EnvMapResolvedHandle_;
     // EnvMap record remains separate from Shadow layer count / record / resolved texture.
-    unsigned long ShadowHandle_; // EnvMap retained texture record (retail +0x68).
+    uint32_t ShadowHandle_; // EnvMap retained texture record (retail +0x68).
     ITextureLibrary2* ShadowTextureLibrary_; // borrowed Shadow +0x6c
     void* ShadowTextureRecord_;              // retained Shadow +0x74
-    unsigned long ShadowResolvedHandle_;    // Shadow +0x70 pipeline texture
-    unsigned long ShadowLayerCount_;        // Shadow +0x68 candidate layer count
+    uint32_t ShadowResolvedHandle_;    // Shadow +0x70 pipeline texture
+    uint32_t ShadowLayerCount_;        // Shadow +0x68 candidate layer count
     bool bShadowTextureInitialized_;         // Shadow +0x78 one-shot lookup
     // CRC of the texture name currently retained in ShadowHandle_.
-    unsigned long EnvMapTexNameCrc_;
-    unsigned long StageCounter_;
+    uint32_t EnvMapTexNameCrc_;
+    uint32_t StageCounter_;
     // Wire and Wire2 store RGBA here, initially white.
     float WireColorR_;
     float WireColorG_;
     float WireColorB_;
     float WireField74_;
     // Wire ARGB color; Wire2 additionally keeps a reduced RGB color for shifted points.
-    unsigned long WireField78_;
-    unsigned long WireField7C_;
+    uint32_t WireField78_;
+    uint32_t WireField7C_;
     // Cached facegroup cursor; retry group zero once when selection fails.
-    unsigned long WireGroupIndex_;
-    unsigned long Exclusion68_;
+    uint32_t WireGroupIndex_;
+    uint32_t Exclusion68_;
     // Colorize alpha component used for render flags and base opacity.
     float ColorizeExtraW_;
     // Colorize Options is a raw flags word, not a float.
-    unsigned long ColorizeOptionsFlags_;
+    uint32_t ColorizeOptionsFlags_;
 
     // Owned lowercase name; replaced on SetName and destroyed after textures.
     char* InstanceName_; // Owned, capped at 64 bytes including terminator.
     bool bInstanceNameSet_;
 
     // Number of entries in the per-instance texture array shared by bind, resolve and setup.
-    unsigned long TextureVerifyCount_;
+    uint32_t TextureVerifyCount_;
 };

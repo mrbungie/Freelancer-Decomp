@@ -34,6 +34,39 @@
 
 // Playback: slots 19/22/23/26 + Start types 1РІР‚вЂњ19. docs/re/thorn.md.
 
+#if !defined(_MSC_VER) || defined(FREELANCER_PORTABLE)
+// Portable replacements for the x87 sequences below. Extended precision is
+// modelled with double; no intermediate contraction (FMA) is allowed.
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+namespace
+{
+    // x87 FISTP with round-toward-zero; NaN/out-of-range gives integer indefinite.
+    inline long long PortableChopToInt64(double Value)
+    {
+        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
+            return static_cast<long long>(0x8000000000000000ULL);
+        return static_cast<long long>(Value);
+    }
+
+    // FLD dword / FSTP dword round trip quiets a signalling NaN.
+    inline float PortableQuietF32(float Value)
+    {
+        unsigned int Bits;
+        std::memcpy(&Bits, &Value, sizeof(Bits));
+        if ((Bits & 0x7f800000u) == 0x7f800000u && (Bits & 0x007fffffu) != 0u)
+            Bits |= 0x00400000u;
+        std::memcpy(&Value, &Bits, sizeof(Value));
+        return Value;
+    }
+
+    // Stand-in for the x87 stack slot the audio tick keeps live across calls.
+    double G_PortableX87Progress = 0.0;
+
+}
+#endif
+
 namespace
 {
     unsigned int G_NextEventId = 0; // DAT_06f61e24: module lifetime, wrapping counter.
@@ -2260,7 +2293,7 @@ void FThornEvent::ApplyFloorHeightDesc(const void* DescIn)
     if (ReadEventWord(DescIn, 0) == kThornTypeFloorHeightAnim)
     {
         std::memcpy(&FloorTarget, static_cast<const unsigned char*>(DescIn) + 44, sizeof(FloorTarget));
-        SetFloorTargetPart(reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12))));
+        SetFloorTargetPart(fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 12))));
         TargetType = ReadEventWord(DescIn, 13);
     }
     // 49677..49696 mirrors common timing/endpoints after the payload work.
@@ -2782,12 +2815,12 @@ void FThornEvent::ApplyConnectDesc(const void* DescIn)
     if (bMatchingType)
     {
         const char* HardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 11)));
+            fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 11)));
         if (HardpointName != nullptr)
             SetConnectHardpoint(HardpointName);
         // 48237 reads the second argument after the first string operation.
         const char* ParentHardpointName =
-            reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 12)));
+            fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 12)));
         if (ParentHardpointName != nullptr)
             SetConnectParentHardpoint(ParentHardpointName);
     }
@@ -2806,7 +2839,7 @@ void FThornEvent::ApplyAttachDesc(const void* DescIn)
         TargetType = ReadEventWord(DescIn, 14);
         LookAtUpAxis = ReadEventWord(DescIn, 15);
         LookAtFrontAxis = ReadEventWord(DescIn, 16);
-        const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 17)));
+        const char* TargetPartName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 17)));
         if (TargetPartName != nullptr)
         {
             AttachTargetPartStorage.Assign(TargetPartName);
@@ -2903,13 +2936,13 @@ void FThornEvent::ApplyMotionDesc(const void* DescIn)
         std::memcpy(&TransTime, static_cast<const unsigned char*>(DescIn) + 48, sizeof(TransTime));
         std::memcpy(&TransScale, static_cast<const unsigned char*>(DescIn) + 76, sizeof(TransScale));
         std::memcpy(&Weight, static_cast<const unsigned char*>(DescIn) + 56, sizeof(Weight));
-        const char* AnimationName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 15)));
+        const char* AnimationName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 15)));
         if (AnimationName != nullptr)
         {
             MotionAnimationStorage.Assign(AnimationName);
             Animation = MotionAnimationStorage.GetPublishedData();
         }
-        const char* BoneName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 18)));
+        const char* BoneName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 18)));
         if (BoneName != nullptr)
         {
             MotionLockedBoneStorage.Assign(BoneName);
@@ -2983,7 +3016,7 @@ void FThornEvent::ApplySpatialPropAnimDesc(const void* DescIn)
         SpatialMatrixToQuaternion(G_SceneEventMathEngine, TargetQuat,
             static_cast<const unsigned char*>(DescIn) + 48);
     }
-    const char* TargetPartName = reinterpret_cast<const char*>(static_cast<INT_PTR>(ReadEventWord(DescIn, 30)));
+    const char* TargetPartName = fl::HandleTo<const char>(static_cast<uint32_t>(ReadEventWord(DescIn, 30)));
     // 46636 already cleared exposure before the math callback. Null input
     // skips assignment entirely; do not clear a callback's later publication.
     if (TargetPartName != nullptr)
@@ -5877,14 +5910,14 @@ FThornEvent* FThornScene::AddEvent(int DescriptorStorageType)
     return Event;
 }
 
-unsigned long FThornScene::EntityCount() const
+uint32_t FThornScene::EntityCount() const
 {
-    return static_cast<unsigned long>(EntityCount_);
+    return static_cast<uint32_t>(EntityCount_);
 }
 
-unsigned long FThornScene::LiveEntityCount() const
+uint32_t FThornScene::LiveEntityCount() const
 {
-    return static_cast<unsigned long>(Entities_.size());
+    return static_cast<uint32_t>(Entities_.size());
 }
 
 bool FThornScene::EntityExists(int Index) const
@@ -6079,12 +6112,12 @@ FThornEntitySnap* FThornScene::EntitySnapInorder(int Index)
     return nullptr;
 }
 
-unsigned long FThornScene::UserPropCount(int Index) const
+uint32_t FThornScene::UserPropCount(int Index) const
 {
     // LAB_06f38ca0: lookup by key; *(inner+0x80). Miss РІвЂ вЂ™ 0.
     if (!EntityExists(Index))
         return 0;
-    return static_cast<unsigned long>(EntityAt(Index)->UserProps->size());
+    return static_cast<uint32_t>(EntityAt(Index)->UserProps->size());
 }
 
 const char* FThornScene::UserPropKey(int Index, int N) const
@@ -7097,10 +7130,10 @@ namespace
         // discards the entire pending buffer, and is never retried.
         if (Buf->Len == 0)
             return 0;
-        unsigned long Written = 0;
-        Buf->FileSystemOwner.FileSystem->Write(0, Buf->Data, static_cast<unsigned long>(Buf->Len),
+        uint32_t Written = 0;
+        Buf->FileSystemOwner.FileSystem->Write(0, Buf->Data, static_cast<uint32_t>(Buf->Len),
                                &Written, nullptr);
-        const int Result = Written == static_cast<unsigned long>(Buf->Len) ? 0 : -1;
+        const int Result = Written == static_cast<uint32_t>(Buf->Len) ? 0 : -1;
         Buf->Len = 0;
         return Result;
     }
@@ -7873,7 +7906,7 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             IPersistString* Persist = Entity->MotionPath.MotionPath;
             if (Persist != nullptr)
             {
-                const unsigned long Size = Persist->Slot5EstimateSize();
+                const uint32_t Size = Persist->Slot5EstimateSize();
                 if (Size != 0)
                 {
                     char* Data = new char[Size + 1u];
@@ -7893,11 +7926,11 @@ GENRESULT FThornScene::SaveToFileSystem(void* FileSystem, IThornComContext* ComC
             SaveBufAppendLiteral(&Buf, "\t\t}");
         }
 
-        const unsigned long PropCount = UserPropCount(Index);
+        const uint32_t PropCount = UserPropCount(Index);
         if (PropCount > 0)
         {
             SaveBufAppendLiteral(&Buf, ",\r\n\t\tuserprops =\r\n\t\t{\r\n");
-            for (unsigned long Prop = 0; Prop < PropCount; ++Prop)
+            for (uint32_t Prop = 0; Prop < PropCount; ++Prop)
             {
                 char* Value = nullptr;
                 const char* Key = UserPropKey(Index, static_cast<int>(Prop));

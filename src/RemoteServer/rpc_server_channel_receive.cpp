@@ -253,7 +253,7 @@ static ::Reputation::Relation* RpcServerRelationArrayFromList(
 void RpcReceiveServerChannel(unsigned int ClientId, FPacketBase* Packet, IClient* Client)
 {
     unsigned int Opcode = Packet->GetOpcode();
-    const unsigned char* Payload = reinterpret_cast<const unsigned char*>(Packet) + 0x20;
+    const unsigned char* Payload = reinterpret_cast<const unsigned char*>(Packet) + FPacketRetailOffset(0x20);
 
         switch (Opcode)
         {
