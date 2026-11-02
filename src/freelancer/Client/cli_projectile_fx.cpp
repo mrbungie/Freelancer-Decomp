@@ -595,7 +595,7 @@ void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,
             if (EffectArch->VisBeam != nullptr && EffectArch->VisBeam->Nickname[0] != '\0')
             {
                 // 0x0053f4e8..0x0053f506: FUN_004f79a0(0x84) + FUN_004f9540(0) into +0xd0.
-                void* const Mem = EffectAlloc(0x84u);
+                void* const Mem = EffectAlloc(sizeof(FBeamEffect));
                 FBeamEffect* Beam = nullptr;
                 if (Mem != nullptr)
                 {

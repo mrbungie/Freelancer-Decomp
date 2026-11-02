@@ -569,16 +569,6 @@ inline IObjInspect const* ObjInspectOf(void const* Object)
     return static_cast<IObjInspect const*>(Object);
 }
 
-// `Watchable` is IObjRW's third base and sits at +8, so the `- 8` the AI state machines
-// do on a watcher target is a downcast to the whole object. The AI TUs (common_aisteer.cpp,
-// common_behaviormanager.cpp, common_targetmanager.cpp, ...) all spell it out by hand; this names it.
-inline IObjRW* ObjRwFromWatchable(void* WatchableSubObject)
-{
-    if (WatchableSubObject == nullptr)
-        return nullptr;
-    return reinterpret_cast<IObjRW*>(static_cast<char*>(WatchableSubObject) - 8);
-}
-
 // IObjAffect abstract interface — mutation methods.
 struct IObjAffect
 {
@@ -801,6 +791,27 @@ struct IObjRW : IObjInspect, IObjAffect, Watchable
 };
 
 static_assert(sizeof(IObjRW) == 0x0C, "IObjRW is two vtable pointers plus Watchable");
+
+// `Watchable` is IObjRW's third base and sits at +8, so the `- 8` the AI state machines
+// do on a watcher target is a downcast to the whole object. The AI TUs (common_aisteer.cpp,
+// common_behaviormanager.cpp, common_targetmanager.cpp, ...) all spell it out by hand; this names it.
+inline IObjRW* ObjRwFromWatchable(void* WatchableSubObject)
+{
+    if (WatchableSubObject == nullptr)
+        return nullptr;
+    // Watchable is a base of IObjRW: the downcast adjusts by the real (host) offset, not retail's +8.
+    return static_cast<IObjRW*>(static_cast<Watchable*>(WatchableSubObject));
+}
+
+// Address of the whole object a Watchable sub-object belongs to (retail: `watchable - 8`).
+template <class P>
+inline char const* WatchableOwnerAddr(P const* W)
+{
+    return W == nullptr ? nullptr
+                        : reinterpret_cast<char const*>(static_cast<IObjRW const*>(
+                              static_cast<Watchable const*>(static_cast<void const*>(W))));
+}
+
 
 // ============================================================================
 // IObjInspectImpl — concrete implementation delegating to CObject/CSimple/CShip

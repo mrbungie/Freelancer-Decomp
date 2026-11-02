@@ -5090,7 +5090,7 @@ int FClientGuidedGameobj::set_target(IObjRW* Target, unsigned short SubTarget, i
     Watchable const* const Watched = Guided->TargetWatch.target();
     IObjRW const* const Current =
         (Watched != nullptr)
-            ? reinterpret_cast<IObjRW const*>(reinterpret_cast<unsigned char const*>(Watched) - 8)
+            ? reinterpret_cast<IObjRW const*>(WatchableOwnerAddr(Watched))
             : nullptr;
     if (Current == Target && Guided->SubTarget == SubTarget)
         return 0;
@@ -5277,7 +5277,7 @@ namespace
         Watchable const* const Target = Watcher.target();
         if (Target == nullptr)
             return nullptr;
-        return reinterpret_cast<IObjRW const*>(reinterpret_cast<unsigned char const*>(Target) - 8);
+        return reinterpret_cast<IObjRW const*>(WatchableOwnerAddr(Target));
     }
 
     // FUN_0045aa10(out, first, last, &Obj): the first node from first up to last whose

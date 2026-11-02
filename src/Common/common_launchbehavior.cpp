@@ -192,7 +192,7 @@ void LaunchBehavior::Engage()
     // .text:062cd84c-062cd871: `EAX = Watcher168 target; EAX = EAX ? EAX-8 : 0;
     // CALL FUN_062e6200(EAX)` (== GetObjectTypeOrZero, which null-checks its argument itself).
     Watchable const* Watched168 = Watcher168.target();
-    void const* RawBlock = Watched168 ? (reinterpret_cast<unsigned char const*>(Watched168) - 8) : nullptr;
+    void const* RawBlock = Watched168 ? (WatchableOwnerAddr(Watched168)) : nullptr;
     TargetType174 = GetObjectTypeOrZero(ObjInspectOf(RawBlock));
 
     // .text:062cd863-062cd877: `MOV ECX,[ESI+0x24]; PUSH 0; ADD ECX,0x12c;
@@ -269,7 +269,7 @@ bool LaunchBehavior::ApplyDirective(void const* Param)
     DirectiveField178 = *reinterpret_cast<int const*>(static_cast<unsigned char const*>(Param) + 0x10);
 
     Watchable const* Watched168 = Watcher168.target();
-    void const* RawBlock = Watched168 ? (reinterpret_cast<unsigned char const*>(Watched168) - 8) : nullptr;
+    void const* RawBlock = Watched168 ? (WatchableOwnerAddr(Watched168)) : nullptr;
 
     if (RawBlock != nullptr)
     {
@@ -362,7 +362,7 @@ int LaunchBehavior::Update()
         return 3;
     }
     Watchable const* Watched168 = Watcher168.target();
-    if (Watched168 == nullptr || (reinterpret_cast<unsigned char const*>(Watched168) - 8) == nullptr)
+    if (Watched168 == nullptr || (WatchableOwnerAddr(Watched168)) == nullptr)
     {
         UpdateResult10 = 3;
         return 3;
@@ -702,7 +702,7 @@ void LaunchBehavior::ComputeLaunchApproachTransform()
     // then an unguarded `MOV EAX,[ECX]` (Update()'s entry gate has already proved both
     // halves non-null by the time case 2 runs).
     Watchable const* const Watched = Watcher168.target();
-    void const* const Owner = reinterpret_cast<unsigned char const*>(Watched) - 8;
+    void const* const Owner = WatchableOwnerAddr(Watched);
 
     // Retail leaves these three uninitialised too -- get_dock_hardpoints fills them.
     Transform XformA;
@@ -787,9 +787,9 @@ bool LaunchBehavior::StartLaunchSequence()
 {
     // .text:062cdfa9-062cdfbc: watcher target, then target-8, both must be non-null.
     Watchable const* const Watched = Watcher168.target();
-    if (Watched == nullptr || (reinterpret_cast<unsigned char const*>(Watched) - 8) == nullptr)
+    if (Watched == nullptr || (WatchableOwnerAddr(Watched)) == nullptr)
         return false;
-    void const* const Owner = reinterpret_cast<unsigned char const*>(Watched) - 8;
+    void const* const Owner = WatchableOwnerAddr(Watched);
 
     // Retail leaves all four out-buffers uninitialised; get_dock_hardpoints fills them.
     TERMINAL_TYPE Type;

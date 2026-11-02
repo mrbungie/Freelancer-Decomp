@@ -299,7 +299,7 @@ FCliTractorBeam::FCliTractorBeam() : FEffectBase(kTractorBeamEffectType)
 FCliTractorBeam* CliTractorBeamCreate()
 {
     // 0x0052fa2b..0x0052fa66.
-    FCliTractorBeam* const Beam = static_cast<FCliTractorBeam*>(EffectAlloc(0x84u));
+    FCliTractorBeam* const Beam = static_cast<FCliTractorBeam*>(EffectAlloc(sizeof(FCliTractorBeam)));
     if (Beam == nullptr)
         return nullptr;
     ::new (Beam) FCliTractorBeam();
