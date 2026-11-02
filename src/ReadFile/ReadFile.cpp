@@ -1870,9 +1870,13 @@ namespace
             FFileSystemDesc* FsDesc = (FFileSystemDesc*)(Desc);
             char Resolved[0x105];
             if (JoinRoot(RootPath, FsDesc->Path, Resolved, 0x104) == 0)
+            {
+                if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] fs: CreateRelative JoinRoot failed root='%s' path='%s'\n", RootPath, FsDesc->Path);
                 return GR_GENERIC;
+            }
 
             const DWORD Attributes = GetFileAttributesA(Resolved);
+            if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] fs: CreateRelative root='%s' path='%s' resolved='%s' attr=%08x\n", RootPath, FsDesc->Path, Resolved, (unsigned)Attributes);
             if (Attributes == INVALID_FILE_ATTRIBUTES)
                 return GR_GENERIC;
 

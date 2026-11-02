@@ -205,6 +205,13 @@ namespace
             inner_.Owner = this;
             ability_[3] = 256ul << 20;        // video memory bytes (callers shift >> 20)
             ability_[0x11] = 0;               // no max display width
+            // Capabilities RP8 derives from D3DCAPS8, here for a modern GPU (see RP8.cpp ~1410..1440).
+            ability_[1] = 1; ability_[2] = 1;          // raster caps the gamma/blit paths test
+            ability_[4] = 1;                            // hardware transform & lighting
+            ability_[5] = 0;                            // square-only textures: no
+            ability_[6] = 256; ability_[7] = 256;       // max texture width / height (RP8 clamps to 0x100 with LimitTextureSize; BigImage tiles exactly at this size)
+            ability_[8] = 0;                            // environment mapping: not rendered yet
+            ability_[16] = 1;                           // trilinear filtering
             fldraw::Identity(worldV_); fldraw::Identity(viewV_); fldraw::Identity(projV_);
             ResetRenderStatesToDefaults();
         }

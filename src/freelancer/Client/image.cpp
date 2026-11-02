@@ -110,7 +110,7 @@ namespace
         int Open(char const* Path, uint32_t Field30)
         {
             FFileSystemDesc Desc;
-            memset(&Desc, 0, 0x34);
+            memset(&Desc, 0, sizeof(Desc));   // the host descriptor is wider than retail's 0x34 bytes; Size stays 0x34
             Desc.Size = 0x34;
             Desc.ComponentName = "FileSystem";
             Desc.Path = Path;
@@ -250,6 +250,7 @@ void Image::Release()
 bool Image::Load(char const* Path)
 {
     // FUN_00565430.
+    if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: Image::Load('%s') bigimage=%p\n", Path ? Path : "(null)", (void*)BigImage);
     char const* const Dot = strrchr(Path, '.');
     if (Dot != nullptr)
     {
@@ -348,7 +349,7 @@ bool Image::LoadTga(char const* Path)
     // 0x005654bf..0x00565536: a "FileSystem" (desc size 0x34) rooted at TgaPath under
     // DALib::Data.
     FFileSystemDesc Desc;
-    memset(&Desc, 0, 0x34);
+    memset(&Desc, 0, sizeof(Desc));   // the host descriptor is wider than retail's 0x34 bytes; Size stays 0x34
     Desc.Size = 0x34;
     Desc.ComponentName = "FileSystem";
     Desc.Path = GetIntroConfigState()->TgaPath.Text;
@@ -358,8 +359,9 @@ bool Image::LoadTga(char const* Path)
     Desc.Flags = 0x8000080u;
     Desc.Field30 = 0xffffffffu;
     IFileSystem* SubFs = nullptr;
-    if (DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc),
-                                    reinterpret_cast<void**>(&SubFs)) != 0)
+    const GENRESULT SubFsResult = DALib::Data->CreateInstance(reinterpret_cast<AGGDESC*>(&Desc), reinterpret_cast<void**>(&SubFs));
+    if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: Image::LoadTga sub-filesystem path='%s' state='%s' -> %d\n", Desc.Path ? Desc.Path : "(null)", GetIntroConfigState()->TgaPath.Text, (int)SubFsResult);
+    if (SubFsResult != 0)
     {
         // 0x0056562a: FUN_00526a20 on the holder, return false.
         if (SubFs != nullptr)
@@ -441,6 +443,7 @@ bool Image::LoadTga(char const* Path)
         // Every exit: FUN_005659b0, then FUN_00526a20 on the (already cleared) +0x10 holder.
         Mapped.Close();
     }
+    if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: Image::LoadTga('%s') tgaPath='%s' -> %d bigimage=%p\n", Path ? Path : "", GetIntroConfigState()->TgaPath.Text, (int)bResult, (void*)BigImage);
     // 0x00565756..0x0056576c / 0x00565794..0x005657aa: release the sub filesystem.
     if (SubFs != nullptr)
         SubFs->Release();

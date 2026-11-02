@@ -63,15 +63,19 @@ namespace
         // through GetFileSysPath against DALib::Data a second time; the result is opened.
         char ResolvedPath[MAX_PATH];
         GetFileSysPath(ResolvedPath, IntroIniPath, DALib::Data);
-        if (!Reader.open(ResolvedPath, false))
+        const bool bOpened = Reader.open(ResolvedPath, false);
+        if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: intro.ini '%s' (arg '%s') opened=%d\n", ResolvedPath, IntroIniPath ? IntroIniPath : "", (int)bOpened);
+        if (!bOpened)
             return;
 
         while (Reader.read_header())
         {
+            if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: intro.ini header\n");
             if (Reader.is_header("Images") && Reader.read_value())
             {
                 do
                 {
+                    if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: intro.ini value is_TgaPath=%d str='%s'\n", (int)Reader.is_value("TgaPath"), Reader.get_value_string() ? Reader.get_value_string() : "(null)");
                     if (Reader.is_value("TgaPath"))
                         ReadIntroPathValue(Reader, GIntroConfigState.TgaPath);
                     else if (Reader.is_value("ScreenType"))
@@ -96,6 +100,7 @@ namespace
             }
         }
 
+        if (getenv("FL_TRACE_UI")) fprintf(stderr, "[fl] ui: intro.ini TgaPath='%s' Screen1='%s' len=%d\n", GIntroConfigState.TgaPath.Text, GIntroConfigState.Screen[0].Text, (int)GIntroConfigState.TgaPath.Length);
         // 00564e5c..00564e97: the logo name, bounded at 0x3f chars, and its length.
         GIntroConfigState.Logo.Length =
             CopyBoundedString(GIntroConfigState.Logo.Text, 0x40, "FRONT_freelancerlogo.tga");
