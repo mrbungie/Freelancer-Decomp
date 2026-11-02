@@ -179,7 +179,7 @@ namespace AlchemyImpl
     {
         FFxEffectObject* const Effect = new FFxEffectObject();
         IFxEffectArchetype* Archetype = nullptr;
-        const uint32_t Hash = static_cast<uint32_t>(fl::PtrToHandle(Key));
+        const uint32_t Hash = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Key));
         if (FindByHash(Hash, &Archetype) != GR_OK)
         {
             if (Archetype != nullptr)

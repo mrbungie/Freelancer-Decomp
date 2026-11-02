@@ -490,6 +490,14 @@ namespace AlchemyImpl
 
     void AppendParticleNode(FPooledParticle** Head, FPooledParticle** Tail, FPooledParticle* Node)
     {
+        if (Node == nullptr || Node == *Tail || Node == *Head)
+        {
+            static int Reported = 0;
+            if (Reported++ < 6)
+                fprintf(stderr, "[fx] AppendParticleNode: node=%p already head=%p tail=%p (caller %p)\n", (void*)Node, (void*)*Head, (void*)*Tail, __builtin_return_address(0));
+            if (Node == nullptr || Node == *Tail)
+                return;
+        }
         Node->Next = nullptr;
         Node->Prev = *Tail;
         if (*Tail != nullptr)
@@ -652,6 +660,27 @@ namespace AlchemyImpl
         *Slot = nullptr;
     }
 
+    IDAComponent* ComSlotGet(const void* Slot)
+    {
+        return static_cast<IDAComponent*>(fl::HandleToPtr(*static_cast<const uint32_t*>(Slot)));
+    }
+
+    void ComSlotSet(void* Slot, IDAComponent* Value)
+    {
+        *static_cast<uint32_t*>(Slot) = fl::PtrToHandle(Value);
+        if (Value != nullptr)
+            Value->AddRef();
+    }
+
+    void ComSlotRelease(void* Slot)
+    {
+        IDAComponent* const Current = ComSlotGet(Slot);
+        if (Current == nullptr)
+            return;
+        Current->Release();
+        *static_cast<uint32_t*>(Slot) = 0;
+    }
+
     FPooledParticle* ParticleFromUsedLink(FAppearancePool* Pool, FPoolLink* Link)
     {
         if (Pool == nullptr || Link == nullptr || Pool->Items == nullptr ||
@@ -713,7 +742,7 @@ namespace AlchemyImpl
             Axis[2] = 0.0f;
         }
         else if (Pool->Stride >= 0x34)
-            AssignComPtr(reinterpret_cast<IDAComponent**>(Item + 0x30), nullptr);
+            ComSlotSet(Item + 0x30, nullptr);
         return Particle;
     }
 
@@ -878,8 +907,14 @@ namespace AlchemyImpl
                                            const float& Dt)
     {
         FPooledParticle* Particle = Owner->InstanceListHead_;
+        uint32_t Guard = 0;
         while (Particle != nullptr)
         {
+            if (++Guard > Pool->Capacity + 8u)
+            {
+                fprintf(stderr, "[fx] IntegratePool: list longer than pool (cap=%u stride=%u live=%d) -- cycle; head=%p tail=%p cur=%p next=%p prev=%p\n", Pool->Capacity, Pool->Stride, (int)Owner->LiveInstanceCount_, (void*)Owner->InstanceListHead_, (void*)Owner->InstanceListTail_, (void*)Particle, (void*)(FPooledParticle*)Particle->Next, (void*)(FPooledParticle*)Particle->Prev);
+                break;
+            }
             Particle->Age = static_cast<float>(static_cast<double>(Dt) + Particle->Age);
             if (Particle->Age > Particle->Duration)
             {
@@ -1031,10 +1066,8 @@ namespace AlchemyImpl
         Pool->FreeCount -= 1;
         UnlinkPoolNode(&Pool->FreeHead, &Pool->FreeTail, Node);
         AppendPoolNode(&Pool->UsedHead, &Pool->UsedTail, Node);
-        const uint32_t LinkOffset = static_cast<uint32_t>(
-            reinterpret_cast<std::uintptr_t>(Node) -
-            reinterpret_cast<std::uintptr_t>(Pool->FreeNodes));
-        const uint32_t ItemOffset = (LinkOffset >> 3) * Pool->Stride;
+        // Retail links are 8 bytes (LinkOffset >> 3); host links are wider, so take the element index.
+        const uint32_t ItemOffset = static_cast<uint32_t>(Node - Pool->FreeNodes) * Pool->Stride;
         return reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(Pool->Items) +
                                        ItemOffset);
     }
@@ -1045,6 +1078,8 @@ namespace AlchemyImpl
             reinterpret_cast<std::uintptr_t>(Item) -
             reinterpret_cast<std::uintptr_t>(Pool->Items));
         const uint32_t Index = Offset / Pool->Stride;
+        if (getenv("FL_TRACE_FX") && (reinterpret_cast<std::uintptr_t>(Item) < reinterpret_cast<std::uintptr_t>(Pool->Items) || Index >= Pool->Capacity))
+            fprintf(stderr, "[fx] FreePoolItem out of pool: item=%p items=%p stride=%u cap=%u index=%u pool=%p\n", Item, Pool->Items, Pool->Stride, Pool->Capacity, Index, (void*)Pool);
         FPoolLink* const Node = &Pool->FreeNodes[Index];
         UnlinkPoolNode(&Pool->UsedHead, &Pool->UsedTail, Node);
         AppendPoolNode(&Pool->FreeHead, &Pool->FreeTail, Node);
@@ -1078,29 +1113,23 @@ namespace AlchemyImpl
         unsigned char* const Bytes = static_cast<unsigned char*>(Item);
         if (Pool == &G_PoolMesh)
         {
-            IFxMesh** const MeshSlot = reinterpret_cast<IFxMesh**>(Bytes + 0x30);
-            FPoolComponentSlotOwner<IFxMesh> MeshOwner = {MeshSlot};
-            if (*MeshSlot != nullptr)
-                (*MeshSlot)->Slot7();
-            MeshOwner.Release();
+            if (IFxMesh* const Mesh = static_cast<IFxMesh*>(ComSlotGet(Bytes + 0x30)))
+                Mesh->Slot7();
+            ComSlotRelease(Bytes + 0x30);
         }
         else if (Pool->Stride != kStridePerp && Pool->Stride >= 0x34 &&
                  Pool != &G_PoolParticle)
         {
-            ReleaseComPtr(reinterpret_cast<IDAComponent**>(Bytes + 0x30));
+            ComSlotRelease(Bytes + 0x30);
         }
         if (Pool == &G_PoolParticle)
         {
-            IFxEffect** const Life = reinterpret_cast<IFxEffect**>(Bytes + 0x6c);
-            IFxEffect** const Death = reinterpret_cast<IFxEffect**>(Bytes + 0x70);
-            FPoolComponentSlotOwner<IFxEffect> LifeOwner = {Life};
-            FPoolComponentSlotOwner<IFxEffect> DeathOwner = {Death};
-            if (*Life != nullptr)
-                (*Life)->Slot13(reinterpret_cast<void*>(7));
-            if (*Death != nullptr)
-                (*Death)->Slot13(reinterpret_cast<void*>(7));
-            DeathOwner.Release();
-            LifeOwner.Release();
+            if (IFxEffect* const Life = static_cast<IFxEffect*>(ComSlotGet(Bytes + 0x6c)))
+                Life->Slot13(reinterpret_cast<void*>(7));
+            if (IFxEffect* const Death = static_cast<IFxEffect*>(ComSlotGet(Bytes + 0x70)))
+                Death->Slot13(reinterpret_cast<void*>(7));
+            ComSlotRelease(Bytes + 0x70);
+            ComSlotRelease(Bytes + 0x6c);
         }
         FreePoolItem(Pool, Item);
     }

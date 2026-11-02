@@ -40,10 +40,13 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
     void* Node = nullptr;
     AGGDESC Desc = {8, "FxNode"};
     bool bFailed = true;
-    if (DALib::Dacom->CreateInstance(&Desc, &Node) == GR_OK)
+    GENRESULT const HrNode = DALib::Dacom->CreateInstance(&Desc, &Node);
+    if (getenv("FL_TRACE_FX")) fprintf(stderr, "[fx] CreateInstance(FxNode) hr=0x%x node=%p crc=0x%x lib=%p\n", (unsigned)HrNode, Node, (unsigned)Vis->EffectCrc, (void*)DALib::FxEffectLibrary);
+    if (HrNode == GR_OK)
     {
-        if (DALib::FxEffectLibrary->CreateEffect(Node, reinterpret_cast<void*>(Vis->EffectCrc),
-                                                 &Effect) == GR_OK)
+        GENRESULT const HrFx = DALib::FxEffectLibrary->CreateEffect(Node, reinterpret_cast<void*>(Vis->EffectCrc), &Effect);
+        if (getenv("FL_TRACE_FX")) fprintf(stderr, "[fx] CreateEffect hr=0x%x\n", (unsigned)HrFx);
+        if (HrFx == GR_OK)
         {
             void* Root = nullptr;
             DALib::Alchemy->GetRootNode(&Root);

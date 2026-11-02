@@ -1374,7 +1374,7 @@ namespace AlchemyImpl
             return;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
         const bool bStreak = (Descriptor_->Flags & 4u) != 0;
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         float ViewWorld[12];
         ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
         float FrameBlock[5];
@@ -1560,7 +1560,7 @@ namespace AlchemyImpl
     {
         const FPooledParticle* Particle = InstanceListHead_;
         const bool bFrameLookup = Texture_.FrameCount != 1 && (Descriptor_->Flags & 8u) == 0;
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         const float* const View = Camera->GetViewTransform();
         if (G_BasicGeometry3DMath == nullptr)
             G_BasicGeometry3DMath = Create3DMath();
@@ -2010,7 +2010,7 @@ namespace AlchemyImpl
             std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
         }
         std::int32_t LastFrame = -1;
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         const float* const CameraPosition = Camera->GetPosition();
         if (G_Rect3DMath == nullptr)
             G_Rect3DMath = Create3DMath();
@@ -2490,7 +2490,7 @@ namespace AlchemyImpl
         std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
 
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         const float* const View = Camera->GetViewTransform();
         if (G_Perp3DMath == nullptr)
             G_Perp3DMath = Create3DMath();
@@ -2547,7 +2547,7 @@ namespace AlchemyImpl
             std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
         }
         std::int32_t LastFrame = -1;
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         FVector CameraPosition;
         std::memcpy(&CameraPosition, Camera->GetPosition(), sizeof(CameraPosition));
         const float Scale = static_cast<float>(ForwardAppearanceSingleEval(
@@ -3027,7 +3027,7 @@ namespace AlchemyImpl
             ComputeGeneralInverseTransform(*reinterpret_cast<const FTransform*>(NodeWorldXform_),
                 InverseTemporary, InverseW);
             std::memcpy(&InverseNode, &InverseTemporary, sizeof(InverseNode));
-            ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+            ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
             std::memcpy(&CameraPosition, Camera->GetPosition(), sizeof(CameraPosition));
         }
         float FrameBlock[5];
@@ -3261,7 +3261,7 @@ namespace AlchemyImpl
         void* FrameTexture;
         std::memcpy(&FrameTexture, Texture_.Frame, sizeof(FrameTexture));
         G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         float ViewWorld[12];
         ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
         G_RenderPipeline->SetModelview(ViewWorld);
@@ -3485,7 +3485,7 @@ namespace AlchemyImpl
         if (Particle == nullptr)
             return GR_OK;
 
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         const float* CameraView = Camera->GetViewTransform();
         ComposeTransform(ViewXform_, CameraView, NodeWorldXform_);
 
@@ -3495,7 +3495,7 @@ namespace AlchemyImpl
         GetQueuedIndexCount(&IndexCount);
 
         float CameraPos[3];
-        ICamera* const PositionCamera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const PositionCamera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         std::memcpy(CameraPos, PositionCamera->GetPosition(), sizeof(CameraPos));
         float CameraDelta[3];
         StoreAlchemyFpuFloat(CameraDelta[0], static_cast<double>(CameraPos[0]) - LastCameraPos_[0]);
@@ -4239,7 +4239,7 @@ namespace AlchemyImpl
         } SavedFillMode(G_RenderPipeline, FillMode);
 
         float ViewWorld[12];
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
         G_RenderPipeline->SetModelview(ViewWorld);
     }
@@ -4471,7 +4471,7 @@ namespace AlchemyImpl
         State.PrevPos[1] = 0.0f;
         State.PrevPos[2] = 0.0f;
         float Basis[12];
-        ICamera* const Camera = reinterpret_cast<ICamera*>(static_cast<std::uintptr_t>(G_DrawCookie));
+        ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         ComposeTransform(Basis, Camera->GetOrientation(), NodeWorldXform_);
         std::memcpy(State.Xform, Basis, sizeof(Basis));
 
@@ -4983,9 +4983,7 @@ namespace AlchemyImpl
             Particle->Appearance = static_cast<FGenericFxObjectBase*>(this);
             Particle->Duration = Duration;
             Particle->Age = Age;
-            AssignComPtr(reinterpret_cast<IDAComponent**>(
-                             reinterpret_cast<unsigned char*>(Particle) + 0x30),
-                         LocalMesh);
+            ComSlotSet(reinterpret_cast<unsigned char*>(Particle) + 0x30, LocalMesh);
             Particle->InvDuration = 1.0f / Particle->Duration;
         }
 
@@ -5061,8 +5059,8 @@ namespace AlchemyImpl
                 Particle->PosX += Step[0];
                 Particle->PosY += Step[1];
                 Particle->PosZ += Step[2];
-                IFxMesh* const ParticleMesh = *reinterpret_cast<IFxMesh**>(
-                    reinterpret_cast<unsigned char*>(Particle) + 0x30);
+                IFxMesh* const ParticleMesh = static_cast<IFxMesh*>(ComSlotGet(
+                    reinterpret_cast<unsigned char*>(Particle) + 0x30));
                 ParticleMesh->Slot5(reinterpret_cast<void*>(static_cast<std::uintptr_t>(DtBits)));
                 Particle = Particle->Next;
             }
@@ -5111,8 +5109,8 @@ namespace AlchemyImpl
         FPooledParticle* Item = InstanceListHead_;
         while (Item != nullptr)
         {
-            IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
+            IFxMesh* const Mesh = static_cast<IFxMesh*>(ComSlotGet(
+                reinterpret_cast<unsigned char*>(Item) + 0x30));
             if (Mesh != nullptr)
             {
                 I3DMathEngine* const Math = Acquire3DMath();
@@ -5170,9 +5168,9 @@ namespace AlchemyImpl
         FPooledParticle* Item = InstanceListHead_;
         while (Item != nullptr)
         {
-            IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
-            Mesh->Slot6(reinterpret_cast<void*>(static_cast<std::uintptr_t>(G_DrawCookie)));
+            IFxMesh* const Mesh = static_cast<IFxMesh*>(ComSlotGet(
+                reinterpret_cast<unsigned char*>(Item) + 0x30));
+            Mesh->Slot6(fl::HandleToPtr(G_DrawCookie));
             Item = Item->Next;
         }
         return GR_OK;

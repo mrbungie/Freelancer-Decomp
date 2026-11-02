@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #pragma once
+#include "fl/handles.h"
 
 #include "dacom.h"
 #include "alchemy.h"
@@ -156,9 +157,10 @@ namespace AlchemyImpl
     // text here called the slots child ramps and the construction an open gap.)
     struct FPooledParticle
     {
-        FPooledParticle* Next;
-        FPooledParticle* Prev;
-        FGenericFxObjectBase* Appearance;
+        // Retail 4-byte pointer slots (pool strides are retail byte counts): handles, not raw pointers.
+        fl::Slot32<FPooledParticle> Next;
+        fl::Slot32<FPooledParticle> Prev;
+        fl::Slot32<FGenericFxObjectBase> Appearance;
         float PosX;
         float PosY;
         float PosZ;

@@ -238,6 +238,11 @@ namespace AlchemyImpl
     // ---- COM-pointer helpers ----------------------------------------------
     IDAComponent** AssignComPtr(IDAComponent** Slot, IDAComponent* Value);
     void ReleaseComPtr(IDAComponent** Slot);
+    // Pool items keep COM pointers in retail 4-byte slots (+0x30 mesh/beam, +0x6c/+0x70 life/death effects):
+    // the slot holds a handle, not a host pointer.
+    IDAComponent* ComSlotGet(const void* Slot);
+    void ComSlotSet(void* Slot, IDAComponent* Value);   // stores, AddRefs (no release of the old value, as AssignComPtr)
+    void ComSlotRelease(void* Slot);                    // Release + zero
     // Typed Release-and-null for a smart-pointer member (the FUN_0620a010 /
     // FUN_06209ff0 / FUN_0620a030 / FUN_0620a0d0 family: release a non-null pointer, null
     // the slot).
