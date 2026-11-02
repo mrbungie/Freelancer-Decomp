@@ -6,6 +6,10 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include "metal_bridge.h"
+#import <ImageIO/ImageIO.h>
+#import <CoreServices/CoreServices.h>
+#include <string>
+#include <mutex>
 
 namespace flmetal
 {
@@ -27,7 +31,7 @@ namespace flmetal
         if (!c->device) { delete c; return nullptr; }
         c->layer.device = c->device;
         c->layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-        c->layer.framebufferOnly = YES;
+        c->layer.framebufferOnly = NO;   // readable, so FL_CONTROL 'shot' can grab the frame
         return c;
     }
 
@@ -58,4 +62,43 @@ namespace flmetal
     }
 
     void Destroy(Context* c) { delete c; }
+
+    // ---- framebuffer capture (debug): the game writes its own frame to a PNG, no window grab needed ----
+    static std::mutex g_capMutex;
+    static std::string g_capPath;
+    void RequestCapture(const char* path) { std::lock_guard<std::mutex> l(g_capMutex); g_capPath = path ? path : ""; }
+
+    // Call right after sg_commit(): sokol has queued the frame and presented it; a blit queued behind it on
+    // the same command queue sees the finished image.
+    void CaptureIfRequested(Context* c, const void* sokolQueue)
+    {
+        std::string path;
+        { std::lock_guard<std::mutex> l(g_capMutex); path.swap(g_capPath); }
+        if (path.empty() || !c->drawable || !sokolQueue) return;
+        id<MTLTexture> src = c->drawable.texture;
+        NSUInteger w = src.width, h = src.height;
+        MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                                     width:w height:h mipmapped:NO];
+        d.storageMode = MTLStorageModeShared;
+        id<MTLTexture> dst = [c->device newTextureWithDescriptor:d];
+        id<MTLCommandQueue> q = (__bridge id<MTLCommandQueue>)sokolQueue;
+        id<MTLCommandBuffer> cb = [q commandBuffer];
+        id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+        [blit copyFromTexture:src toTexture:dst];
+        [blit endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+        std::string px(w * h * 4, 0);
+        [dst getBytes:px.data() bytesPerRow:w * 4 fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        CGContextRef g = CGBitmapContextCreate(px.data(), w, h, 8, w * 4, cs,
+                                               kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
+        CGImageRef img = CGBitmapContextCreateImage(g);
+        NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]];
+        CGImageDestinationRef dest = CGImageDestinationCreateWithURL((__bridge CFURLRef)url, kUTTypePNG, 1, nullptr);
+        CGImageDestinationAddImage(dest, img, nullptr);
+        CGImageDestinationFinalize(dest);
+        CFRelease(dest); CGImageRelease(img); CGContextRelease(g); CGColorSpaceRelease(cs);
+        fprintf(stderr, "[fl] captured %s\n", path.c_str());
+    }
 }

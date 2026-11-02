@@ -683,6 +683,13 @@ int MenuStateDriverUpdate(FMenuNavState* Nav, float DeltaSeconds)
     int TransitionCode = 0; // [esp+0x18]
     bool bDidEnter = false; // BL
 
+#ifdef FREELANCER_PORTABLE
+    {   // Development hook (not in retail): FL_MENU_STATE=N jumps the menu to state N once it has settled.
+        static const char* Jump = getenv("FL_MENU_STATE");
+        if (Jump && Nav->CurrentState == Nav->PrevState) { Nav->CurrentState = atoi(Jump); Jump = nullptr; }
+    }
+#endif
+
     // 0x00573ed8..0x00573f53: leave the old state, enter the new one, until it settles.
     while (Nav->CurrentState != Nav->PrevState)
     {

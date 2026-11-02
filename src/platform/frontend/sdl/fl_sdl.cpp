@@ -56,6 +56,7 @@ static bool g_relMouse = false;   // pointer captured (DirectInput exclusive): o
 static std::atomic<bool> g_ctlActive{false};
 static std::atomic<int> g_ctlX{0}, g_ctlY{0}, g_ctlDx{0}, g_ctlDy{0};
 static std::atomic<unsigned> g_ctlButtons{0}, g_ctlLatch{0};
+#include "../../render/sokol/metal_bridge.h"
 static void CtlMove(int x, int y)
 {
     g_ctlDx += x - g_ctlX.load(); g_ctlDy += y - g_ctlY.load();
@@ -81,6 +82,7 @@ static void ControlThread(std::string path)
                 g_ctlButtons = 1; g_ctlLatch = 1; usleep(120000); g_ctlButtons = 0;
                 fprintf(stderr, "[ctl] click %d %d\n", a, b);
             }
+            else if (!strcmp(cmd, "shot")) { char path[256] = "/tmp/fl_shot.png"; sscanf(line, "%*s %255s", path); flmetal::RequestCapture(path); }
             else if (n >= 1 && !strcmp(cmd, "quit")) { SDL_Event e; SDL_zero(e); e.type = SDL_QUIT; SDL_PushEvent(&e); }
         }
         fclose(f);

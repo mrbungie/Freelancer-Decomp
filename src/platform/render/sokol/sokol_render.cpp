@@ -884,6 +884,7 @@ namespace
             if (!passOpen_) { clearPending_ = true; BeginPassIfNeeded(); }
             EndPassIfOpen();
             sg_commit();
+            flmetal::CaptureIfRequested(metal_, sg_mtl_command_queue());
             for (sg_buffer b : garbage_) sg_destroy_buffer(b);
             garbage_.clear();
             for (auto& kv : poolVb_) kv.second->count = 0;

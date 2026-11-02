@@ -11,4 +11,6 @@ namespace flmetal
     // Returns false when no drawable is available (skip the frame).
     bool BeginFrame(Context*, int w, int h, const void** drawable, const void** depthStencil);
     void Destroy(Context*);
+    void RequestCapture(const char* path);                     // next presented frame is written to a PNG
+    void CaptureIfRequested(Context*, const void* sokolQueue); // call right after sg_commit()
 }
