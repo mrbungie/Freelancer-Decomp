@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #pragma once
+#include "fl/handles.h"
 
 #include "common_exports.h"
 #include "common_behavior.h"  // Behavior, FormationMoveFx
@@ -546,7 +547,7 @@ public:
     int ModeSelector0xc;        // +0x0c. FUN_062d20d0 sets =1; EvaluateReadiness() also writes it.
     int UpdateResult10;         // +0x10. Update()'s own tri-state result (EDI at return); FUN_062d20d0 sets =1.
     void* OwnerContext;         // +0x14. Set by SetContext() (Param1); null-checked by Update().
-    IObjDB* ObjectDb;           // +0x18, formerly Opaque18. Written only by Behavior::Slot2
+    fl::Slot32<IObjDB> ObjectDb;           // +0x18, formerly Opaque18. Written only by Behavior::Slot2
                                 // (.text:0629afd0, the manager's IObjDB; see common_behavior.h).
     float DeltaTime;            // +0x1c. Zeroed by FUN_062d20d0; read constantly by Update().
     // +0x20. Same role/offset as IdleBehavior::BehaviorMgrPtr20 (shared initializer).
