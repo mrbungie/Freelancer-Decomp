@@ -459,8 +459,11 @@ namespace
     };
 } // namespace
 
-COMMON_API bool __cdecl JointEnumCallback(int32_t Param1, int32_t Param2, struct JointInfo const* Joint, void* Context)
+COMMON_API bool __cdecl JointEnumCallback(void* ParentHandle, void* ChildHandle, struct JointInfo const* Joint, void* Context)
 {
+    // The engine hands over its archetype handles as pointers; Common carries them as 32-bit handles.
+    int32_t const Param1 = static_cast<int32_t>(fl::PtrToHandle(ParentHandle));
+    int32_t const Param2 = static_cast<int32_t>(fl::PtrToHandle(ChildHandle));
     unsigned char JointCopy[0x5c];
     if (Joint != nullptr)
         memcpy(JointCopy, Joint, sizeof(JointCopy));
