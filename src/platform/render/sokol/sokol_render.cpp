@@ -479,8 +479,8 @@ namespace
             if (!sgReady_ || !verts || nverts == 0) return GR_GENERIC;
             const fldraw::FvfLayout L = fldraw::MakeLayout(fvf);
             if (!L.pos || L.stride == 0) return GR_GENERIC;
-            if (TraceCam()) fprintf(stderr, "[cam] draw fvf=0x%x n=%u tex0=%p world.t=(%g %g %g)\n", fvf, nverts, stageTex_[0], worldV_[12], worldV_[13], worldV_[14]);
-            if (TraceCam() && !L.rhw && (fvf == 0x102 || fvf == 0x142))
+            if (TraceCam()) fprintf(stderr, "[cam] draw fvf=0x%x n=%u tex0=%p world.t=(%g %g %g) view.t=(%g %g %g) viewRaw=[%g %g %g | %g %g %g | %g %g %g]\n", fvf, nverts, stageTex_[0], worldV_[12], worldV_[13], worldV_[14], viewV_[12], viewV_[13], viewV_[14], viewRaw_[0], viewRaw_[1], viewRaw_[2], viewRaw_[3], viewRaw_[4], viewRaw_[5], viewRaw_[9], viewRaw_[10], viewRaw_[11]);
+            if (TraceCam() && !L.rhw && (fvf == 0x102 || fvf == 0x142 || fvf == 0x112))
             {   // NDC bounding box of the mesh under the current world/view/projection
                 float wv[16], m[16]; fldraw::Mul(wv, worldV_, viewV_); fldraw::Mul(m, wv, projV_);
                 float mnx = 1e30f, mny = 1e30f, mxx = -1e30f, mxy = -1e30f; unsigned front = 0;

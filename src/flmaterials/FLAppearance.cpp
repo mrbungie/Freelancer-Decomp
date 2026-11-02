@@ -1114,6 +1114,7 @@ namespace
         FCameraBlob* Camera = (FCameraBlob*)Scratch88_;
         IDAComponent* const Override = G_Overrides[5];
         Camera->BindArg(A, 1, 0);
+        if (getenv("FL_TRACE_RENDER")) fprintf(stderr, "[fl] DrawBackdrop A=%p Extra=%p byte9=%d\n", A, Extra, (int)Camera->Byte9());
         CallSetPerspective(Pipeline_, Camera);
         FillLocalAxes(Camera);
         if (Camera->Byte9() != 0)
