@@ -1,6 +1,16 @@
 // win_compat.h - High-fidelity Win32 compatibility layer for macOS / POSIX
 #pragma once
 
+// MSVCRT rand() is 15 bits (RAND_MAX 32767); retail code scales with `rand() * N / 32768`, which
+// overflows with the 31-bit libc generator. Same call sites, retail's range.
+#include <cstdlib>
+namespace std { inline int FlRand15() { return static_cast<int>(::random() & 0x7fff); } }
+inline int FlRand15() { return std::FlRand15(); }
+#define rand FlRand15
+#undef RAND_MAX
+#define RAND_MAX 32767
+
+
 #ifndef _WIN32
 
 #include <cstdint>
