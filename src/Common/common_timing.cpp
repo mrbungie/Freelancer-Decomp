@@ -9,6 +9,9 @@
 #include "dacom.h" // FDUMP
 
 #include <cmath>
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
 #include <cstddef>
 #include <intrin.h>
 #include <windows.h>
@@ -90,6 +93,19 @@ namespace
     // the delta reaches the x87 stack through FILD qword (signed).
     double TestClockSpeed()
     {
+#if defined(__aarch64__) && defined(__APPLE__)
+        // arm64 has no cycle counter equivalent to RDTSC: cntvct_el0 ticks at a fixed
+        // 24 MHz, which would grade every machine as ancient. Ask the OS for the CPU
+        // frequency; Apple Silicon does not expose one, so fall back to a nominal value
+        // well above the 1000 MHz top threshold used by the callers.
+        {
+            unsigned long long Hz = 0;
+            size_t Len = sizeof(Hz);
+            if (sysctlbyname("hw.cpufrequency_max", &Hz, &Len, nullptr, 0) != 0 || Hz == 0)
+                Hz = 3200000000ull;
+            return (double)Hz;
+        }
+#endif
         for (int Round = 0; Round <= 0x18; ++Round)
         {
             double Samples[6];
