@@ -2071,7 +2071,7 @@ void FCliGunFx::notify(Event Code, void* Param)
         if (TurretVoice != nullptr)
         {
             ID_String const* const MotionSound = reinterpret_cast<ID_String const*>(
-                reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0x84);
+                reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + Archetype::CliObjDerivedOffset(0x84));
             if (!MotionSound->IsEmpty())
                 UnloadClientSoundArch(MotionSound);
         }
@@ -2095,7 +2095,7 @@ bool FCliGunFx::Update(float Dt)
             if (Voice != nullptr)
             {
                 ID_String const* const MotionSound = reinterpret_cast<ID_String const*>(
-                    reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + 0x84);
+                    reinterpret_cast<unsigned char const*>(Equip->Arch->Companion) + Archetype::CliObjDerivedOffset(0x84));
                 Voice->Start(LookupClientSoundArch(MotionSound), 0);
             }
         }
@@ -2150,7 +2150,7 @@ namespace
         unsigned char const* const LauncherComp =
             reinterpret_cast<unsigned char const*>(Launch->Arch->Companion);
         ID_String const* const DryFireSound =
-            reinterpret_cast<ID_String const*>(LauncherComp + 0x80);
+            reinterpret_cast<ID_String const*>(LauncherComp + Archetype::CliObjDerivedOffset(0x80));
         if (!DryFireSound->IsEmpty())
         {
             Wrapper->DryFireSoundArch = LookupClientSoundArch(DryFireSound);
@@ -2165,7 +2165,7 @@ namespace
         unsigned char const* const MunitionComp =
             reinterpret_cast<unsigned char const*>(Munition->Companion);
         ID_String const* const OneShotSound =
-            reinterpret_cast<ID_String const*>(MunitionComp + 0x5c);
+            reinterpret_cast<ID_String const*>(MunitionComp + Archetype::CliObjDerivedOffset(0x5c));
         if (!OneShotSound->IsEmpty())
         {
             Wrapper->OneShotSoundArch = LookupClientSoundArch(OneShotSound);
@@ -2176,7 +2176,7 @@ namespace
         // 0x0052c95f..0x0052c9d2: its const_effect (+0x58); non-empty -> FUN_0040f080 into
         // +0x20, referenced (FUN_0040e960(1)) when found, else the FDUMP at line 0x51.
         ID_String const* const ConstEffect =
-            reinterpret_cast<ID_String const*>(MunitionComp + 0x58);
+            reinterpret_cast<ID_String const*>(MunitionComp + Archetype::CliObjDerivedOffset(0x58));
         if (!ConstEffect->IsEmpty())
         {
             Wrapper->ConstEffectArch = FindEffectArch(&ConstEffect->Id);
@@ -2237,7 +2237,7 @@ FCliLauncherFx* CliGunEquipFxConstruct(CEquip* Equip, void* Host)
     // 0x0052d8b1..0x0052d8e5: the gun companion's turret sound (+0x84, companion not tested)
     // must be non-empty and DALib::Sound live.
     ID_String const* const TurretSound = reinterpret_cast<ID_String const*>(
-        reinterpret_cast<unsigned char const*>(Wrapper->Equip->Arch->Companion) + 0x84);
+        reinterpret_cast<unsigned char const*>(Wrapper->Equip->Arch->Companion) + Archetype::CliObjDerivedOffset(0x84));
     if (!TurretSound->IsEmpty() && DALib::Sound != nullptr)
     {
         // 0x0052d8fe: FUN_00427a10(&sound, 1) -- look up and Acquire; the result is not read.

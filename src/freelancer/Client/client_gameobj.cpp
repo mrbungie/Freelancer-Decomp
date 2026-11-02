@@ -2818,7 +2818,7 @@ void FClientShipGameobj::Slot170()
     // (0x503) with no null test of the result.
     CShip* const Ship = static_cast<CShip*>(NarrowObject(this, CObject::ClassShip));
     AttachPilotMesh(reinterpret_cast<ID_String const*>(
-        reinterpret_cast<unsigned char const*>(Ship->Archetype->Companion) + 0x64));
+        reinterpret_cast<unsigned char const*>(Ship->Archetype->Companion) + Archetype::CliObjDerivedOffset(0x64)));
 
     // 0x00544806..0x00544846: the local player's ship (the CShip's +0xb4 against DAT_00673344)
     // gets its behaviour interface for the "Player" state graph.

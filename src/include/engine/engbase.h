@@ -173,7 +173,7 @@ inline void* AsOpaqueDword(float Value)
 
 inline void* AsOpaqueDword(int Value)
 {
-    return (void*)((ptrdiff_t)Value);
+    return (void*)fl::HandleToPtr(static_cast<uint32_t>(Value));   // retail dword token -> host pointer (handles, -1, small ids)
 }
 
 inline void* AsOpaqueDword(uint32_t Value)

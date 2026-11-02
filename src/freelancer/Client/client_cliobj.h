@@ -85,6 +85,10 @@ namespace Archetype
     // The companion (ICliObj) fields and methods other client code reads by raw offset in
     // retail: +0x10 the envmap material name (CacheString), +0x20 the material path list, and
     // FUN_00406cd0, the explicit-parameter LOD recompute.
+    // Retail offset (>= 0x54, the first field of a derived companion) -> byte offset in this build's object:
+    // the FCliObj base is wider here (8-byte vptr and pointers) and the derived fields follow it unchanged.
+    // Raw readers of derived companion fields must add this instead of the retail constant.
+    unsigned CliObjDerivedOffset(unsigned RetailOffset);
     char const* CliObjEnvmapMaterial(ICliObj* Companion);
     FCliVc6Vector<FCliMaterialPathPair> const* CliObjMaterialPaths(ICliObj* Companion);
     // A solar archetype's companion (CliSolar) +0x60: its shape_name text. Companion must be a

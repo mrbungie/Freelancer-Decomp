@@ -4570,6 +4570,12 @@ namespace Archetype
         return &static_cast<FCliObj*>(Companion)->MaterialPaths;
     }
 
+    unsigned CliObjDerivedOffset(unsigned RetailOffset)
+    {
+        // The first derived field sits right after the base's data size (tail padding is reused), not sizeof(FCliObj).
+        return RetailOffset - 0x54u + static_cast<unsigned>(offsetof(FCliTractor, Color));
+    }
+
     char const* CliSolarShapeName(ICliObj* Companion)
     {
         // Companion +0x60 (e.g. the nav map's FUN_004917c0 at 0x00491aa2..0x00491ab9).
