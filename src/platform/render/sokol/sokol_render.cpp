@@ -328,6 +328,17 @@ namespace
                 }
                 lw = lw > 1 ? lw / 2 : 1; lh = lh > 1 ? lh / 2 : 1;
             }
+            if (getenv("FL_DUMP_TEX") && !IsDxt(t->format))
+            {   // debug: 32-bit BMP of level 0 (BGRA, top-down)
+                static int idx = 0; char path[128]; snprintf(path, sizeof(path), "/tmp/texdump/%02d_%ux%u_f%u.bmp", idx++, t->width, t->height, t->format);
+                if (FILE* f = fopen(path, "wb"))
+                {
+                    const uint32_t sz = 54 + t->width * t->height * 4; uint8_t h[54] = {'B','M'};
+                    memcpy(h + 2, &sz, 4); const uint32_t off = 54, hs = 40, w = t->width, hh = (uint32_t)(-(int)t->height); const uint16_t pl = 1, bp = 32;
+                    memcpy(h + 10, &off, 4); memcpy(h + 14, &hs, 4); memcpy(h + 18, &w, 4); memcpy(h + 22, &hh, 4); memcpy(h + 26, &pl, 2); memcpy(h + 28, &bp, 2);
+                    fwrite(h, 1, 54, f); fwrite(blob.data(), 1, (size_t)t->width * t->height * 4, f); fclose(f);
+                }
+            }
             sg_image_desc id = {};
             id.type = SG_IMAGETYPE_2D; id.width = (int)t->width; id.height = (int)t->height; id.num_mipmaps = (int)levels;
             id.pixel_format = gf; id.data.ptr = blob.data(); id.data.size = blob.size();
@@ -582,8 +593,10 @@ namespace
                 if (seen.insert({stageTex_[0], stageTex_[1]}).second)
                 {
                     auto fmtOf = [&](void* h) { FTexture* t = (FTexture*)h; return (t && textures_.count(t)) ? (int)t->format : -1; };
+                    if (fvf == 0x102) fprintf(stderr, "[fl] pass-mats: world.t=(%g %g %g) world.diag=(%g %g %g) view.t=(%g %g %g) proj=[%g %g %g %g | %g %g %g %g] vp=%d,%d,%d,%d z=%g..%g\n", worldV_[12], worldV_[13], worldV_[14], worldV_[0], worldV_[5], worldV_[10], viewV_[12], viewV_[13], viewV_[14], projV_[0], projV_[5], projV_[10], projV_[11], projV_[12], projV_[13], projV_[14], projV_[15], vpX_, vpY_, vpW_, vpH_, depthMin_, depthMax_);
                     fprintf(stderr, "[fl] pass: fvf=0x%x tex0=%p(fmt %d) tex1=%p(fmt %d) c0=%d/%d/%d a0=%d c1=%d/%d/%d a1=%d lit=%d n=%u\n", fvf, stageTex_[0], fmtOf(stageTex_[0]), stageTex_[1], fmtOf(stageTex_[1]),
                             stageState_[0][1], stageState_[0][2], stageState_[0][3], stageState_[0][4], stageState_[1][1], stageState_[1][2], stageState_[1][3], stageState_[1][4], renderState_[137], count);
+                    fprintf(stderr, "        blend=%d src=%d dst=%d atest=%d(func %d ref %d) zen=%d zfunc=%d zwrite=%d cull=%d lit=%d tfactor=%08x\n", renderState_[27], renderState_[19], renderState_[20], renderState_[15], renderState_[25], renderState_[24], renderState_[7], renderState_[23], renderState_[14], renderState_[22], renderState_[137], (unsigned)renderState_[60]);
                 }
             }
             if (getenv("FL_TRACE_QUADS") && fvf == 0x1c4)
@@ -1011,12 +1024,12 @@ namespace
                 unsigned char* d = dst.data() + (size_t)y * lw * db;
                 if (sf == t->format) { memcpy(d, sp, (size_t)cw * db); continue; }
                 if (t->format == 7 && sf == 1 && palette)
-                {   // P8: 256 colour words
+                {   // P8: RP8 reads the palette as 256 RGB triples (3 bytes per entry) with flags 0xff
                     const unsigned char* pal = (const unsigned char*)palette;
                     for (unsigned x = 0; x < cw; ++x)
                     {
-                        const unsigned char* e = pal + 4u * sp[x];
-                        d[x * 4 + 0] = e[0]; d[x * 4 + 1] = e[1]; d[x * 4 + 2] = e[2]; d[x * 4 + 3] = 255;   // palette entries are 0xAARRGGBB words (B,G,R,A in memory)
+                        const unsigned char* e = pal + 3u * sp[x];
+                        d[x * 4 + 0] = e[2]; d[x * 4 + 1] = e[1]; d[x * 4 + 2] = e[0]; d[x * 4 + 3] = 255;
                     }
                     continue;
                 }
@@ -1042,7 +1055,18 @@ namespace
             info->Width = H[4];
             info->Depth = 1;
             info->MipLevels = (H[2] & 0x20000) && H[7] ? H[7] : 1;   // DDSD_MIPMAPCOUNT
-            info->Format = (D3DFORMAT)((H[0x50 / 4] & 4) ? H[0x54 / 4] : 21 /* uncompressed: A8R8G8B8 */);
+            if (H[0x50 / 4] & 4) info->Format = (D3DFORMAT)H[0x54 / 4];   // FourCC (DXTn)
+            else
+            {   // uncompressed: the D3D format follows from the pixel format's bit count and channel masks
+                const uint32_t bits = H[0x58 / 4], rm = H[0x5C / 4], gm = H[0x60 / 4], am = H[0x68 / 4];
+                (void)rm;
+                uint32_t f = 21;                                    // A8R8G8B8
+                if (bits == 32) f = (H[0x50 / 4] & 1) && am ? 21 : 22;   // A8R8G8B8 / X8R8G8B8
+                else if (bits == 24) f = 20;                        // R8G8B8
+                else if (bits == 16) f = gm == 0x07E0 ? 23 : (am == 0x8000 ? 25 : (am == 0xF000 ? 26 : 24));   // R5G6B5 / A1R5G5B5 / A4R4G4B4 / X1R5G5B5
+                else if (bits == 8) f = 41;                         // P8
+                info->Format = (D3DFORMAT)f;
+            }
             info->ResourceType = (D3DRESOURCETYPE)((H[0x70 / 4] & 0x200) ? 5 : 3);   // cube map : texture
             info->ImageFileFormat = (D3DXIMAGE_FILEFORMAT)4;                         // D3DXIFF_DDS
             return GR_OK;

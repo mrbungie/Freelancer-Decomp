@@ -1054,6 +1054,7 @@ GENRESULT FTextureLibrary::LoadDdsTexture(IFileSystem* FileSystem, const char* N
     SelectTextureDimensions(Width, Height, &DestinationWidth, &DestinationHeight);
     uint32_t TargetFormat = D3dFormatToTextureFormat(0);
     PickGpuFormat(&SourceFormat, &TargetFormat);
+    if (getenv("FL_TRACE_TEX")) fprintf(stderr, "[fl] dds: '%s' %ux%u src=%u target=%u levels=%u pitchflag=%d\n", Name, DestinationWidth, DestinationHeight, SourceFormat, TargetFormat, Levels, (int)bPitch);
     unsigned int GpuFormat = TargetFormat;
     void* Handle = nullptr;
     if (Pipeline->CreateTexture(DestinationWidth, DestinationHeight, &GpuFormat, Levels, 0, &Handle) < 0)
@@ -1258,6 +1259,8 @@ GENRESULT FTextureLibrary::LoadTgaTexture(IFileSystem* FileSystem, const char* N
         const int Height = (short)ReadU16(Blob, 14);
         const uint32_t Pitch = ((TextureFormatDescriptor(UploadFormat)->BitsPerPixel + 7) >> 3) * Width;
         unsigned int Format = UploadFormat;
+        if (getenv("FL_TRACE_TEX") && Level == 0)
+            fprintf(stderr, "[fl] tga: '%s' %dx%d fmt=%u pitch=%u type=%u bpp=%u origin=%02x\n", Name, Width, Height, UploadFormat, Pitch, Blob[2], Blob[16], Blob[17]);
         const GENRESULT Result = Pipeline->SetTextureLevelData(Handle, Level, Width, Height, Pitch,
             &Format, Pixels, nullptr, UploadFormat == 1 ? Palette : nullptr);
         delete[] Pixels;
