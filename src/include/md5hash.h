@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <windows.h>
+
 // Preserve per-module class exports for header-defined members; bodies live in DALib.
 #if defined(DALIB_EXPORTS) || defined(COMMON_EXPORTS) || defined(SERVER_EXPORTS) || defined(FREELANCER_EXPORTS)
 #define MD5HASH_API __declspec(dllexport)

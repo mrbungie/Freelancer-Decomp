@@ -86,6 +86,7 @@ namespace
     // Stores precede the next component source reads, including aliased calls.
     void MulVecByMatrix(FVector& Dst, const FMatrix& Matrix, const FVector& Source)
     {
+#if defined(_M_IX86) && defined(_MSC_VER)
         float* ResultVector = &Dst.X;
         const float* MatrixValues = &Matrix.D[0][0];
         const float* SourceVector = &Source.X;
@@ -123,12 +124,18 @@ namespace
             faddp st(1), st(0)
             fstp dword ptr [edx + 8]
         }
+#else
+        Dst.X = Matrix.D[0][2] * Source.Z + Matrix.D[0][1] * Source.Y + Matrix.D[0][0] * Source.X;
+        Dst.Y = Matrix.D[1][2] * Source.Z + Matrix.D[1][0] * Source.X + Matrix.D[1][1] * Source.Y;
+        Dst.Z = Matrix.D[2][2] * Source.Z + Matrix.D[2][0] * Source.X + Matrix.D[2][1] * Source.Y;
+#endif
     }
 
     // LAB_06f718f0: shared InverseRotate/TransposeTransform body. Each
     // output float is stored before the next component reads the source.
     void MulVecByTranspose(FVector& Dst, const FMatrix& Matrix, const FVector& Source)
     {
+#if defined(_M_IX86) && defined(_MSC_VER)
         float* ResultVector = &Dst.X;
         const float* MatrixValues = &Matrix.D[0][0];
         const float* SourceVector = &Source.X;
@@ -166,6 +173,11 @@ namespace
             faddp st(1), st(0)
             fstp dword ptr [edx + 8]
         }
+#else
+        Dst.X = Matrix.D[2][0] * Source.Z + Matrix.D[1][0] * Source.Y + Matrix.D[0][0] * Source.X;
+        Dst.Y = Matrix.D[2][1] * Source.Z + Matrix.D[0][1] * Source.X + Matrix.D[1][1] * Source.Y;
+        Dst.Z = Matrix.D[2][2] * Source.Z + Matrix.D[0][2] * Source.X + Matrix.D[1][2] * Source.Y;
+#endif
     }
 
     void TransposeMatrix(FMatrix& Dst, const FMatrix& Source)
@@ -617,9 +629,11 @@ namespace
     static_assert(offsetof(FFastDot, A) == 0, "FastDot A");
     static_assert(offsetof(FFastDot, B) == 4, "FastDot B");
     static_assert(offsetof(FFastDot, C) == 8, "FastDot C");
+#if defined(_M_IX86) || defined(__i386__)
     static_assert(offsetof(FFastDot, Kernel) == 0xC, "retail kernel @ +0xC");
     static_assert(offsetof(FFastDot, SavedOps) == 0x10, "retail saved-ops @ +0x10");
     static_assert(sizeof(FFastDotKernel) == 4, "MSVC simple-class member pointer is a code address");
+#endif
 
     // Ordinary C++ member dispatch; the native result/store boundary is
     // checked against 71ab4..71ad2 and 72110..7213c.
@@ -791,6 +805,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     {
         // LAB_06f716f0: literal row/translation interleave and x87 sum order.
         // Input words are read after each output store, including aliased calls.
+#if defined(_M_IX86) && defined(_MSC_VER)
         float* ResultTransform = &Dst.Rotation.D[0][0];
         const float* LeftTransform = &A.Rotation.D[0][0];
         const float* RightTransform = &B.Rotation.D[0][0];
@@ -912,6 +927,20 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             xor eax, eax
             fstp dword ptr [edx + 02ch]
         }
+#else
+        FTransform Result;
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                Result.Rotation.D[i][j] = A.Rotation.D[i][0] * B.Rotation.D[0][j] +
+                                          A.Rotation.D[i][1] * B.Rotation.D[1][j] +
+                                          A.Rotation.D[i][2] * B.Rotation.D[2][j];
+            }
+        }
+        Result.Translation.X = A.Rotation.D[0][0] * B.Translation.X + A.Rotation.D[0][1] * B.Translation.Y + A.Rotation.D[0][2] * B.Translation.Z + A.Translation.X;
+        Result.Translation.Y = A.Rotation.D[1][0] * B.Translation.X + A.Rotation.D[1][1] * B.Translation.Y + A.Rotation.D[1][2] * B.Translation.Z + A.Translation.Y;
+        Result.Translation.Z = A.Rotation.D[2][0] * B.Translation.X + A.Rotation.D[2][1] * B.Translation.Y + A.Rotation.D[2][2] * B.Translation.Z + A.Translation.Z;
+        Dst = Result;
+#endif
         return GR_OK;
     }
 
@@ -919,6 +948,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     {
         // 71670..716e1: literal x87 loop, preserving product/add/store order
         // and immediate alias visibility between individual result writes.
+#if defined(_M_IX86) && defined(_MSC_VER)
         float* ResultMatrix = &Dst.D[0][0];
         const float* LeftMatrix = &A.D[0][0];
         const float* RightMatrix = &B.D[0][0];
@@ -964,6 +994,17 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             fstp dword ptr [edx - 4]
             jnz MatrixRowLoop
         }
+#else
+        FMatrix Result;
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                Result.D[i][j] = A.D[i][0] * B.D[0][j] +
+                                 A.D[i][1] * B.D[1][j] +
+                                 A.D[i][2] * B.D[2][j];
+            }
+        }
+        Dst = Result;
+#endif
         return GR_OK;
     }
 
@@ -985,6 +1026,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     {
         // 71890..718ed: translation is added while each dot remains extended,
         // then that component is stored before the next source read.
+#if defined(_M_IX86) && defined(_MSC_VER)
         float* ResultVector = &Dst.X;
         const float* TransformValues = &Xform.Rotation.D[0][0];
         const float* SourceVector = &Source.X;
@@ -1024,6 +1066,11 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             fadd dword ptr [eax + 2ch]
             fstp dword ptr [edx + 8]
         }
+#else
+        Dst.X = Xform.Rotation.D[0][2] * Source.Z + Xform.Rotation.D[0][1] * Source.Y + Xform.Rotation.D[0][0] * Source.X + Xform.Translation.X;
+        Dst.Y = Xform.Rotation.D[1][2] * Source.Z + Xform.Rotation.D[1][0] * Source.X + Xform.Rotation.D[1][1] * Source.Y + Xform.Translation.Y;
+        Dst.Z = Xform.Rotation.D[2][2] * Source.Z + Xform.Rotation.D[2][0] * Source.X + Xform.Rotation.D[2][1] * Source.Y + Xform.Translation.Z;
+#endif
         return GR_OK;
     }
 
@@ -1099,6 +1146,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
 
     GENRESULT DACOM_API MatrixToQuaternion(FQuaternion& Dst, const FMatrix& Source) override
     {
+#if defined(_M_IX86) && defined(_MSC_VER)
         const FMatrix* SourceMatrix = &Source;
         FQuaternion* DestinationQuat = &Dst;
         const float Zero = 0.0f;
@@ -1203,6 +1251,35 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             fstp st(0)
         MatrixQuatDone:
         }
+#else
+        float trace = Source.D[0][0] + Source.D[1][1] + Source.D[2][2];
+        if (trace > 0.0f)
+        {
+            float root = std::sqrt(trace + 1.0f);
+            Dst.W = 0.5f * root;
+            float recip = 0.5f / root;
+            Dst.X = (Source.D[2][1] - Source.D[1][2]) * recip;
+            Dst.Y = (Source.D[0][2] - Source.D[2][0]) * recip;
+            Dst.Z = (Source.D[1][0] - Source.D[0][1]) * recip;
+        }
+        else
+        {
+            static const int next[3] = {1, 2, 0};
+            int i = 0;
+            if (Source.D[1][1] > Source.D[0][0]) i = 1;
+            if (Source.D[2][2] > Source.D[i][i]) i = 2;
+            int j = next[i];
+            int k = next[j];
+
+            float root = std::sqrt((Source.D[i][i] - (Source.D[j][j] + Source.D[k][k])) + 1.0f);
+            float recip = 0.5f / root;
+            float* components[3] = { &Dst.X, &Dst.Y, &Dst.Z };
+            *components[i] = 0.5f * root;
+            Dst.W = (Source.D[k][j] - Source.D[j][k]) * recip;
+            *components[j] = (Source.D[j][i] + Source.D[i][j]) * recip;
+            *components[k] = (Source.D[k][i] + Source.D[i][k]) * recip;
+        }
+#endif
         return GR_OK;
     }
 
@@ -1210,6 +1287,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     {
         // 723c0..724c4: retain S/Xs and selected products on x87; the
         // asymmetric float scratch stores are part of the arithmetic contract.
+#if defined(_M_IX86) && defined(_MSC_VER)
         float Scratch[5];
         float Zs;
         const float One = 1.0f;
@@ -1301,6 +1379,26 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             fstp dword ptr [eax + 20h]
             fstp st(0)
         }
+#else
+        float norm = Quat.W * Quat.W + Quat.X * Quat.X + Quat.Y * Quat.Y + Quat.Z * Quat.Z;
+        float s = (norm > 0.0f) ? (2.0f / norm) : 0.0f;
+        float xs = Quat.X * s, ys = Quat.Y * s, zs = Quat.Z * s;
+        float wx = Quat.W * xs, wy = Quat.W * ys, wz = Quat.W * zs;
+        float xx = Quat.X * xs, xy = Quat.X * ys, xz = Quat.X * zs;
+        float yy = Quat.Y * ys, yz = Quat.Y * zs, zz = Quat.Z * zs;
+
+        Dst.D[0][0] = 1.0f - (yy + zz);
+        Dst.D[0][1] = xy - wz;
+        Dst.D[0][2] = xz + wy;
+
+        Dst.D[1][0] = xy + wz;
+        Dst.D[1][1] = 1.0f - (xx + zz);
+        Dst.D[1][2] = yz - wx;
+
+        Dst.D[2][0] = xz - wy;
+        Dst.D[2][1] = yz + wx;
+        Dst.D[2][2] = 1.0f - (xx + yy);
+#endif
         return GR_OK;
     }
 
@@ -1313,6 +1411,7 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     {
         // 724d0..725cb: normalized linear interpolation, literal x87 terms,
         // component store order and NaN hemisphere selection. Inputs may alias Dst.
+#if defined(_M_IX86) && defined(_MSC_VER)
         static const float Zero = 0.0f;
         static const float One = 1.0f;
         __asm
@@ -1413,6 +1512,38 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
             fmul dword ptr [eax + 0ch]
             fstp dword ptr [eax + 0ch]
         }
+#else
+        float dot = A.W * B.W + A.X * B.X + A.Y * B.Y + A.Z * B.Z;
+        float factor = *T;
+        FQuaternion Temp;
+        if (dot < 0.0f)
+        {
+            Temp.W = A.W - (A.W + B.W) * factor;
+            Temp.X = A.X - (A.X + B.X) * factor;
+            Temp.Y = A.Y - (A.Y + B.Y) * factor;
+            Temp.Z = A.Z - (A.Z + B.Z) * factor;
+        }
+        else
+        {
+            Temp.W = A.W + (B.W - A.W) * factor;
+            Temp.X = A.X + (B.X - A.X) * factor;
+            Temp.Y = A.Y + (B.Y - A.Y) * factor;
+            Temp.Z = A.Z + (B.Z - A.Z) * factor;
+        }
+        float mag = std::sqrt(Temp.W * Temp.W + Temp.X * Temp.X + Temp.Y * Temp.Y + Temp.Z * Temp.Z);
+        if (mag > 0.0f)
+        {
+            float invMag = 1.0f / mag;
+            Dst.W = Temp.W * invMag;
+            Dst.X = Temp.X * invMag;
+            Dst.Y = Temp.Y * invMag;
+            Dst.Z = Temp.Z * invMag;
+        }
+        else
+        {
+            Dst = Temp;
+        }
+#endif
         return GR_OK;
     }
 
@@ -1465,7 +1596,9 @@ struct FMathEngine final : I3DMathEngine, IComponentFactory
     }
 };
 
+#if defined(_M_IX86) || defined(__i386__)
 static_assert(sizeof(FMathEngine) == 8, "retail DllMain allocates operator_new(8) — two vfptrs");
+#endif
 
 FMathEngine* G_Engine = nullptr;
 
@@ -1475,7 +1608,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
     {
         DisableThreadLibraryCalls(Module);
         // FUN_06f71090: PUSH 8 / operator_new. Null → DAT=0, RET TRUE, no InvSqrt table.
-        void* Memory = ::operator new(8, std::nothrow);
+        void* Memory = ::operator new(sizeof(FMathEngine), std::nothrow);
         if (Memory == nullptr)
         {
             G_Engine = nullptr;
