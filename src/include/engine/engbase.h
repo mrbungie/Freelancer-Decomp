@@ -31,23 +31,23 @@ static const uint32_t G_EngineJointPayloadDwords = 0x17;
 // Transform callbacks carry an instance argument and have no IDAComponent prefix.
 struct IInstanceTransform
 {
-    virtual GENRESULT DACOM_API Init(void* Instance) = 0;                               // 0
-    virtual GENRESULT DACOM_API AddRef(void* Instance) = 0;                             // 1 +0x04
-    virtual GENRESULT DACOM_API Release(void* Instance) = 0;                            // 2 +0x08
-    virtual GENRESULT DACOM_API SetPosition(void* Instance, const float* Position) = 0;  // 3 +0x0C
-    virtual float* DACOM_API GetPosition(void* Instance) = 0;                           // 4 +0x10
-    virtual GENRESULT DACOM_API SetOrientation(void* Instance, const float* Rows) = 0;   // 5 +0x14
-    virtual float* DACOM_API GetOrientation(void* Instance) = 0;                        // 6 +0x18
-    virtual GENRESULT DACOM_API SetMatrix(void* Instance, const float* Matrix) = 0;      // 7 +0x1C
-    virtual float* DACOM_API GetMatrix(void* Instance) = 0;                             // 8 +0x20
-    virtual GENRESULT DACOM_API GetExtra(void* Instance, float* OutExtra,
+    virtual GENRESULT DACOM_API Init(fl::Slot32<void> Instance) = 0;                               // 0
+    virtual GENRESULT DACOM_API AddRef(fl::Slot32<void> Instance) = 0;                             // 1 +0x04
+    virtual GENRESULT DACOM_API Release(fl::Slot32<void> Instance) = 0;                            // 2 +0x08
+    virtual GENRESULT DACOM_API SetPosition(fl::Slot32<void> Instance, const float* Position) = 0;  // 3 +0x0C
+    virtual float* DACOM_API GetPosition(fl::Slot32<void> Instance) = 0;                           // 4 +0x10
+    virtual GENRESULT DACOM_API SetOrientation(fl::Slot32<void> Instance, const float* Rows) = 0;   // 5 +0x14
+    virtual float* DACOM_API GetOrientation(fl::Slot32<void> Instance) = 0;                        // 6 +0x18
+    virtual GENRESULT DACOM_API SetMatrix(fl::Slot32<void> Instance, const float* Matrix) = 0;      // 7 +0x1C
+    virtual float* DACOM_API GetMatrix(fl::Slot32<void> Instance) = 0;                             // 8 +0x20
+    virtual GENRESULT DACOM_API GetExtra(fl::Slot32<void> Instance, float* OutExtra,
                                          float* OutVec) = 0;                            // 9 +0x24
-    virtual GENRESULT DACOM_API SetExtra(void* Instance, float Extra,
+    virtual GENRESULT DACOM_API SetExtra(fl::Slot32<void> Instance, float Extra,
                                          const float* Vec) = 0;                         // 10 +0x28
-    virtual GENRESULT DACOM_API SetUser(void* Instance, uint32_t User) = 0;         // 11 +0x2C
-    virtual uint32_t DACOM_API GetUser(void* Instance) = 0;                        // 12 +0x30
+    virtual GENRESULT DACOM_API SetUser(fl::Slot32<void> Instance, uint32_t User) = 0;         // 11 +0x2C
+    virtual uint32_t DACOM_API GetUser(fl::Slot32<void> Instance) = 0;                        // 12 +0x30
     // Returns whether dirtiness should propagate to children; roots stop propagation.
-    virtual uint32_t DACOM_API MarkWorldDirty(void* Instance) = 0; // formerly Slot13; +0x34
+    virtual uint32_t DACOM_API MarkWorldDirty(fl::Slot32<void> Instance) = 0; // formerly Slot13; +0x34
 };
 
 struct IEngine : IDAComponent

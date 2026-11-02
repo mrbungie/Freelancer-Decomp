@@ -257,20 +257,20 @@ struct FInstanceTransform : IInstanceTransform
 {
     FInstanceTransform() { User = 0; }   // FUN_0661f310; every other member keeps the block's bytes
 
-    GENRESULT DACOM_API Init(void* Instance) override;                                  // LAB_0661f340
-    GENRESULT DACOM_API AddRef(void* Instance) override;                                // LAB_06612160
-    GENRESULT DACOM_API Release(void* Instance) override;                               // LAB_06612160
-    GENRESULT DACOM_API SetPosition(void* Instance, const float* Position) override;     // LAB_0661f380
-    float* DACOM_API GetPosition(void* Instance) override;                              // LAB_0661f3a0
-    GENRESULT DACOM_API SetOrientation(void* Instance, const float* Rows) override;      // LAB_0661f3b0
-    float* DACOM_API GetOrientation(void* Instance) override;                           // LAB_0661f3d0
-    GENRESULT DACOM_API SetMatrix(void* Instance, const float* Matrix) override;         // LAB_0661f3e0
-    float* DACOM_API GetMatrix(void* Instance) override;                                // LAB_0661f3d0
-    GENRESULT DACOM_API GetExtra(void* Instance, float* OutExtra, float* OutVec) override; // LAB_0661f400
-    GENRESULT DACOM_API SetExtra(void* Instance, float Extra, const float* Vec) override; // LAB_0661f430
-    GENRESULT DACOM_API SetUser(void* Instance, uint32_t User) override;            // LAB_0661f460
-    uint32_t DACOM_API GetUser(void* Instance) override;                           // LAB_0661f470
-    uint32_t DACOM_API MarkWorldDirty(void* Instance) override; // formerly Slot13
+    GENRESULT DACOM_API Init(fl::Slot32<void> Instance) override;                                  // LAB_0661f340
+    GENRESULT DACOM_API AddRef(fl::Slot32<void> Instance) override;                                // LAB_06612160
+    GENRESULT DACOM_API Release(fl::Slot32<void> Instance) override;                               // LAB_06612160
+    GENRESULT DACOM_API SetPosition(fl::Slot32<void> Instance, const float* Position) override;     // LAB_0661f380
+    float* DACOM_API GetPosition(fl::Slot32<void> Instance) override;                              // LAB_0661f3a0
+    GENRESULT DACOM_API SetOrientation(fl::Slot32<void> Instance, const float* Rows) override;      // LAB_0661f3b0
+    float* DACOM_API GetOrientation(fl::Slot32<void> Instance) override;                           // LAB_0661f3d0
+    GENRESULT DACOM_API SetMatrix(fl::Slot32<void> Instance, const float* Matrix) override;         // LAB_0661f3e0
+    float* DACOM_API GetMatrix(fl::Slot32<void> Instance) override;                                // LAB_0661f3d0
+    GENRESULT DACOM_API GetExtra(fl::Slot32<void> Instance, float* OutExtra, float* OutVec) override; // LAB_0661f400
+    GENRESULT DACOM_API SetExtra(fl::Slot32<void> Instance, float Extra, const float* Vec) override; // LAB_0661f430
+    GENRESULT DACOM_API SetUser(fl::Slot32<void> Instance, uint32_t User) override;            // LAB_0661f460
+    uint32_t DACOM_API GetUser(fl::Slot32<void> Instance) override;                           // LAB_0661f470
+    uint32_t DACOM_API MarkWorldDirty(fl::Slot32<void> Instance) override; // formerly Slot13
 
     float Matrix[12];        // +0x04
     float Extra;             // +0x34

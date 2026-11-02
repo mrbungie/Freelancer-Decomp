@@ -42,7 +42,7 @@ public:
     explicit IVP_VHash(int Size)
         : SizeMm(Size - 1)
         , NElemsAndFlags(0)
-        , Elems(calloc(static_cast<size_t>(Size), 8))
+        , Elems(calloc(static_cast<size_t>(Size), 2 * sizeof(void*)))   // retail 8-byte {hashTag, value}; host elems are pointer-wide
     {
     }
 

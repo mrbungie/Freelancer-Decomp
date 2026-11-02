@@ -5384,7 +5384,7 @@ static bool IsValidInstance(FEngineInstance* Instance)
 
 // LAB_0661f340 (slot 0, RET 8): 3x3 identity (1.0 at +4 / +0x14 / +0x24, 0 elsewhere),
 // translation 0, extra 0, extra vector 0. +0x44 (user) is NOT touched.
-GENRESULT DACOM_API FInstanceTransform::Init(void* Instance)
+GENRESULT DACOM_API FInstanceTransform::Init(fl::Slot32<void> Instance)
 {
     (void)Instance;
     InitIdentity3x4(Matrix);
@@ -5396,20 +5396,20 @@ GENRESULT DACOM_API FInstanceTransform::Init(void* Instance)
 }
 
 // LAB_06612160 (slots 1 and 2, RET 8): no body.
-GENRESULT DACOM_API FInstanceTransform::AddRef(void* Instance)
+GENRESULT DACOM_API FInstanceTransform::AddRef(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return GR_OK;
 }
 
-GENRESULT DACOM_API FInstanceTransform::Release(void* Instance)
+GENRESULT DACOM_API FInstanceTransform::Release(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return GR_OK;
 }
 
 // LAB_0661f380 (slot 3, RET 0xC): three dwords to +0x28.
-GENRESULT DACOM_API FInstanceTransform::SetPosition(void* Instance, const float* Position)
+GENRESULT DACOM_API FInstanceTransform::SetPosition(fl::Slot32<void> Instance, const float* Position)
 {
     (void)Instance;
     Matrix[9] = Position[0];
@@ -5419,14 +5419,14 @@ GENRESULT DACOM_API FInstanceTransform::SetPosition(void* Instance, const float*
 }
 
 // LAB_0661f3a0 (slot 4, RET 8): this + 0x28.
-float* DACOM_API FInstanceTransform::GetPosition(void* Instance)
+float* DACOM_API FInstanceTransform::GetPosition(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return Matrix + 9;
 }
 
 // LAB_0661f3b0 (slot 5, RET 0xC): MOVSD x9 to +4.
-GENRESULT DACOM_API FInstanceTransform::SetOrientation(void* Instance, const float* Rows)
+GENRESULT DACOM_API FInstanceTransform::SetOrientation(fl::Slot32<void> Instance, const float* Rows)
 {
     (void)Instance;
     std::memcpy(Matrix, Rows, 9 * sizeof(float));
@@ -5434,20 +5434,20 @@ GENRESULT DACOM_API FInstanceTransform::SetOrientation(void* Instance, const flo
 }
 
 // LAB_0661f3d0 (slots 6 and 8, RET 8): this + 4.
-float* DACOM_API FInstanceTransform::GetOrientation(void* Instance)
+float* DACOM_API FInstanceTransform::GetOrientation(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return Matrix;
 }
 
-float* DACOM_API FInstanceTransform::GetMatrix(void* Instance)
+float* DACOM_API FInstanceTransform::GetMatrix(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return Matrix;
 }
 
 // LAB_0661f3e0 (slot 7, RET 0xC): MOVSD x0xC to +4.
-GENRESULT DACOM_API FInstanceTransform::SetMatrix(void* Instance, const float* NewMatrix)
+GENRESULT DACOM_API FInstanceTransform::SetMatrix(fl::Slot32<void> Instance, const float* NewMatrix)
 {
     (void)Instance;
     std::memcpy(Matrix, NewMatrix, 12 * sizeof(float));
@@ -5455,7 +5455,7 @@ GENRESULT DACOM_API FInstanceTransform::SetMatrix(void* Instance, const float* N
 }
 
 // LAB_0661f400 (slot 9, RET 0x10): *OutExtra = +0x34, OutVec = +0x38..+0x40.
-GENRESULT DACOM_API FInstanceTransform::GetExtra(void* Instance, float* OutExtra, float* OutVec)
+GENRESULT DACOM_API FInstanceTransform::GetExtra(fl::Slot32<void> Instance, float* OutExtra, float* OutVec)
 {
     (void)Instance;
     *OutExtra = Extra;
@@ -5466,7 +5466,7 @@ GENRESULT DACOM_API FInstanceTransform::GetExtra(void* Instance, float* OutExtra
 }
 
 // LAB_0661f430 (slot 10, RET 0x10): +0x34 = Extra (FLD/FSTP float), Vec to +0x38.
-GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra, const float* Vec)
+GENRESULT DACOM_API FInstanceTransform::SetExtra(fl::Slot32<void> Instance, float NewExtra, const float* Vec)
 {
     (void)Instance;
     Extra = NewExtra;
@@ -5477,7 +5477,7 @@ GENRESULT DACOM_API FInstanceTransform::SetExtra(void* Instance, float NewExtra,
 }
 
 // LAB_0661f460 (slot 11, RET 0xC): +0x44 = User.
-GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, uint32_t NewUser)
+GENRESULT DACOM_API FInstanceTransform::SetUser(fl::Slot32<void> Instance, uint32_t NewUser)
 {
     (void)Instance;
     User = NewUser;
@@ -5485,14 +5485,14 @@ GENRESULT DACOM_API FInstanceTransform::SetUser(void* Instance, uint32_t NewUser
 }
 
 // LAB_0661f470 (slot 12, RET 8): +0x44.
-uint32_t DACOM_API FInstanceTransform::GetUser(void* Instance)
+uint32_t DACOM_API FInstanceTransform::GetUser(fl::Slot32<void> Instance)
 {
     (void)Instance;
     return User;
 }
 
 // LAB_0661f320 (slot 13, RET 8): XOR AL,AL.
-uint32_t DACOM_API FInstanceTransform::MarkWorldDirty(void* Instance) // formerly Slot13
+uint32_t DACOM_API FInstanceTransform::MarkWorldDirty(fl::Slot32<void> Instance) // formerly Slot13
 {
     (void)Instance;
     return 0;

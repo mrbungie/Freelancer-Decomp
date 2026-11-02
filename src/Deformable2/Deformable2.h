@@ -406,20 +406,20 @@ struct FBoneRuntime : IInstanceTransform
     // The per-slot body of the FUN_065f1550 construct loop (065f15a0..15c8).
     FBoneRuntime();
 
-    GENRESULT DACOM_API Init(void* InInstance) override;                              // LAB_065f1690
-    GENRESULT DACOM_API AddRef(void* InInstance) override;                            // FUN_065f16a0
-    GENRESULT DACOM_API Release(void* InInstance) override;                           // FUN_065f16a0
-    GENRESULT DACOM_API SetPosition(void* InInstance, const float* Position) override; // LAB_065f16b0
-    float* DACOM_API GetPosition(void* InInstance) override;                          // LAB_065f16e0
-    GENRESULT DACOM_API SetOrientation(void* InInstance, const float* Rows) override;  // LAB_065f16f0
-    float* DACOM_API GetOrientation(void* InInstance) override;                       // LAB_065f1720
-    GENRESULT DACOM_API SetMatrix(void* InInstance, const float* InMatrix) override;   // LAB_065f1730
-    float* DACOM_API GetMatrix(void* InInstance) override;                            // LAB_065f1720
-    GENRESULT DACOM_API GetExtra(void* InInstance, float* OutExtra, float* OutVec) override; // LAB_065f1760
-    GENRESULT DACOM_API SetExtra(void* InInstance, float Extra, const float* Vec) override;  // LAB_065f1780
-    GENRESULT DACOM_API SetUser(void* InInstance, uint32_t User) override;       // LAB_065f1790
-    uint32_t DACOM_API GetUser(void* InInstance) override;                       // LAB_065f17a0
-    uint32_t DACOM_API MarkWorldDirty(void* InInstance) override; // formerly Slot13
+    GENRESULT DACOM_API Init(fl::Slot32<void> InInstance) override;                              // LAB_065f1690
+    GENRESULT DACOM_API AddRef(fl::Slot32<void> InInstance) override;                            // FUN_065f16a0
+    GENRESULT DACOM_API Release(fl::Slot32<void> InInstance) override;                           // FUN_065f16a0
+    GENRESULT DACOM_API SetPosition(fl::Slot32<void> InInstance, const float* Position) override; // LAB_065f16b0
+    float* DACOM_API GetPosition(fl::Slot32<void> InInstance) override;                          // LAB_065f16e0
+    GENRESULT DACOM_API SetOrientation(fl::Slot32<void> InInstance, const float* Rows) override;  // LAB_065f16f0
+    float* DACOM_API GetOrientation(fl::Slot32<void> InInstance) override;                       // LAB_065f1720
+    GENRESULT DACOM_API SetMatrix(fl::Slot32<void> InInstance, const float* InMatrix) override;   // LAB_065f1730
+    float* DACOM_API GetMatrix(fl::Slot32<void> InInstance) override;                            // LAB_065f1720
+    GENRESULT DACOM_API GetExtra(fl::Slot32<void> InInstance, float* OutExtra, float* OutVec) override; // LAB_065f1760
+    GENRESULT DACOM_API SetExtra(fl::Slot32<void> InInstance, float Extra, const float* Vec) override;  // LAB_065f1780
+    GENRESULT DACOM_API SetUser(fl::Slot32<void> InInstance, uint32_t User) override;       // LAB_065f1790
+    uint32_t DACOM_API GetUser(fl::Slot32<void> InInstance) override;                       // LAB_065f17a0
+    uint32_t DACOM_API MarkWorldDirty(fl::Slot32<void> InInstance) override; // formerly Slot13
 };
 
 static_assert(sizeof(FBoneRuntime) == 0x70, "bone runtime must be 0x70");

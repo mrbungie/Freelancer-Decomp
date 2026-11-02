@@ -158,6 +158,7 @@ void GameobjCreateOfClass(FClientGameobj* Self, CObject::Class ObjectClass,
     // caller does that afterwards.
     Self->Object = CObject::Alloc(ObjectClass);
     Arch->create_instance(static_cast<IEngineInstance*>(Self->Object));
+    if (getenv("FL_TRACE_FX")) fprintf(stderr,"[go] id=%x ptr=%p\n",(unsigned)Self->Object->EngineInstanceId,reinterpret_cast<void*>(Self->Object->EngineInstanceId));
     DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Self->Object->EngineInstanceId), 0u,
                                   nullptr);
     Self->advise(true);

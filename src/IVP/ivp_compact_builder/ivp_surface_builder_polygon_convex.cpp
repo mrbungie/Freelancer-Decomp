@@ -83,7 +83,7 @@ IVP_SurfaceBuilder_Polygon_Convex::IVP_SurfaceBuilder_Polygon_Convex(IVP_Templat
     IVP_Triangle* const Back = Front->other_side;
     Front->pierce_partner = Back;
     Back->pierce_partner = Front;
-    IVP_Poly_Surface* const Surface = static_cast<IVP_Poly_Surface*>(::operator new(0xc));
+    IVP_Poly_Surface* const Surface = static_cast<IVP_Poly_Surface*>(::operator new(sizeof(IVP_Poly_Surface)));
     Surface->tetra = nullptr;
     Front->ivp_surface = Surface;
     Back->ivp_surface = Surface;

@@ -1980,27 +1980,27 @@ FBoneRuntime::FBoneRuntime()
 }
 
 // LAB_065f1690 (RET 8), slot 0: [this+4] = the instance.
-GENRESULT DACOM_API FBoneRuntime::Init(void* InInstance)
+GENRESULT DACOM_API FBoneRuntime::Init(fl::Slot32<void> InInstance)
 {
     Instance = InInstance;
     return GR_OK; // EAX = this (065f1690 loads it); nobody reads it
 }
 
 // FUN_065f16a0, slot 1.
-GENRESULT DACOM_API FBoneRuntime::AddRef(void* InInstance)
+GENRESULT DACOM_API FBoneRuntime::AddRef(fl::Slot32<void> InInstance)
 {
     return (GENRESULT)(BoneRuntimeRet8(this, InInstance));
 }
 
 // FUN_065f16a0, slot 2.
-GENRESULT DACOM_API FBoneRuntime::Release(void* InInstance)
+GENRESULT DACOM_API FBoneRuntime::Release(fl::Slot32<void> InInstance)
 {
     return (GENRESULT)(BoneRuntimeRet8(this, InInstance));
 }
 
 // LAB_065f16b0 (RET 0xC), slot 3: three dwords of Position to +0x30; bit 0 of +0x3c set ->
 // |= 2.
-GENRESULT DACOM_API FBoneRuntime::SetPosition(void* /*InInstance*/, const float* Position)
+GENRESULT DACOM_API FBoneRuntime::SetPosition(fl::Slot32<void> /*InInstance*/, const float* Position)
 {
     float* const Dest = LocalTransform + 9;
     Dest[0] = Position[0];
@@ -2012,14 +2012,14 @@ GENRESULT DACOM_API FBoneRuntime::SetPosition(void* /*InInstance*/, const float*
 }
 
 // LAB_065f16e0 (RET 8), slot 4: this + 0x30.
-float* DACOM_API FBoneRuntime::GetPosition(void* /*InInstance*/)
+float* DACOM_API FBoneRuntime::GetPosition(fl::Slot32<void> /*InInstance*/)
 {
     return LocalTransform + 9;
 }
 
 // LAB_065f16f0 (RET 0xC), slot 5: REP MOVSD of 9 dwords Rows -> +0x0C, always (065f1707);
 // the bit 0 test made before it (065f16f7) only decides the |= 2 after it (065f170b).
-GENRESULT DACOM_API FBoneRuntime::SetOrientation(void* /*InInstance*/, const float* Rows)
+GENRESULT DACOM_API FBoneRuntime::SetOrientation(fl::Slot32<void> /*InInstance*/, const float* Rows)
 {
     const unsigned char Flags = this->Flags;
     std::memcpy(LocalTransform, Rows, 9 * sizeof(float));
@@ -2029,14 +2029,14 @@ GENRESULT DACOM_API FBoneRuntime::SetOrientation(void* /*InInstance*/, const flo
 }
 
 // LAB_065f1720 (RET 8), slots 6 and 8: this + 0x0C.
-float* DACOM_API FBoneRuntime::GetOrientation(void* /*InInstance*/)
+float* DACOM_API FBoneRuntime::GetOrientation(fl::Slot32<void> /*InInstance*/)
 {
     return LocalTransform;
 }
 
 // LAB_065f1730 (RET 0xC), slot 7: REP MOVSD of 12 dwords (rotation + position) -> +0x0C,
 // always (065f1747); bit 0 tested before (065f1737) decides only the |= 2 (065f174b).
-GENRESULT DACOM_API FBoneRuntime::SetMatrix(void* /*InInstance*/, const float* InMatrix)
+GENRESULT DACOM_API FBoneRuntime::SetMatrix(fl::Slot32<void> /*InInstance*/, const float* InMatrix)
 {
     const unsigned char Flags = this->Flags;
     std::memcpy(LocalTransform, InMatrix, 12 * sizeof(float));
@@ -2046,14 +2046,14 @@ GENRESULT DACOM_API FBoneRuntime::SetMatrix(void* /*InInstance*/, const float* I
 }
 
 // LAB_065f1720, slot 8 (the same body as slot 6).
-float* DACOM_API FBoneRuntime::GetMatrix(void* /*InInstance*/)
+float* DACOM_API FBoneRuntime::GetMatrix(fl::Slot32<void> /*InInstance*/)
 {
     return LocalTransform;
 }
 
 // LAB_065f1760 (RET 0x10), slot 9: *[ESP+0xC] = 0 and the three dwords at [ESP+0x10] = 0 --
 // the second and third arguments; the instance is not read.
-GENRESULT DACOM_API FBoneRuntime::GetExtra(void* /*InInstance*/, float* OutExtra, float* OutVec)
+GENRESULT DACOM_API FBoneRuntime::GetExtra(fl::Slot32<void> /*InInstance*/, float* OutExtra, float* OutVec)
 {
     *(uint32_t*)OutExtra = 0;
     ((uint32_t*)OutVec)[0] = 0;
@@ -2063,28 +2063,28 @@ GENRESULT DACOM_API FBoneRuntime::GetExtra(void* /*InInstance*/, float* OutExtra
 }
 
 // LAB_065f1780 (1 instruction, RET 0x10), slot 10.
-GENRESULT DACOM_API FBoneRuntime::SetExtra(void* /*InInstance*/, float /*Extra*/,
+GENRESULT DACOM_API FBoneRuntime::SetExtra(fl::Slot32<void> /*InInstance*/, float /*Extra*/,
                                            const float* /*Vec*/)
 {
     return GR_OK;
 }
 
 // LAB_065f1790 (RET 0xC), slot 11.
-GENRESULT DACOM_API FBoneRuntime::SetUser(void* InInstance, uint32_t User)
+GENRESULT DACOM_API FBoneRuntime::SetUser(fl::Slot32<void> InInstance, uint32_t User)
 {
     BoneRuntimeRetC(this, InInstance, (void*)((ptrdiff_t)User));
     return GR_OK;
 }
 
 // LAB_065f17a0 (RET 8), slot 12: XOR EAX,EAX.
-uint32_t DACOM_API FBoneRuntime::GetUser(void* /*InInstance*/)
+uint32_t DACOM_API FBoneRuntime::GetUser(fl::Slot32<void> /*InInstance*/)
 {
     return 0;
 }
 
 // LAB_065f17b0 (RET 8), slot 13: bit 1 of +0x3c set -> AL = 0; else |= 2 and EAX =
 // (~byte) & 1 (NOT AL; AND EAX,1 -- the AND clears EAX's upper bytes).
-uint32_t DACOM_API FBoneRuntime::MarkWorldDirty(void* /*InInstance*/) // formerly Slot13
+uint32_t DACOM_API FBoneRuntime::MarkWorldDirty(fl::Slot32<void> /*InInstance*/) // formerly Slot13
 {
     unsigned char Flags = this->Flags;
     if ((Flags & 2u) != 0)

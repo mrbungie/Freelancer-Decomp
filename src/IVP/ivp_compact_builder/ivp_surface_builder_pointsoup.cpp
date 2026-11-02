@@ -763,7 +763,7 @@ void FLedgeConvexHullBuilder::BuildHull()
                 PointHash.Add(Point, static_cast<unsigned>(reinterpret_cast<intptr_t>(Point)));
 
                 const IVP_U_Float_Point* Source = reinterpret_cast<const IVP_U_Float_Point*>(Point);
-                IVP_U_Float_Point* Copy = static_cast<IVP_U_Float_Point*>(::operator new(0x10));
+                IVP_U_Float_Point* Copy = static_cast<IVP_U_Float_Point*>(::operator new(sizeof(IVP_U_Float_Point)));
                 Copy->X = Source->X;
                 Copy->Y = Source->Y;
                 Copy->Z = Source->Z;
