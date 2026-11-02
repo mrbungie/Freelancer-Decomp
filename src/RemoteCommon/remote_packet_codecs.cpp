@@ -1347,8 +1347,8 @@ const double GUpdateInverseScale = 1.0 / 127.0;   // PE 06c0df48: 08040281402080
 // and only then calls _ftol. Keep that ordering around an unmasked FP exception.
 // The commit stores the destination cached before the preceding payload write
 // plus its width (RC06b64d58/06b64d5b, 06b64e3d/06b64e3e); it never rereads Ptr.
-unsigned char RpcUpdateQuantize(const float& Value, unsigned int* PointerToCommit,
-    unsigned int CommittedPointer) {
+unsigned char RpcUpdateQuantize(const float& Value, uintptr_t* PointerToCommit,
+    uintptr_t CommittedPointer) {
     return static_cast<unsigned char>(PortableRpcQuantization::QuantizeUpdate(
         &Value, PointerToCommit, CommittedPointer));
 }

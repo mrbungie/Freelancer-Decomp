@@ -8,8 +8,6 @@
 #include "PortableSplineMath.h"
 #include <cmath>
 
-#include <cmath>
-
 // Private Thorn arithmetic. FUN_06f21000 and its vector helpers retain
 // extended x87 values only where the retail listing omits a float store.
 namespace ThornSplineMath
@@ -103,11 +101,6 @@ namespace ThornSplineMath
                 cubic * U3
             );
         }
-#else
-        ResultVector[0] = (TwiceP1[0] + Sum[0]) * Half;
-        ResultVector[1] = (TwiceP1[1] + Sum[1]) * Half;
-        ResultVector[2] = (TwiceP1[2] + Sum[2]) * Half;
-#endif
     }
     // 23145/23181, 232c5/23301, and 2347c/234b8 zero-extend the
     // sample-index dword before FILD qword, then store the float product.

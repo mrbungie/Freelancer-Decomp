@@ -9,7 +9,6 @@
 #include "portable_comparison_c.h"
 #include "portable_lua_number.h"
 #include <string.h>
-#include <math.h>
 
 #include "lauxlib.h"
 #include "ldo.h"
@@ -23,9 +22,6 @@
 #include "lua.h"
 #include "luadebug.h"
 #include "lzio.h"
-
-/* avoid clash with C99 exp2() from <math.h> */
-#define exp2 lparser_exp2
 
 
 
@@ -283,10 +279,6 @@ static int real_constant (FuncState *fs, const real *Number) {
       /* C3 selects equality or unordered; retain signaling NaN exceptions. */
       if (PortableDoubleEqualOrUnordered(ExistingNumber, Number))
         return c;
-#else
-      if (*ExistingNumber == *Number)
-        return c;
-#endif
     }
   }
   /* not found; create a new entry */
@@ -306,17 +298,6 @@ static void code_number (LexState *ls, const real *Number) {
     code_oparg(ls, Negative ? PUSHNUMBERNEG : PUSHNUMBER, (int)Converted, 1);
     return;
   }
-#else
-  real val = *Number;
-  real abs_val = fabs(val);
-  if (abs_val >= 0.0 && abs_val <= (real)MAX_WORD) {
-    int converted = (int)abs_val;
-    if ((real)converted == abs_val) {
-      code_oparg(ls, (val < 0.0) ? PUSHNUMBERNEG : PUSHNUMBER, converted, 1);
-      return;
-    }
-  }
-#endif
   code_constant(ls, real_constant(ls->fs, Number));
 }
 

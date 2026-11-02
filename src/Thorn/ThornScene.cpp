@@ -34,39 +34,6 @@
 
 // Playback: slots 19/22/23/26 + Start types 1РІР‚вЂњ19. docs/re/thorn.md.
 
-#if !defined(_MSC_VER) || defined(FREELANCER_PORTABLE)
-// Portable replacements for the x87 sequences below. Extended precision is
-// modelled with double; no intermediate contraction (FMA) is allowed.
-#if defined(__clang__)
-#pragma clang fp contract(off)
-#endif
-namespace
-{
-    // x87 FISTP with round-toward-zero; NaN/out-of-range gives integer indefinite.
-    inline long long PortableChopToInt64(double Value)
-    {
-        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
-            return static_cast<long long>(0x8000000000000000ULL);
-        return static_cast<long long>(Value);
-    }
-
-    // FLD dword / FSTP dword round trip quiets a signalling NaN.
-    inline float PortableQuietF32(float Value)
-    {
-        unsigned int Bits;
-        std::memcpy(&Bits, &Value, sizeof(Bits));
-        if ((Bits & 0x7f800000u) == 0x7f800000u && (Bits & 0x007fffffu) != 0u)
-            Bits |= 0x00400000u;
-        std::memcpy(&Value, &Bits, sizeof(Value));
-        return Value;
-    }
-
-    // Stand-in for the x87 stack slot the audio tick keeps live across calls.
-    double G_PortableX87Progress = 0.0;
-
-}
-#endif
-
 namespace
 {
     unsigned int G_NextEventId = 0; // DAT_06f61e24: module lifetime, wrapping counter.

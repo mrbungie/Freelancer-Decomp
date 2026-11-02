@@ -35,15 +35,6 @@ extern "C"
 
 namespace
 {
-    // x87 FISTP with round-toward-zero as used by retail's chop control word.
-    // Out-of-range/NaN inputs produce the x86 "integer indefinite" value.
-    inline long long PortableChopToInt64(double Value)
-    {
-        if (!(Value > -9223372036854775808.0 && Value < 9223372036854775808.0))
-            return static_cast<long long>(0x8000000000000000ULL);
-        return static_cast<long long>(Value);
-    }
-
     const int kFdumpError = 0x100001;
     const char* const kLuaParserCpp = "LuaScriptParser.cpp";
 

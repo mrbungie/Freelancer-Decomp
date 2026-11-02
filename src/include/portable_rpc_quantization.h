@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 #include "portable_integer_conversion.h"
 #include <cmath>
@@ -30,8 +31,8 @@ namespace PortableRpcQuantization
         return PortableIntegerConversion::ToInt64Bits(&scaled);
     }
 
-    inline std::uint64_t QuantizeUpdate(const float* value, unsigned int* pointerToCommit,
-                                       unsigned int committedPointer)
+    inline std::uint64_t QuantizeUpdate(const float* value, std::uintptr_t* pointerToCommit,
+                                       std::uintptr_t committedPointer)
     {
         const volatile double scaled = static_cast<double>(*value) * 127.0;
         if (pointerToCommit) *pointerToCommit = committedPointer;
