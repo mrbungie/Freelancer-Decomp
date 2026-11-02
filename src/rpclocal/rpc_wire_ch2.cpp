@@ -335,8 +335,8 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
         }
         // 06d91f47 / 06d91f4f dereference both buffers with no null test. The marshaller
         // always fills them (RpcFlattenFmtStr, as 06d88de7 / 06d88e26).
-        const unsigned int* NameAFirst = static_cast<const unsigned int*>(Wire->NameABuffer);
-        const unsigned int* NameBFirst = static_cast<const unsigned int*>(Wire->NameBBuffer);
+        const unsigned int* NameAFirst = static_cast<const unsigned int*>(static_cast<void*>(Wire->NameABuffer));
+        const unsigned int* NameBFirst = static_cast<const unsigned int*>(static_cast<void*>(Wire->NameBBuffer));
         if (*NameAFirst != 0 || *NameBFirst != 0) {
             Mask = (unsigned char)(Mask | Flag2);              // 06d91f5c
         }

@@ -16,7 +16,9 @@ inline T FlReinterpretCast(U u)
 {
 #pragma push_macro("reinterpret_cast")
 #undef reinterpret_cast
-    if constexpr (std::is_pointer<T>::value && !std::is_function<typename std::remove_pointer<T>::type>::value &&
+    if constexpr (fl::IsSlot32<U>::value)
+        return reinterpret_cast<T>(static_cast<typename fl::IsSlot32<U>::Pointee*>(u));   // retail 4-byte pointer slot
+    else if constexpr (std::is_pointer<T>::value && !std::is_function<typename std::remove_pointer<T>::type>::value &&
                   std::is_integral<U>::value && sizeof(U) < sizeof(void*))
         return static_cast<T>(fl::HandleToPtr(static_cast<uint32_t>(u)));
     else

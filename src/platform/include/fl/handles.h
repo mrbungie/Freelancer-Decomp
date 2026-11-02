@@ -29,4 +29,8 @@ namespace fl
         operator T*() const { return HandleTo<T>(h); }
         T* operator->() const { return HandleTo<T>(h); }
     };
+
+    template <class U> struct IsSlot32 { static constexpr bool value = false; };
+    template <class T> struct IsSlot32<Slot32<T>> { static constexpr bool value = true; using Pointee = T; };
+    template <class T> struct IsSlot32<const Slot32<T>> { static constexpr bool value = true; using Pointee = T; };
 }

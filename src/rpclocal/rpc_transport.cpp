@@ -9,6 +9,7 @@
 // Ground truth: EXE/Disasm/rpclocal.dll.txt.
 // Retail addresses are quoted per function.
 
+#include "fl/handles.h"
 #include "rpc_transport.h"
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
@@ -112,14 +113,14 @@ void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int 
 struct FRpcEmbeddedListHeader {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    void* Head;                     // +0x04  the sentinel node
+    fl::Slot32<void> Head;          // +0x04  the sentinel node
     unsigned int Size;              // +0x08
 };
 
 // The two links every node starts with.
 struct FRpcEmbeddedListNode {
-    FRpcEmbeddedListNode* Next;     // +0x00
-    FRpcEmbeddedListNode* Prev;     // +0x04
+    fl::Slot32<FRpcEmbeddedListNode> Next;     // +0x00
+    fl::Slot32<FRpcEmbeddedListNode> Prev;     // +0x04
 };
 
 // 06d9d52f..06d9d549 (FUN_06d9d4f0, the CHARACTERINFO ctor; the other list-building
@@ -132,7 +133,7 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
         reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
     Header->Allocator = 0;                                  // 06d9d535 MOV [ESI+0x24],AL
     FRpcEmbeddedListNode* Sentinel =
-        static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize * 2u + 0x10u));   // host nodes carry 8-byte links   // 06d9d52f / 06d9d538
+        static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize));   // 06d9d52f / 06d9d538
     Sentinel->Next = Sentinel;                              // 06d9d541 MOV [EAX],EAX
     Sentinel->Prev = Sentinel;                              // 06d9d543 MOV [EAX+0x4],EAX
     Header->Size = 0;                                       // 06d9d546 MOV [ESI+0x2c],EDI
@@ -144,7 +145,7 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
 void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset) {
     FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
         reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
-    FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(Header->Head);
+    FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(static_cast<void*>(Header->Head));
     FRpcEmbeddedListNode* Node = Sentinel->Next;            // 06d9d1f8 MOV ESI,[EBX]
     while (Node != Sentinel) {                              // 06d9d1fa / 06d9d220 CMP
         FRpcEmbeddedListNode* Erased = Node;                // 06d9d200 MOV EAX,ESI
@@ -154,7 +155,7 @@ void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset) {
         ::operator delete(Erased);                          // 06d9d214
         --Header->Size;                                     // 06d9d219..06d9d222
     }
-    ::operator delete(Header->Head);                        // 06d9d22b
+    ::operator delete(static_cast<void*>(Header->Head));                        // 06d9d22b
     Header->Head = nullptr;                                 // 06d9d235
     Header->Size = 0;                                       // 06d9d238
 }

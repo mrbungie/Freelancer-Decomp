@@ -215,7 +215,7 @@ static bool MarshalCh2Empty(FPacketBase*, const uintptr_t*, unsigned int) {
 #define RPC_CH2_DELIVER_BLOB(FnName, SlotCall)                                             \
     static bool FnName(const FPacketBase* Packet, IClient* Client, IChatClient*) {          \
         const FPayloadServerBlob Wire = RpcPayloadRead<FPayloadServerBlob>(Packet, 0);      \
-        Client->SlotCall(1u, static_cast<const unsigned char*>(Wire.Buffer), Wire.Size);    \
+        Client->SlotCall(1u, static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);    \
         return true;                                                                        \
     }
 
@@ -223,7 +223,7 @@ static bool MarshalCh2Empty(FPacketBase*, const uintptr_t*, unsigned int) {
     static bool FnName(const FPacketBase* Packet, IClient* Client, IChatClient*) {          \
         const FPayloadServerBlobReversed Wire =                                             \
             RpcPayloadRead<FPayloadServerBlobReversed>(Packet, 0);                          \
-        Client->SlotCall(1u, static_cast<const unsigned char*>(Wire.Buffer), Wire.Size);    \
+        Client->SlotCall(1u, static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);    \
         return true;                                                                        \
     }
 
@@ -2454,7 +2454,7 @@ static bool DeliverLoadHint(const FPacketBase* Packet, IClient* Client, IChatCli
         // then called through the vtable with no test (06d81bde `MOV EDI,[ESI]`,
         // 06d81c01 `CALL [EDI+0x8]`).
         Hint = new (std::nothrow) FRpcLocalCostumeHint;
-        Hint->UnSerialize(static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+        Hint->UnSerialize(static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     }
 
     // 06d81c0a..06d81c20: the hint pointer goes out even when it is null, and the literal

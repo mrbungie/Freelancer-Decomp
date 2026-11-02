@@ -668,7 +668,7 @@ static bool MarshalTradeResponse(FPacketBase* Packet, const uintptr_t* Args, uns
 
 static bool DeliverTradeResponse(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
     const FPayloadClientBlob Wire = RpcPayloadRead<FPayloadClientBlob>(Packet, 0);
-    Server->TradeResponse(static_cast<const unsigned char*>(Wire.Buffer), (int)Wire.Size, SessionId);
+    Server->TradeResponse(static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size, SessionId);
     return true;
 }
 
@@ -1357,7 +1357,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
     }
     case 0x11: {   // SET_WEAPON_GROUP -> slot 70
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->SetWeaponGroup(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->SetWeaponGroup(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x12: {   // PLAYER_TRADE -> the eight trade slots, picked by the bitmask at +0x00
@@ -1409,7 +1409,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
     }
     case 0x13: {   // SET_VISITED_STATE -> slot 71
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->SetVisitedState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->SetVisitedState(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x14: {   // JETTISONCARGO -> slot 8
@@ -1437,27 +1437,27 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
     }
     case 0x16: {   // REQUEST_BEST_PATH -> slot 72
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->RequestBestPath(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->RequestBestPath(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x17: {   // REQUEST_GROUP_POSITIONS -> slot 75
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->RequestGroupPositions(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->RequestGroupPositions(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x18: {   // REQUEST_PLAYER_STATS -> slot 73
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->RequestPlayerStats(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->RequestPlayerStats(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x19: {   // SET_MISSION_LOG -> slot 76
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->SetMissionLog(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->SetMissionLog(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x1a: {   // REQUEST_RANK_LEVEL -> slot 78
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->RequestRankLevel(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->RequestRankLevel(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x1b: {   // POP_UP_DIALOG -> slot 74. Retail forwards ONLY payload+0x10; the two
@@ -1469,7 +1469,7 @@ static bool DispatchChannel1ToServer(const FPacketBase* Packet, IServer* Server,
     }
     case 0x1c: {   // SET_INTERFACE_STATE -> slot 77
         const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-        Server->SetInterfaceState(SessionId, static_cast<unsigned char*>(Wire.Buffer), (int)Wire.Size);
+        Server->SetInterfaceState(SessionId, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), (int)Wire.Size);
         return true;
     }
     case 0x1d: {   // TRACTOROBJECTS -> slot 5

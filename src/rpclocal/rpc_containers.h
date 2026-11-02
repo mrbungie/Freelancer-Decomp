@@ -102,6 +102,7 @@
 // mirror to a real interface type any more: the real Common types cross the interface
 // (former-BRIDGE entry in docs/re/deviations.md).
 #pragma once
+#include "fl/handles.h"
 
 #include "rpc_transport.h"
 #include "rpc_payloads.h"
@@ -168,8 +169,8 @@ void RpcRetailVectorAppend(FRetailVector<T>& Vector, T Value) {
 
 // One node of a retail list whose value is a CollisionGroupDesc. operator new(0x10).
 struct FRpcCollisionGroupNode {
-    FRpcCollisionGroupNode* Next;   // +0x00
-    FRpcCollisionGroupNode* Prev;   // +0x04
+    fl::Slot32<FRpcCollisionGroupNode> Next;   // +0x00
+    fl::Slot32<FRpcCollisionGroupNode> Prev;   // +0x04
     // CollisionGroupDesc, 8 bytes.
     //
     // UPDATED 2026-09-17 by the CREATESHIP/CREATESOLAR header codec, which is the first
@@ -195,7 +196,7 @@ static_assert(sizeof(FRpcCollisionGroupNode) == 0x10,
 struct FRpcCollisionGroupList {
     unsigned char Allocator;        // +0x00  VC6 allocator<T>: one byte, never read back
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcCollisionGroupNode* Head;   // +0x04  dummy node; Next == Prev == itself when empty
+    fl::Slot32<FRpcCollisionGroupNode> Head;   // +0x04  dummy node; Next == Prev == itself when empty
     unsigned int Size;              // +0x08
 };
 
@@ -233,7 +234,7 @@ struct FRpcEquipWireRecord {
     unsigned char Field_0x0f;       // +0x0f  EquipDesc::bMission
     unsigned short HardpointSize;   // +0x10  strlen + 1, or 0 for internal equipment
     unsigned char Pad_0x12[2];      // +0x12
-    char* Hardpoint;                // +0x14  owned by the record
+    fl::Slot32<char> Hardpoint;                // +0x14  owned by the record
 };
 
 static_assert(sizeof(FRpcEquipWireRecord) == 0x18,
@@ -241,9 +242,9 @@ static_assert(sizeof(FRpcEquipWireRecord) == 0x18,
 
 // One node of the equipment list. operator new(0x0c) -- the value is a POINTER.
 struct FRpcEquipWireNode {
-    FRpcEquipWireNode* Next;        // +0x00
-    FRpcEquipWireNode* Prev;        // +0x04
-    FRpcEquipWireRecord* Value;     // +0x08
+    fl::Slot32<FRpcEquipWireNode> Next;        // +0x00
+    fl::Slot32<FRpcEquipWireNode> Prev;        // +0x04
+    fl::Slot32<FRpcEquipWireRecord> Value;     // +0x08
 };
 
 static_assert(sizeof(FRpcEquipWireNode) == 0x0c,
@@ -253,7 +254,7 @@ static_assert(sizeof(FRpcEquipWireNode) == 0x0c,
 struct FRpcEquipWireListHeader {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcEquipWireNode* Head;        // +0x04
+    fl::Slot32<FRpcEquipWireNode> Head;        // +0x04
     unsigned int Size;              // +0x08
 };
 
@@ -771,9 +772,9 @@ struct FPayloadServerCreateSolar {
     unsigned char Field_0x7d;       // +0x7d <- src+0xa8
     unsigned char Pad_0x7e[2];      // +0x7e
     unsigned int NameASize;         // +0x80
-    void* NameABuffer;              // +0x84
+    fl::Slot32<void> NameABuffer;              // +0x84
     unsigned int NameBSize;         // +0x88
-    void* NameBBuffer;              // +0x8c
+    fl::Slot32<void> NameBBuffer;              // +0x8c
     unsigned int Affiliation;       // +0x90    Reputation::Vibe::GetAffiliation out
     float Attitude;                 // +0x94    Reputation::Vibe::AttitudeTowards out
 };
@@ -833,11 +834,11 @@ struct FPayloadServerCreateShip {
     unsigned short Field_0xa4;      // +0xa4 <- LOW WORD of src+0xd8
     unsigned char Pad_0xa6[2];      // +0xa6
     unsigned int NameASize;         // +0xa8
-    void* NameABuffer;              // +0xac
+    fl::Slot32<void> NameABuffer;              // +0xac
     unsigned int NameBSize;         // +0xb0
-    void* NameBBuffer;              // +0xb4
+    fl::Slot32<void> NameBBuffer;              // +0xb4
     unsigned int DisplayNameLength; // +0xb8    wcslen, written but never read back
-    wchar_t* DisplayName;           // +0xbc    operator new((len*2)+2) + wcscpy
+    fl::Slot32<wchar_t> DisplayName;           // +0xbc    operator new((len*2)+2) + wcscpy
     unsigned int Affiliation;       // +0xc0
     float Attitude;                 // +0xc4
     unsigned char Field_0xc8;       // +0xc8 <- src+0xa8  (06d8950a read / 06d89514 store,
@@ -963,8 +964,8 @@ struct FRpcCharacterInfoWireRecord {
     unsigned char Field_0x260;      // +0x260
     FRpcEquipWireHandle Equipment;  // +0x264 built from the caller's EquipDescList
     FRpcCollisionGroupList CollisionGroups; // +0x268 <- the caller's list at src+0x254
-    FRpcIdArrayBlockWire* BlockA;   // +0x274 <- the inline block at src+0x274
-    FRpcIdArrayBlockWire* BlockB;   // +0x278 <- the inline block at src+0x2a8
+    fl::Slot32<FRpcIdArrayBlockWire> BlockA;   // +0x274 <- the inline block at src+0x274
+    fl::Slot32<FRpcIdArrayBlockWire> BlockB;   // +0x278 <- the inline block at src+0x2a8
 };
 
 // The caller's record, 0x2dc in retail, and the 0x18 argument IClient slot 13 takes:
@@ -980,14 +981,14 @@ struct FRpcCharacterInfoWireRecord {
 // The wire list header, at packet+0x24. Same retail 0x0c shape as everywhere else, with
 // a pointer value.
 struct FRpcCharacterInfoWireNode {
-    FRpcCharacterInfoWireNode* Next;        // +0x00
-    FRpcCharacterInfoWireNode* Prev;        // +0x04
-    FRpcCharacterInfoWireRecord* Value;     // +0x08
+    fl::Slot32<FRpcCharacterInfoWireNode> Next;        // +0x00
+    fl::Slot32<FRpcCharacterInfoWireNode> Prev;        // +0x04
+    fl::Slot32<FRpcCharacterInfoWireRecord> Value;     // +0x08
 };
 struct FRpcCharacterInfoWireList {
     unsigned char Allocator;                // +0x00
     unsigned char Pad_0x01[3];              // +0x01
-    FRpcCharacterInfoWireNode* Head;        // +0x04
+    fl::Slot32<FRpcCharacterInfoWireNode> Head;        // +0x04
     unsigned int Size;                      // +0x08
 };
 static_assert(sizeof(FRpcCharacterInfoWireList) == 0x0c, "retail std::list header is 0x0c");
@@ -1072,6 +1073,12 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
 // ===========================================================================
 bool RpcPutSizedBlock(FRpcMarshalStream& Stream, unsigned int Size, const void* Buffer);
 bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize, void*& OutBuffer);
+inline bool RpcGetSizedBlock(FRpcMarshalStream& Stream, unsigned int& OutSize, fl::Slot32<void>& OutBuffer) {
+    void* P = nullptr;
+    const bool Ok = RpcGetSizedBlock(Stream, OutSize, P);
+    OutBuffer = P;
+    return Ok;
+}
 
 // ===========================================================================
 // FUN_06da2240 / FUN_06da2480 -- the equipment/cargo list on the wire, { word Count;

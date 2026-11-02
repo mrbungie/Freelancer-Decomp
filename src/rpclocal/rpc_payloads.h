@@ -34,6 +34,7 @@
 // Retail's own first argument (a session/client id) is never forwarded: every receive
 // case pushes the literal 1 in its place. That is reproduced verbatim.
 #pragma once
+#include "fl/handles.h"
 
 #include "rpc_transport.h"
 #include "common_server_types.h"
@@ -173,7 +174,7 @@ struct FPayloadCommonChatMsg {
     // TODO: semantics unproven. 2nd argument; forwarded as the chat slot's 2nd argument.
     unsigned int Field_0x04;   // +0x04
     unsigned int Size;         // +0x08  operator new() argument and memcpy length
-    void* Buffer;              // +0x0c  owned by the packet
+    fl::Slot32<void> Buffer;              // +0x0c  owned by the packet
 };
 static_assert(sizeof(FPayloadCommonChatMsg) == 0x10, "CHATMSG payload 0x10");
 
@@ -244,7 +245,7 @@ static_assert(sizeof(FPayloadCommonStopTradelane) == 0x0c, "STOPTRADELANE payloa
 //     the one member that borrows, so it alone must be delivered before the call returns.
 // The wire decoders (0x06da62d0, 0x06da5bc0) set the flag on the block they allocate.
 struct FPayloadCommonBuffer {
-    void* Buffer;              // +0x00  sender's 2nd argument
+    fl::Slot32<void> Buffer;              // +0x00  sender's 2nd argument
     unsigned int Size;         // +0x04  sender's 3rd argument
     unsigned char bOwnsBuffer; // +0x08  the destructor frees Buffer when set
     unsigned char Pad_0x09[3]; // +0x09
@@ -298,9 +299,9 @@ static_assert(sizeof(FPayloadCommonActivateThrusters) == 0x08, "ACTIVATETHRUSTER
 // out. See rpc_payload_ch1.cpp for why the port cannot do that yet.
 struct FPayloadCommonPopUpDialog {
     unsigned int SizeA;     // +0x00  flattened size of the 1st FmtStr
-    void* BufferA;          // +0x04  flattened bytes of the 1st FmtStr
+    fl::Slot32<void> BufferA;          // +0x04  flattened bytes of the 1st FmtStr
     unsigned int SizeB;     // +0x08  flattened size of the 2nd FmtStr
-    void* BufferB;          // +0x0c  flattened bytes of the 2nd FmtStr
+    fl::Slot32<void> BufferB;          // +0x0c  flattened bytes of the 2nd FmtStr
     unsigned int Field_0x10;// +0x10  the sender's 4th argument. TODO: semantics unproven.
 };
 static_assert(sizeof(FPayloadCommonPopUpDialog) == 0x14, "POP_UP_DIALOG payload 0x14");
@@ -398,7 +399,7 @@ static_assert(sizeof(FPayloadServerDwordPair) == 0x08, "ch2 dword-pair payload 0
 // packet+0x20. The matching packet destructor (e.g. FUN_06d974c0) frees packet+0x24.
 struct FPayloadServerBlob {
     unsigned int Size;   // +0x00
-    void* Buffer;        // +0x04  owned by the packet
+    fl::Slot32<void> Buffer;        // +0x04  owned by the packet
 };
 static_assert(sizeof(FPayloadServerBlob) == 0x08, "ch2 blob payload 0x08");
 
@@ -407,7 +408,7 @@ static_assert(sizeof(FPayloadServerBlob) == 0x08, "ch2 blob payload 0x08");
 // length at packet+0x24. Only FLPACKET_SERVER_GFUPDATEAMBIENTSCRIPT uses it, and its
 // receiver reads the fields in the matching (reversed) order, so the difference is real.
 struct FPayloadServerBlobReversed {
-    void* Buffer;        // +0x00  owned by the packet
+    fl::Slot32<void> Buffer;        // +0x00  owned by the packet
     unsigned int Size;   // +0x04
 };
 static_assert(sizeof(FPayloadServerBlobReversed) == 0x08, "ch2 reversed-blob payload 0x08");
@@ -520,7 +521,7 @@ struct FPayloadServerSetAddItem {
     unsigned char bEquipped;        // +0x18  <- EquipDesc +0x0c
     unsigned char bMission;         // +0x19  <- EquipDesc +0x18
     unsigned char Pad_0x1a[2];
-    char* Hardpoint;                // +0x1c  owned by the packet, nullptr when internal
+    fl::Slot32<char> Hardpoint;                // +0x1c  owned by the packet, nullptr when internal
 };
 static_assert(sizeof(FPayloadServerSetAddItem) == 0x20, "SETADDITEM payload 0x20");
 
@@ -729,7 +730,7 @@ static_assert(sizeof(FPayloadServerSetMusic) == 0x18, "SET_MUSIC payload 0x18");
 // payload+0x04 on kind 1.
 struct FPayloadServerPlayerList {
     unsigned int Kind;          // +0x00  0, 1 or 2; the ctor's 3 means "nothing to send"
-    wchar_t* Name;              // +0x04  malloc'd copy, freed by the packet
+    fl::Slot32<wchar_t> Name;              // +0x04  malloc'd copy, freed by the packet
     unsigned int Field_0x08;    // +0x08
     unsigned char Field_0x0c;   // +0x0c  delivered as bool: SETNZ against zero
     unsigned char Pad_0x0d[3];
@@ -902,8 +903,8 @@ static_assert(sizeof(FRpcDamageEntryMirror) == 0x0c, "damage entry is 0x0c (node
 
 // operator new(0x14) at 06d90413 / 06d90324.
 struct FRpcDamageEntryNode {
-    FRpcDamageEntryNode* Next;      // +0x00
-    FRpcDamageEntryNode* Prev;      // +0x04
+    fl::Slot32<FRpcDamageEntryNode> Next;      // +0x00
+    fl::Slot32<FRpcDamageEntryNode> Prev;      // +0x04
     FRpcDamageEntryMirror Value;    // +0x08
 };
 static_assert(sizeof(FRpcDamageEntryNode) == 0x14, "retail damage list node is operator new(0x14)");
@@ -912,7 +913,7 @@ static_assert(sizeof(FRpcDamageEntryNode) == 0x14, "retail damage list node is o
 struct FRpcDamageEntryList {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcDamageEntryNode* Head;      // +0x04  dummy node
+    fl::Slot32<FRpcDamageEntryNode> Head;      // +0x04  dummy node
     unsigned int Size;              // +0x08
 };
 static_assert(sizeof(FRpcDamageEntryList) == 0x0c, "retail std::list header is 0x0c");
@@ -1024,8 +1025,8 @@ struct FRpcLootWireRecord {
 static_assert(sizeof(FRpcLootWireRecord) == 0x48, "CREATELOOT wire record is 0x50 - 8 links");
 
 struct FRpcLootWireNode {
-    FRpcLootWireNode* Next;         // +0x00
-    FRpcLootWireNode* Prev;         // +0x04
+    fl::Slot32<FRpcLootWireNode> Next;         // +0x00
+    fl::Slot32<FRpcLootWireNode> Prev;         // +0x04
     FRpcLootWireRecord Value;       // +0x08
 };
 static_assert(sizeof(FRpcLootWireNode) == 0x50, "retail loot list node is operator new(0x50)");
@@ -1033,7 +1034,7 @@ static_assert(sizeof(FRpcLootWireNode) == 0x50, "retail loot list node is operat
 struct FRpcLootWireList {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcLootWireNode* Head;         // +0x04
+    fl::Slot32<FRpcLootWireNode> Head;         // +0x04
     unsigned int Size;              // +0x08
 };
 static_assert(sizeof(FRpcLootWireList) == 0x0c, "retail std::list header is 0x0c");
@@ -1149,7 +1150,7 @@ struct FPayloadServerRequestSpaceScript {
     unsigned int Field_0x10;        // +0x10 <- argument+0x110
     unsigned char Field_0x14;       // +0x14 <- the enum remap above
     unsigned char Pad_0x15[3];      // +0x15
-    char* Name;                     // +0x18  owned by the packet
+    fl::Slot32<char> Name;                     // +0x18  owned by the packet
 };
 static_assert(sizeof(FPayloadServerRequestSpaceScript) == 0x1c, "REQUESTSPACESCRIPT payload 0x1c");
 
@@ -1224,9 +1225,9 @@ static_assert(sizeof(FRpcRelation) == sizeof(::Reputation::Relation),
 // 0x06d88e81..0x06d88ec0 allocates the 8 bytes, copies the pair in and links the node;
 // receiver 0x06d814c8..0x06d814f3 copies the pair out and frees the value straight away.
 struct FRpcRelationNode {
-    FRpcRelationNode* Next;         // +0x00
-    FRpcRelationNode* Prev;         // +0x04
-    FRpcRelation* Value;            // +0x08
+    fl::Slot32<FRpcRelationNode> Next;         // +0x00
+    fl::Slot32<FRpcRelationNode> Prev;         // +0x04
+    fl::Slot32<FRpcRelation> Value;            // +0x08
 };
 static_assert(sizeof(FRpcRelationNode) == 0x0c,
               "retail relation list node is operator new(0xc)");
@@ -1234,7 +1235,7 @@ static_assert(sizeof(FRpcRelationNode) == 0x0c,
 struct FRpcRelationList {
     unsigned char Allocator;        // +0x00  VC6 allocator<T>: one byte, never read back
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcRelationNode* Head;         // +0x04  dummy node; Next == Prev == itself when empty
+    fl::Slot32<FRpcRelationNode> Head;         // +0x04  dummy node; Next == Prev == itself when empty
     unsigned int Size;              // +0x08
 };
 static_assert(sizeof(FRpcRelationList) == 0x0c,
@@ -1249,9 +1250,9 @@ static_assert(sizeof(FRpcRelationList) == 0x0c,
 // ===========================================================================
 struct FPayloadServerSetReputation {
     unsigned int NameASize;         // +0x00  06d88de5  flattened size of arg+0x18
-    void* NameABuffer;              // +0x04  06d88df6
+    fl::Slot32<void> NameABuffer;              // +0x04  06d88df6
     unsigned int NameBSize;         // +0x08  06d88e23  flattened size of arg+0x30
-    void* NameBBuffer;              // +0x0c  06d88e36
+    fl::Slot32<void> NameBBuffer;              // +0x0c  06d88e36
     float Attitude;                 // +0x10  06d88ee9 <- arg+0x04 ; ctor seeds 0
     // +0x14..+0x24 are the codec's FIVE PRESENCE-FLAG constants, not five payload
     // fields. The constructor seeds them 1, 2, 4, 8, 0x10 -- and the earlier claim
@@ -1272,7 +1273,7 @@ struct FPayloadServerSetReputation {
     unsigned int VibeHandle;        // +0x38  06d88db2 <- arg+0x00
     unsigned int Field_0x3c;        // +0x3c  06d88dbc <- arg+0x08 ; ctor seeds 0xffffffff
     unsigned int DisplayNameLength; // +0x40  FUN_06d92710: wcslen(arg+0x48) + 1, in wchar_t
-    wchar_t* DisplayName;           // +0x44  operator new((len+1)*4) -- see the note below
+    fl::Slot32<wchar_t> DisplayName;           // +0x44  operator new((len+1)*4) -- see the note below
 };
 static_assert(sizeof(FPayloadServerSetReputation) == 0x48, "SETREPUTATION payload 0x48");
 
@@ -1300,7 +1301,7 @@ static_assert(sizeof(FPayloadServerSetReputation) == 0x48, "SETREPUTATION payloa
 // strncpy, size at packet+0x24), and the relation list is the same std::list<Relation*>.
 // ===========================================================================
 struct FPayloadServerSetGroupFeelings {
-    char* Name;                     // +0x00  FUN_06d91850: operator new(strlen+1) + strncpy
+    fl::Slot32<char> Name;                     // +0x00  FUN_06d91850: operator new(strlen+1) + strncpy
     unsigned int NameSize;          // +0x04  strlen(arg+0x00) + 1, from the REPNE SCASB
     FRpcRelationList Relations;     // +0x08  packet+0x28..+0x33 (FUN_06d91ca0 / FUN_06d91d20)
 };
@@ -1320,7 +1321,7 @@ struct FPayloadServerReplaceMissionObjective {
     unsigned int Field_0x00;        // +0x00  06d8adba <- arg+0x00
     unsigned int State;             // +0x04  06d8adbd MOVZX from the BYTE at arg+0x20
     unsigned int TextSize;          // +0x08  06d8ae12
-    void* TextBuffer;               // +0x0c  06d8ae22
+    fl::Slot32<void> TextBuffer;               // +0x0c  06d8ae22
 };
 static_assert(sizeof(FPayloadServerReplaceMissionObjective) == 0x10,
               "REPLACEMISSIONOBJECTIVE payload 0x10");
@@ -1336,7 +1337,7 @@ static_assert(sizeof(FPayloadServerReplaceMissionObjective) == 0x10,
 // ===========================================================================
 struct FPayloadServerSetMissionMessage {
     unsigned int TextSize;          // +0x00  06d8afd0
-    void* TextBuffer;               // +0x04  06d8afe0
+    fl::Slot32<void> TextBuffer;               // +0x04  06d8afe0
     unsigned int Field_0x08;        // +0x08  06d8aff4 <- arg+0x18
 };
 static_assert(sizeof(FPayloadServerSetMissionMessage) == 0x0c,
@@ -1356,15 +1357,15 @@ struct FRpcMissionObjectiveRecord {
     unsigned char State;            // +0x00  06d8b15d
     unsigned char Pad_0x01[3];      // +0x01  retail news 0xc and writes only byte 0 here
     unsigned int TextSize;          // +0x04  06d8b1a0
-    void* TextBuffer;               // +0x08  06d8b1b2
+    fl::Slot32<void> TextBuffer;               // +0x08  06d8b1b2
 };
 static_assert(sizeof(FRpcMissionObjectiveRecord) == 0x0c,
               "per-objective record is operator new(0xc)");
 
 struct FRpcMissionObjectiveNode {
-    FRpcMissionObjectiveNode* Next; // +0x00
-    FRpcMissionObjectiveNode* Prev; // +0x04
-    FRpcMissionObjectiveRecord* Value;  // +0x08  again a POINTER, not an inline value
+    fl::Slot32<FRpcMissionObjectiveNode> Next; // +0x00
+    fl::Slot32<FRpcMissionObjectiveNode> Prev; // +0x04
+    fl::Slot32<FRpcMissionObjectiveRecord> Value;  // +0x08  again a POINTER, not an inline value
 };
 static_assert(sizeof(FRpcMissionObjectiveNode) == 0x0c,
               "retail objective list node is operator new(0xc)");
@@ -1372,7 +1373,7 @@ static_assert(sizeof(FRpcMissionObjectiveNode) == 0x0c,
 struct FRpcMissionObjectiveList {
     unsigned char Allocator;        // +0x00
     unsigned char Pad_0x01[3];      // +0x01
-    FRpcMissionObjectiveNode* Head; // +0x04
+    fl::Slot32<FRpcMissionObjectiveNode> Head; // +0x04
     unsigned int Size;              // +0x08
 };
 static_assert(sizeof(FRpcMissionObjectiveList) == 0x0c,
@@ -1382,9 +1383,9 @@ struct FPayloadServerSetMissionObjectives {
     unsigned int Field_0x00;        // +0x00  06d8b04b <- arg+0x00
     unsigned int Field_0x04;        // +0x04  06d8b058 MOVZX from the BYTE at arg+0x3c
     unsigned int TextASize;         // +0x08  06d8b0a0  flattened size of arg+0x0c
-    void* TextABuffer;              // +0x0c  06d8b0b3
+    fl::Slot32<void> TextABuffer;              // +0x0c  06d8b0b3
     unsigned int TextBSize;         // +0x10  06d8b100  flattened size of arg+0x24
-    void* TextBBuffer;              // +0x14  06d8b111
+    fl::Slot32<void> TextBBuffer;              // +0x14  06d8b111
     unsigned int Count;             // +0x18  NOT written directly: FUN_06d8fc10 increments
                                     //        packet+0x38 on every push_back, in lockstep
                                     //        with the list size at packet+0x44
@@ -1423,7 +1424,7 @@ static_assert(sizeof(FPayloadServerSetMissionObjectives) == 0x28,
 // a member-less derived class local to rpclocal, whose ctor stores this module's vftable
 // after COMMON's ctor and whose deleting dtor frees with this module's operator delete.
 struct FPayloadServerLoadHint {
-    void* Buffer;                   // +0x00  06d90a00: operator new(Size) + the copy
+    fl::Slot32<void> Buffer;                   // +0x00  06d90a00: operator new(Size) + the copy
     unsigned int Size;              // +0x04  06d90a2e `MOV dword ptr [EBX + 0x24],EBP`
     unsigned int Kind;              // +0x08  06d8a406 <- BaseHint::Kind at hint+0x04
 };
@@ -1741,7 +1742,7 @@ struct FPayloadClientReqAddItem {
     float Health;                 // +0x0c
     unsigned char bMounted;       // +0x10
     unsigned char Pad_0x11[3];
-    char* Hardpoint;              // +0x14  packet-owned copy
+    fl::Slot32<char> Hardpoint;              // +0x14  packet-owned copy
 };
 static_assert(sizeof(FPayloadClientReqAddItem) == 0x18, "REQADDITEM payload 0x18");
 
@@ -1757,7 +1758,7 @@ struct FPayloadClientReqModifyItem {
     float Health;                 // +0x0c
     unsigned char bMounted;       // +0x10
     unsigned char Pad_0x11[3];
-    char* Hardpoint;              // +0x14  packet-owned copy
+    fl::Slot32<char> Hardpoint;              // +0x14  packet-owned copy
 };
 static_assert(sizeof(FPayloadClientReqModifyItem) == 0x18, "REQMODIFYITEM payload 0x18");
 
@@ -1770,7 +1771,7 @@ static_assert(sizeof(FPayloadClientReqModifyItem) == 0x18, "REQMODIFYITEM payloa
 // reads the count, but the sender writes it, so it is part of the layout.
 struct FPayloadClientSaveGame {
     unsigned char CharId[0x200];      // +0x000  a CHARACTER_ID
-    wchar_t* Description;             // +0x200  packet-owned wide string copy
+    fl::Slot32<wchar_t> Description;             // +0x200  packet-owned wide string copy
     unsigned int DescriptionCount;    // +0x204  in wide characters, including the NUL
 };
 static_assert(sizeof(FPayloadClientSaveGame) == 0x208, "SAVEGAME payload 0x208");
@@ -1857,7 +1858,7 @@ struct FPayloadClientDbgCreateShip {
     Vector Field_0x20;              // +0x20  FUN_06d8f510
     Quaternion Orientation;         // +0x2c  FUN_06d8f4f0, ctor default {1,0,0,0}
     unsigned int Field_0x3c;        // +0x3c  dword, 06db07a1 / 06db0d09
-    wchar_t* NameChars;             // +0x40  packet-owned, freed at 06db0503
+    fl::Slot32<wchar_t> NameChars;             // +0x40  packet-owned, freed at 06db0503
     unsigned int NameCharCount;     // +0x44  in wide characters
     unsigned int BlockASize;        // +0x48  in bytes
     unsigned int BlockBSize;        // +0x4c  in bytes
@@ -1867,8 +1868,8 @@ struct FPayloadClientDbgCreateShip {
     unsigned int Field_0x5c;        // +0x5c  dword, 06db0a19 / 06db0f5c
     unsigned int DwordArrayCount;   // +0x60  element count, not a byte count
     unsigned int* DwordArray;       // +0x64  packet-owned, freed at 06db053f
-    void* BlockA;                   // +0x68  packet-owned, freed at 06db0519
-    void* BlockB;                   // +0x6c  packet-owned, freed at 06db052c
+    fl::Slot32<void> BlockA;                   // +0x68  packet-owned, freed at 06db0519
+    fl::Slot32<void> BlockB;                   // +0x6c  packet-owned, freed at 06db052c
 };
 static_assert(sizeof(FPayloadClientDbgCreateShip) == 0x70, "DBGCREATESHIP payload 0x70");
 
@@ -1893,7 +1894,7 @@ static_assert(sizeof(FPayloadClientDbgDestroyObject) == 0x08, "DBGDESTROYOBJECT 
 // TradeResponse(payload+0x04, payload+0x00, Session).
 struct FPayloadClientBlob {
     unsigned int Size;            // +0x00
-    void* Buffer;                 // +0x04  packet-owned copy
+    fl::Slot32<void> Buffer;                 // +0x04  packet-owned copy
 };
 static_assert(sizeof(FPayloadClientBlob) == 0x08, "TRADERESPONSE payload 0x08");
 

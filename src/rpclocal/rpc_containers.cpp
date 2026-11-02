@@ -1063,7 +1063,7 @@ __declspec(dllexport) void RpcCreateObjectHeaderRead(CEqObjCreateInfo& Dest,
 // 06d89b30..06d89c23 (BlockA; BlockB is the same run at 06d89c25..06d89d12).
 // The inline block is a Costume (server_characterset.h): four part ids, eight accessory
 // ids, the accessory count.
-static void RpcIdBlockToWire(FRpcIdArrayBlockWire** Out, const Costume& Source) {
+static void RpcIdBlockToWire(fl::Slot32<FRpcIdArrayBlockWire>* Out, const Costume& Source) {
     // 06d89b38 operator new(0x18); the new-expression's test (06d89b42) only skips the
     // six zero stores -- the pointer is stored and written through either way.
     FRpcIdArrayBlockWire* Block = static_cast<FRpcIdArrayBlockWire*>(
@@ -1404,7 +1404,7 @@ void RpcCharacterInfoWireListRelease(FRpcCharacterInfoWireList* List) {
 // (06d946aa) skips just the six zero stores; the five scalars in retail's order; then,
 // for an UNSIGNED non-zero count (06d94724 JBE), a bare operator new(count * 4) and a
 // dword copy whose bound re-reads the DESTINATION's count (06d94768 / 06d9476e JC).
-static void RpcIdBlockWireCopy(FRpcIdArrayBlockWire** Out, const FRpcIdArrayBlockWire* Source) {
+static void RpcIdBlockWireCopy(fl::Slot32<FRpcIdArrayBlockWire>* Out, const FRpcIdArrayBlockWire* Source) {
     if (Source == nullptr) {                                         // 06d94692 / 06d94770
         return;
     }
@@ -1629,7 +1629,7 @@ static void RpcEncodeIdBlock(FRpcMarshalStream& Stream, const FRpcIdArrayBlockWi
     Stream.PutBytes(Block->Ids, (unsigned int)Block->Count * 4u);
 }
 
-static bool RpcDecodeIdBlock(FRpcMarshalStream& Stream, FRpcIdArrayBlockWire** Out) {
+static bool RpcDecodeIdBlock(FRpcMarshalStream& Stream, fl::Slot32<FRpcIdArrayBlockWire>* Out) {
     *Out = nullptr;
     unsigned char bPresent = 0;
     if (!Stream.GetByte(bPresent)) {                  // 06d93bd8

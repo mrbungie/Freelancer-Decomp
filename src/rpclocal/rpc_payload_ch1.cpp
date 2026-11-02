@@ -329,7 +329,7 @@ static bool MarshalSetWeaponGroup(FPacketBase* P, const uintptr_t* A, unsigned i
 }
 static bool DeliverSetWeaponGroup(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonSetWeaponGroup(1u, static_cast<const unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonSetWeaponGroup(1u, static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -342,7 +342,7 @@ static bool MarshalSetVisitedState(FPacketBase* P, const uintptr_t* A, unsigned 
 }
 static bool DeliverSetVisitedState(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonSetVisitedState(1u, static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonSetVisitedState(1u, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -353,7 +353,7 @@ static bool MarshalRequestBestPath(FPacketBase* P, const uintptr_t* A, unsigned 
 }
 static bool DeliverRequestBestPath(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonRequestBestPath(1u, static_cast<const unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonRequestBestPath(1u, static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -363,7 +363,7 @@ static bool MarshalRequestGroupPositions(FPacketBase* P, const uintptr_t* A, uns
 }
 static bool DeliverRequestGroupPositions(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonRequestGroupPositions(1u, static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonRequestGroupPositions(1u, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -374,7 +374,7 @@ static bool MarshalRequestPlayerStats(FPacketBase* P, const uintptr_t* A, unsign
 }
 static bool DeliverRequestPlayerStats(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonRequestPlayerStats(1u, static_cast<const unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonRequestPlayerStats(1u, static_cast<const unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -384,7 +384,7 @@ static bool MarshalSetMissionLog(FPacketBase* P, const uintptr_t* A, unsigned in
 }
 static bool DeliverSetMissionLog(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonSetMissionLog(1u, static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonSetMissionLog(1u, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -394,7 +394,7 @@ static bool MarshalRequestRankLevel(FPacketBase* P, const uintptr_t* A, unsigned
 }
 static bool DeliverRequestRankLevel(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonRequestRankLevel(1u, static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonRequestRankLevel(1u, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 
@@ -404,7 +404,7 @@ static bool MarshalSetInterfaceState(FPacketBase* P, const uintptr_t* A, unsigne
 }
 static bool DeliverSetInterfaceState(const FPacketBase* Packet, IClient* Client, IChatClient*) {
     const FPayloadCommonBuffer Wire = RpcPayloadRead<FPayloadCommonBuffer>(Packet, 0);
-    Client->SendCommonSetInterfaceState(1u, static_cast<unsigned char*>(Wire.Buffer), Wire.Size);
+    Client->SendCommonSetInterfaceState(1u, static_cast<unsigned char*>(static_cast<void*>(Wire.Buffer)), Wire.Size);
     return true;
 }
 

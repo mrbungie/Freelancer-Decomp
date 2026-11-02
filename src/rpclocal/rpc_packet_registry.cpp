@@ -40,6 +40,7 @@
 // in rpc_wire_*.cpp / rpc_containers.cpp / rpc_packet_dump.cpp. Five classes keep
 // CDAPacket's own 06da13d0 / 06da1470, and 150 keep the no-op dump.
 
+#include "fl/handles.h"
 #include "rpc_transport.h"
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
@@ -52,16 +53,19 @@
 namespace {
 
 // A field at a packet-relative offset, exactly as the retail bodies address it.
+// A pointer-typed field is a retail 4-byte slot: it is a fl::Slot32 here, so it reads and writes like the pointer.
+template<typename T> struct RpcPacketFieldType { using Type = T; };
+template<typename T> struct RpcPacketFieldType<T*> { using Type = fl::Slot32<T>; };
 template<typename T>
-inline T& RpcPacketField(FPacketBase* Packet, unsigned int Offset) {
-    return *reinterpret_cast<T*>(reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
+inline typename RpcPacketFieldType<T>::Type& RpcPacketField(FPacketBase* Packet, unsigned int Offset) {
+    return *reinterpret_cast<typename RpcPacketFieldType<T>::Type*>(reinterpret_cast<unsigned char*>(Packet) + FPacketRetailOffset(Offset));
 }
 
 // One node of an MSVCP60 std::list<T*> embedded in a packet: { _Next, _Prev, _Myval }.
 struct FRpcPacketListNode {
-    FRpcPacketListNode* Next;   // +0x00
-    FRpcPacketListNode* Prev;   // +0x04
-    void* Value;                // +0x08
+    fl::Slot32<FRpcPacketListNode> Next;   // +0x00
+    fl::Slot32<FRpcPacketListNode> Prev;   // +0x04
+    fl::Slot32<void> Value;                // +0x08
 };
 
 // The 19-instruction factory every class registers; see the header comment.
@@ -888,7 +892,7 @@ static_assert(sizeof(FPacket_FLPACKET_SERVER_REQUEST_RETURNED) == 0x28u, "FLPACK
 class FPacket_FLPACKET_SERVER_CHARACTERINFO : public FPacketBase {
 public:
     FPacket_FLPACKET_SERVER_CHARACTERINFO() : FPacketBase(0x20003u) {
-        RpcPacketBuildListSentinel(this, 0x28u, 0x0cu);   // 06d9d549 operator new(0xc), Head (host layout: Records is 8-aligned at payload+8)
+        RpcPacketBuildListSentinel(this, 0x24u, 0x0cu);   // 06d9d549 operator new(0xc), Head (list header at payload+4)
     }
     // FUN_06d93350
     ~FPacket_FLPACKET_SERVER_CHARACTERINFO() override {
@@ -896,7 +900,7 @@ public:
         // equipment handle, the two strings, the record), then 06d93472..06d934ab the
         // nodes through FUN_06d901f0 and the sentinel.
         RpcCharacterInfoWireListRelease(
-            reinterpret_cast<FRpcCharacterInfoWireList*>(Payload() + 0x08));
+            reinterpret_cast<FRpcCharacterInfoWireList*>(Payload() + 0x04));
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06d949d0
@@ -2093,7 +2097,7 @@ public:
         // 06d8fb28..06d8fb65: every record, then its text block before the record itself.
         FRpcPacketListNode* Sentinel = RpcPacketField<FRpcPacketListNode*>(this, 0x40u);
         for (FRpcPacketListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next) {
-            unsigned char* Record = static_cast<unsigned char*>(Node->Value);
+            unsigned char* Record = static_cast<unsigned char*>(static_cast<void*>(Node->Value));
             if (Record != nullptr) {                                   // 06d8fb43
                 void* Text = *reinterpret_cast<void**>(Record + 0x08);  // 06d8fb47
                 if (Text != nullptr) {
