@@ -8,6 +8,7 @@
 //  * DirectInput replacement: SDL events -> IDirectInput8-shaped devices.             [NOT implemented: the
 //    stubs below fail device creation and report it]
 //  * Rendering: an IRenderPipeline (RPModern) backend; the D3D8/9 pipelines are not built. [NOT implemented]
+#include <sys/resource.h>
 #include "fl/platform.h"
 #include "win_compat.h"
 
@@ -162,6 +163,16 @@ int main(int argc, char** argv)
     // (DLL_PROCESS_ATTACH) here, as the Windows loader would have.
     for (const char* const* m = FlImplicitModules; *m; ++m)
         LoadLibraryA(*m);
+
+    {   // The game keeps many data files open at once; macOS shells default to 256 descriptors.
+        struct rlimit lim;
+        if (getrlimit(RLIMIT_NOFILE, &lim) == 0)
+        {
+            rlim_t want = 65536;
+            if (lim.rlim_max != RLIM_INFINITY && lim.rlim_max < want) want = lim.rlim_max;
+            if (lim.rlim_cur < want) { lim.rlim_cur = want; setrlimit(RLIMIT_NOFILE, &lim); }
+        }
+    }
 
     static SdlWindowHost host;
     fl::SetWindowHost(&host);
