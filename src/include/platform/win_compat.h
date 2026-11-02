@@ -5,9 +5,11 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstdarg>
 #include <cstring>
 #include <cmath>
 #include <mutex>
+#include <condition_variable>
 #include <thread>
 #include <chrono>
 #include <cstdlib>
@@ -40,6 +42,8 @@ typedef int BOOL;
 
 typedef uint8_t  BYTE;
 typedef uint16_t WORD;
+typedef uint16_t USHORT;
+typedef int16_t  SHORT;
 typedef uint32_t DWORD;
 typedef uint32_t UINT;
 typedef int32_t  INT;
@@ -49,6 +53,15 @@ typedef int64_t  LONGLONG;
 typedef uint64_t ULONGLONG;
 typedef float    FLOAT;
 typedef double   DOUBLE;
+
+typedef BYTE*    PBYTE;
+typedef DWORD*   PDWORD;
+typedef ULONG*   PULONG;
+typedef WORD*    PWORD;
+typedef int*     PINT;
+typedef LONG*    PLONG;
+typedef LONG*    LPLONG;
+typedef ULONG*   LPULONG;
 
 typedef uintptr_t ULONG_PTR;
 typedef intptr_t  LONG_PTR;
@@ -67,16 +80,21 @@ typedef void* HCURSOR;
 typedef void* HBRUSH;
 typedef void* HKEY;
 typedef void* HBITMAP;
+typedef void* HMONITOR;
 
 typedef void* LPVOID;
 typedef const void* LPCVOID;
 
 typedef char CHAR;
 typedef char* LPSTR;
+typedef char* PSTR;
 typedef const char* LPCSTR;
+typedef const char* PCSTR;
 typedef wchar_t WCHAR;
 typedef wchar_t* LPWSTR;
+typedef wchar_t* PWSTR;
 typedef const wchar_t* LPCWSTR;
+typedef const wchar_t* PCWSTR;
 
 #define LOWORD(l) ((WORD)(((DWORD_PTR)(l)) & 0xffff))
 #define HIWORD(l) ((WORD)((((DWORD_PTR)(l)) >> 16) & 0xffff))
@@ -99,6 +117,11 @@ typedef int32_t HRESULT;
 
 #define SUCCEEDED(hr) (((HRESULT)(hr)) >= 0)
 #define FAILED(hr) (((HRESULT)(hr)) < 0)
+
+#ifndef MAKE_HRESULT
+#define MAKE_HRESULT(sev,fac,code) \
+    ((HRESULT)(((uint32_t)(sev)<<31) | ((uint32_t)(fac)<<16) | ((uint32_t)(code))))
+#endif
 
 #define MAX_PATH 260
 #define _MAX_PATH 260
@@ -134,10 +157,79 @@ typedef struct _WIN32_FIND_DATAA {
     CHAR cAlternateFileName[14];
 } WIN32_FIND_DATAA, *PWIN32_FIND_DATAA, *LPWIN32_FIND_DATAA;
 
+struct WinEvent {
+    bool manual_reset;
+    bool signaled;
+    std::mutex mtx;
+    std::condition_variable cv;
+};
+
+inline HANDLE CreateEventA(void*, BOOL bManualReset, BOOL bInitialState, const char*) {
+    auto ev = new WinEvent();
+    ev->manual_reset = (bManualReset != 0);
+    ev->signaled = (bInitialState != 0);
+    return (HANDLE)ev;
+}
+inline HANDLE CreateEventW(void* p, BOOL bManualReset, BOOL bInitialState, const wchar_t*) {
+    return CreateEventA(p, bManualReset, bInitialState, nullptr);
+}
+inline BOOL SetEvent(HANDLE hEvent) {
+    if (!hEvent) return FALSE;
+    auto ev = (WinEvent*)hEvent;
+    {
+        std::lock_guard<std::mutex> lock(ev->mtx);
+        ev->signaled = true;
+    }
+    if (ev->manual_reset) {
+        ev->cv.notify_all();
+    } else {
+        ev->cv.notify_one();
+    }
+    return TRUE;
+}
+inline BOOL ResetEvent(HANDLE hEvent) {
+    if (!hEvent) return FALSE;
+    auto ev = (WinEvent*)hEvent;
+    std::lock_guard<std::mutex> lock(ev->mtx);
+    ev->signaled = false;
+    return TRUE;
+}
+
+#define INFINITE 0xFFFFFFFF
+#define WAIT_OBJECT_0 0
+#define WAIT_TIMEOUT 258
+#define WAIT_FAILED 0xFFFFFFFF
+
+inline DWORD WaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds) {
+    if (!hHandle) return WAIT_FAILED;
+    auto ev = (WinEvent*)hHandle;
+    std::unique_lock<std::mutex> lock(ev->mtx);
+    if (dwMilliseconds == INFINITE) {
+        ev->cv.wait(lock, [&]() { return ev->signaled; });
+        if (!ev->manual_reset) {
+            ev->signaled = false;
+        }
+        return WAIT_OBJECT_0;
+    } else {
+        bool res = ev->cv.wait_for(lock, std::chrono::milliseconds(dwMilliseconds), [&]() { return ev->signaled; });
+        if (res) {
+            if (!ev->manual_reset) {
+                ev->signaled = false;
+            }
+            return WAIT_OBJECT_0;
+        }
+        return WAIT_TIMEOUT;
+    }
+}
+
 inline BOOL CloseHandle(HANDLE hObject) {
     (void)hObject;
     return TRUE;
 }
+
+inline HANDLE GetProcessHeap() { return (HANDLE)1; }
+inline LPVOID HeapAlloc(HANDLE, DWORD, size_t dwBytes) { return std::malloc(dwBytes); }
+inline BOOL HeapFree(HANDLE, DWORD, LPVOID lpMem) { std::free(lpMem); return TRUE; }
 
 inline BOOL UnmapViewOfFile(LPCVOID lpBaseAddress) {
     (void)lpBaseAddress;
@@ -161,6 +253,8 @@ typedef void* LPSECURITY_ATTRIBUTES;
 #define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
 #define FILE_ATTRIBUTE_NORMAL    0x00000080
 #define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+#define FILE_FLAG_SEQUENTIAL_SCAN 0x08000000
+#define FILE_FLAG_RANDOM_ACCESS   0x10000000
 
 #define PAGE_READONLY  0x02
 #define PAGE_READWRITE 0x04
@@ -343,6 +437,27 @@ inline BOOL DosDateTimeToFileTime(WORD wFatDate, WORD wFatTime, LPFILETIME lpFil
 #define wsprintfA sprintf
 #define wsprintf sprintf
 
+inline int _swprintf(wchar_t* buffer, const wchar_t* format, ...) {
+    va_list args;
+    va_start(args, format);
+    int res = vswprintf(buffer, 2048, format, args);
+    va_end(args);
+    return res;
+}
+
+inline char* _itoa(int value, char* str, int radix) {
+    if (radix == 10) {
+        std::sprintf(str, "%d", value);
+    } else if (radix == 16) {
+        std::sprintf(str, "%x", value);
+    } else if (radix == 8) {
+        std::sprintf(str, "%o", value);
+    } else {
+        std::sprintf(str, "%d", value);
+    }
+    return str;
+}
+
 inline char* _strlwr(char* str) {
     if (!str) return nullptr;
     for (char* p = str; *p; ++p) *p = static_cast<char>(std::tolower(static_cast<unsigned char>(*p)));
@@ -373,6 +488,32 @@ typedef struct tagRECT {
     LONG bottom;
 } RECT, *PRECT, *LPRECT;
 
+inline BOOL SetRect(LPRECT lprc, int xLeft, int yTop, int xRight, int yBottom) {
+    if (!lprc) return FALSE;
+    lprc->left = xLeft; lprc->top = yTop; lprc->right = xRight; lprc->bottom = yBottom;
+    return TRUE;
+}
+
+typedef struct tagPALETTEENTRY {
+    BYTE peRed;
+    BYTE peGreen;
+    BYTE peBlue;
+    BYTE peFlags;
+} PALETTEENTRY, *PPALETTEENTRY, *LPPALETTEENTRY;
+
+typedef struct _RGNDATAHEADER {
+    DWORD dwSize;
+    DWORD iType;
+    DWORD nCount;
+    DWORD nRgnSize;
+    RECT  rcBound;
+} RGNDATAHEADER;
+
+typedef struct _RGNDATA {
+    RGNDATAHEADER rdh;
+    char          Buffer[1];
+} RGNDATA, *PRGNDATA, *NPRGNDATA, *LPRGNDATA;
+
 typedef struct tagPOINT {
     LONG x;
     LONG y;
@@ -389,7 +530,75 @@ typedef struct _GUID {
     uint16_t Data2;
     uint16_t Data3;
     uint8_t  Data4[8];
-} GUID, IID, CLSID, REFGUID, REFIID, REFCLSID;
+} GUID, IID, CLSID;
+
+typedef GUID *LPGUID;
+typedef const GUID *LPCGUID;
+
+#define REFGUID const GUID &
+#define REFIID const IID &
+#define REFCLSID const CLSID &
+
+#ifndef DEFINE_GUID
+#define DEFINE_GUID(name, l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
+    inline const GUID name = { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 } }
+#endif
+
+#ifndef __MSABI_LONG
+#define __MSABI_LONG(x) (x)
+#endif
+
+#ifndef DECL_WINELIB_TYPE_AW
+#define DECL_WINELIB_TYPE_AW(type) typedef type##A type;
+#endif
+
+typedef struct tWAVEFORMATEX {
+    WORD        wFormatTag;
+    WORD        nChannels;
+    DWORD       nSamplesPerSec;
+    DWORD       nAvgBytesPerSec;
+    WORD        nBlockAlign;
+    WORD        wBitsPerSample;
+    WORD        cbSize;
+} WAVEFORMATEX, *PWAVEFORMATEX, *NPWAVEFORMATEX, *LPWAVEFORMATEX;
+typedef const WAVEFORMATEX *LPCWAVEFORMATEX;
+
+#define STDMETHODCALLTYPE __stdcall
+#define STDMETHODVCALLTYPE __cdecl
+#define PVOID void*
+
+#ifndef STDMETHOD
+#define STDMETHOD(method)        virtual HRESULT STDMETHODCALLTYPE method
+#define STDMETHOD_(type,method)  virtual type STDMETHODCALLTYPE method
+#define STDMETHODV(method)       virtual HRESULT STDMETHODVCALLTYPE method
+#define STDMETHODV_(type,method) virtual type STDMETHODVCALLTYPE method
+#define PURE                     = 0
+#define THIS_
+#define THIS                     void
+#endif
+
+#ifndef DECLARE_INTERFACE
+#define DECLARE_INTERFACE(iface)                         struct iface
+#define DECLARE_INTERFACE_(iface, baseiface)             struct iface : public baseiface
+#define DECLARE_INTERFACE_IID(iface, iid)                struct iface
+#define DECLARE_INTERFACE_IID_(iface, baseiface, iid)    struct iface : public baseiface
+#endif
+
+struct IUnknown;
+typedef IUnknown *LPUNKNOWN;
+
+#define CLSCTX_INPROC_SERVER 0x1
+#define CLSCTX_INPROC_HANDLER 0x2
+#define CLSCTX_LOCAL_SERVER 0x4
+#define CLSCTX_REMOTE_SERVER 0x10
+#define CLSCTX_ALL (CLSCTX_INPROC_SERVER|CLSCTX_INPROC_HANDLER|CLSCTX_LOCAL_SERVER|CLSCTX_REMOTE_SERVER)
+
+inline HRESULT CoInitialize(void*) { return S_OK; }
+inline void CoUninitialize() {}
+inline HRESULT CoCreateInstance(REFCLSID, IUnknown*, DWORD, REFIID, void** ppv) {
+    if (ppv) *ppv = nullptr;
+    return E_FAIL;
+}
 
 inline bool operator==(const GUID& a, const GUID& b) {
     return std::memcmp(&a, &b, sizeof(GUID)) == 0;
@@ -406,6 +615,55 @@ struct IUnknown {
     virtual ULONG STDMETHODCALLTYPE AddRef() = 0;
     virtual ULONG STDMETHODCALLTYPE Release() = 0;
 };
+
+struct IClassFactory : IUnknown {
+    virtual HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppvObject) = 0;
+    virtual HRESULT STDMETHODCALLTYPE LockServer(BOOL fLock) = 0;
+};
+
+#define CREATE_SUSPENDED 0x00000004
+typedef DWORD (WINAPI *LPTHREAD_START_ROUTINE)(LPVOID lpThreadParameter);
+
+struct WinThread {
+    std::thread th;
+    LPTHREAD_START_ROUTINE func = nullptr;
+    LPVOID param = nullptr;
+    bool suspended = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool started = false;
+};
+
+inline HANDLE CreateThread(void*, size_t, LPTHREAD_START_ROUTINE lpStartAddress, LPVOID lpParameter, DWORD dwCreationFlags, LPDWORD lpThreadId) {
+    auto wt = new WinThread();
+    wt->func = lpStartAddress;
+    wt->param = lpParameter;
+    wt->suspended = (dwCreationFlags & CREATE_SUSPENDED) != 0;
+    if (lpThreadId) *lpThreadId = 1;
+    wt->th = std::thread([wt]() {
+        if (wt->suspended) {
+            std::unique_lock<std::mutex> lock(wt->mtx);
+            wt->cv.wait(lock, [&]() { return wt->started; });
+        }
+        if (wt->func) wt->func(wt->param);
+    });
+    if (!wt->suspended) {
+        wt->th.detach();
+    }
+    return (HANDLE)wt;
+}
+
+inline DWORD ResumeThread(HANDLE hThread) {
+    if (!hThread) return (DWORD)-1;
+    auto wt = (WinThread*)hThread;
+    {
+        std::lock_guard<std::mutex> lock(wt->mtx);
+        wt->started = true;
+    }
+    wt->cv.notify_one();
+    wt->th.detach();
+    return 0;
+}
 
 // CRITICAL_SECTION: MUST be recursive mutex to preserve Win32 semantics
 typedef struct _CRITICAL_SECTION {

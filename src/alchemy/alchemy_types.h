@@ -1361,6 +1361,4 @@ namespace AlchemyImpl
         virtual GENRESULT DACOM_API Slot0x30(unsigned long Arg) = 0;
     };
 
-    struct IFxEffect;
-
 } // namespace AlchemyImpl

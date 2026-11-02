@@ -12,6 +12,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include/platform
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/include/platform/dx
 )
 
 if(APPLE)

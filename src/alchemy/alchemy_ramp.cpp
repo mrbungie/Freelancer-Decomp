@@ -10,8 +10,10 @@
 #include "alchemy_appearances.h"
 #include "alchemy_math.h"
 
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
 #include <intrin.h>
 #include <xmmintrin.h>
+#endif
 
 #include <cmath>
 #include <cstring>
@@ -42,9 +44,13 @@ namespace AlchemyImpl
     // -- bit 25, SSE. Executed on every SetMode call, as retail does.
     static bool RampCpuHasSse()
     {
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
         int Registers[4] = {0, 0, 0, 0};
         __cpuid(Registers, 1);
         return (Registers[3] & 0x2000000) != 0;
+#else
+        return false;
+#endif
     }
 
     // DAT_0624bac4 = 1.0f, DAT_0624bb14 = 3.0f, DAT_0624babc = 255.0f,
@@ -218,7 +224,11 @@ namespace AlchemyImpl
     static unsigned long RampColorSmoothMmx(unsigned long A, unsigned long B, float T)
     {
         const float Weight = (T * -2.0f + 3.0f) * T * T * kRamp255;
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
         const int W = _mm_cvtss_si32(_mm_set_ss(Weight));
+#else
+        const int W = static_cast<int>(std::round(Weight));
+#endif
         const unsigned short WeightB = static_cast<unsigned short>(W);
         const unsigned short WeightA = static_cast<unsigned short>(0xFF - WeightB);
         unsigned long Result = 0;

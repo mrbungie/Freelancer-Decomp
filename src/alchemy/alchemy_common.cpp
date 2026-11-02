@@ -28,8 +28,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
 #include <intrin.h>
 #include <xmmintrin.h>
+#endif
 
 // alchemy.dll — DACOM particle FX scaffolding.
 // Shared constants, CRC/hash helpers, string helpers, FDUMP/debug helpers,
@@ -1429,6 +1431,7 @@ namespace AlchemyImpl
     // precision and CVTTSS2SI's indefinite result, without C++ conversion UB.
     static void ComputeSinCosSse(float AngleRadians, float* Out)
     {
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
         unsigned long AngleBits;
         std::memcpy(&AngleBits, &AngleRadians, sizeof(AngleBits));
         const unsigned long AbsBits = AngleBits & 0x7FFFFFFFu;
@@ -1481,6 +1484,10 @@ namespace AlchemyImpl
         SinValue = _mm_mul_ss(SinValue, SinFactor);
         _mm_store_ss(&Out[0], CosValue);
         _mm_store_ss(&Out[1], SinValue);
+#else
+        Out[0] = std::cos(AngleRadians);
+        Out[1] = std::sin(AngleRadians);
+#endif
     }
 
     static void ComputeSinCosFpu(float AngleRadians, float* Output)
@@ -1488,6 +1495,7 @@ namespace AlchemyImpl
         // FUN_0623f6b0: libm reduces angles that x87 deliberately leaves
         // unchanged when |AngleRadians| >= 2^63 (C2 set). Preserve the
         // instruction semantics and both float stores; no calls in asm.
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             fld AngleRadians
@@ -1498,16 +1506,24 @@ namespace AlchemyImpl
             fsin
             fstp dword ptr [eax + 4]
         }
+#else
+        Output[0] = std::cos(AngleRadians);
+        Output[1] = std::sin(AngleRadians);
+#endif
     }
 
     FnAlchemySinCos G_AlchemySinCos = ComputeSinCosFpu; // PTR_FUN_062572a0
 
     void SelectAlchemyMathImplementation()
     {
+#if defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__) || defined(__i386__)
         int CpuInfo[4];
         __cpuid(CpuInfo, 1);
         if ((CpuInfo[3] & 0x02000000) != 0)
             G_AlchemySinCos = ComputeSinCosSse;
+#else
+        G_AlchemySinCos = ComputeSinCosFpu;
+#endif
     }
 
     void ComputeSinCosPair(float AngleRadians, float* OutCos, float* OutSin)

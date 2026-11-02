@@ -136,6 +136,7 @@ namespace
         unsigned short SavedControl;
         unsigned short TruncateControl;
         long long Converted;
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             fnstcw SavedControl
@@ -148,6 +149,9 @@ namespace
             fistp Converted
             fldcw SavedControl
         }
+#else
+        Converted = static_cast<long long>(static_cast<double>(Component) * GFlmWireColorScale);
+#endif
         return (unsigned char)(Converted);
     }
 

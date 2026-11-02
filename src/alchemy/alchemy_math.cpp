@@ -58,6 +58,7 @@ namespace AlchemyImpl
     // __ftol2 alone inherits the old RC on its unmasked exception path.
     __declspec(noinline) std::int64_t ConvertAlchemyFpuInteger(const double& Value)
     {
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
         unsigned int SavedControl;
         unsigned int CurrentControl;
         __control87_2(0, 0, &SavedControl, nullptr);
@@ -65,5 +66,8 @@ namespace AlchemyImpl
         const std::int64_t Converted = static_cast<std::int64_t>(Value);
         __control87_2(SavedControl, _MCW_RC, &CurrentControl, nullptr);
         return Converted;
+#else
+        return static_cast<std::int64_t>(Value);
+#endif
     }
 }

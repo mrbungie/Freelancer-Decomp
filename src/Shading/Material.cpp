@@ -1241,12 +1241,16 @@ namespace
         {
             if (bFloat)
             {
+#if defined(_M_IX86) && defined(_MSC_VER)
                 __asm
                 {
                     fld dword ptr ReadValue
                     mov eax, Output
                     fstp dword ptr [eax]
                 }
+#else
+                *reinterpret_cast<float*>(Output) = *reinterpret_cast<const float*>(&ReadValue);
+#endif
             }
             else
                 *Output = ReadValue;

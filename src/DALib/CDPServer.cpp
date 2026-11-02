@@ -328,10 +328,10 @@ void CDPServer::CrashCleanup()
 
 
 // Retail DALib.dll.c CDPServer::HandleDPServerMsg @ 0x4670 -- DirectPlay8 IO-thread callback.
-long __stdcall CDPServer::HandleDPServerMsg(void* UserContext, unsigned long MessageId, void* MsgData)
+HRESULT __stdcall CDPServer::HandleDPServerMsg(void* UserContext, DWORD MessageId, void* MsgData)
 {
     CDPServer* Self = (CDPServer*)UserContext;
-    long Result = 0;
+    HRESULT Result = 0;
 
     switch (MessageId)
     {

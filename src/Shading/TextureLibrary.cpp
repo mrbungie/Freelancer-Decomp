@@ -450,6 +450,7 @@ namespace
         const unsigned long long IntegerCount = Count;
         const double Epsilon = 1e-6;
         double Duration;
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             fild IntegerCount
@@ -457,6 +458,9 @@ namespace
             fsub Epsilon
             fstp Duration
         }
+#else
+        Duration = (static_cast<double>(IntegerCount) / static_cast<double>(Rate)) - Epsilon;
+#endif
         return Duration;
     }
 
@@ -499,6 +503,7 @@ namespace
         unsigned short SavedControl;
         unsigned short TruncateControl;
         long long Converted;
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             fnstcw SavedControl
@@ -510,6 +515,9 @@ namespace
             fistp Converted
             fldcw SavedControl
         }
+#else
+        Converted = static_cast<long long>(Value);
+#endif
         return (unsigned int)Converted;
     }
 
@@ -535,12 +543,16 @@ namespace
         const float SecondsPerMillisecond = 0.001f;
         const double Zero = 0.0;
         double Delta;
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             fld Milliseconds
             fmul SecondsPerMillisecond
             fstp Delta
         }
+#else
+        Delta = static_cast<double>(Milliseconds) * static_cast<double>(SecondsPerMillisecond);
+#endif
         double* Elapsed = &Entry->ElapsedTime;
         const double* Duration = &Entry->TotalDuration;
         float* Direction = &Entry->PlaybackDirection;
@@ -548,6 +560,7 @@ namespace
         switch (Entry->WrapMode)
         {
         case 0:
+#if defined(_M_IX86) && defined(_MSC_VER)
             __asm
             {
                 mov ecx, Elapsed
@@ -573,10 +586,20 @@ namespace
             ClampStore:
                 fstp Seconds
             }
+#else
+            *Elapsed += Delta;
+            if (*Elapsed > *Duration)
+                Seconds = static_cast<float>(*Duration);
+            else if (*Elapsed < Zero)
+                Seconds = static_cast<float>(Zero);
+            else
+                Seconds = static_cast<float>(*Elapsed);
+#endif
             break;
         case 1:
         {
             double RoundedNext;
+#if defined(_M_IX86) && defined(_MSC_VER)
             __asm
             {
                 mov ecx, Elapsed
@@ -585,6 +608,10 @@ namespace
                 fst RoundedNext
                 fstp qword ptr [ecx]
             }
+#else
+            *Elapsed += Delta;
+            RoundedNext = *Elapsed;
+#endif
             Seconds = (float)std::fmod(RoundedNext, *Duration);
             break;
         }
@@ -592,6 +619,7 @@ namespace
         {
             double RoundedNext;
             int Reflection = 0;
+#if defined(_M_IX86) && defined(_MSC_VER)
             __asm
             {
                 mov ecx, Elapsed
@@ -600,7 +628,7 @@ namespace
                 fmul Delta
                 fadd qword ptr [ecx]
                 fst RoundedNext
-                fst qword ptr [ecx]
+                fstp qword ptr [ecx]
                 fld dword ptr [edx]
                 fcomp Zero
                 fnstsw ax
@@ -631,20 +659,41 @@ namespace
                 fstp Seconds
             ReflectionDone:
             }
+#else
+            *Elapsed += (*Direction) * Delta;
+            RoundedNext = *Elapsed;
+            if (*Direction <= 0.0f && RoundedNext <= Zero)
+            {
+                Reflection = 1;
+            }
+            else if (*Direction >= 0.0f && RoundedNext >= *Duration)
+            {
+                Reflection = 2;
+            }
+            else
+            {
+                Seconds = static_cast<float>(RoundedNext);
+            }
+#endif
             if (Reflection != 0)
             {
                 const double Remainder = std::fmod(RoundedNext, *Duration);
                 if (Reflection == 1)
                 {
+#if defined(_M_IX86) && defined(_MSC_VER)
                     __asm
                     {
                         fld Remainder
                         fchs
                         fstp Seconds
                     }
+#else
+                    Seconds = static_cast<float>(-Remainder);
+#endif
                 }
                 else
                 {
+#if defined(_M_IX86) && defined(_MSC_VER)
                     __asm
                     {
                         mov ecx, Duration
@@ -652,7 +701,11 @@ namespace
                         fsubr qword ptr [ecx]
                         fstp Seconds
                     }
+#else
+                    Seconds = static_cast<float>(*Duration - Remainder);
+#endif
                 }
+#if defined(_M_IX86) && defined(_MSC_VER)
                 __asm
                 {
                     mov ecx, Direction
@@ -660,6 +713,9 @@ namespace
                     fchs
                     fstp dword ptr [ecx]
                 }
+#else
+                *Direction = -(*Direction);
+#endif
             }
             break;
         }
@@ -993,6 +1049,7 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
         const FTextureFrame* Source = &Frames[Index];
         FTextureFrame* Destination = &Entry->Frames[Index];
         Destination->ChildIndex = Source->ChildIndex;
+#if defined(_M_IX86) && defined(_MSC_VER)
         __asm
         {
             mov ecx, Source
@@ -1006,6 +1063,12 @@ GENRESULT FTextureLibrary::LoadLegacyTextureRecord(IFileSystem* RootFileSystem,
             fstp dword ptr [edx+12]
             fstp dword ptr [edx+16]
         }
+#else
+        Destination->Uv[0] = Source->Uv[0];
+        Destination->Uv[1] = Source->Uv[1];
+        Destination->Uv[2] = Source->Uv[2];
+        Destination->Uv[3] = Source->Uv[3];
+#endif
     }
     Entry->TileRate = FramesPerSecond;
     Entry->Children.resize(TextureCount, nullptr);

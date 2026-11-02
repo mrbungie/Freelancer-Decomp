@@ -350,10 +350,10 @@ unsigned long CDPClient::GetSendQueueSize()
 // Retail DALib.dll.c CDPClient::HandleClientMsg @ 0x19d0 — DirectPlay8 IO-thread callback. Only
 // queues into IncomingMsgs / updates ping globals; all higher-level dispatch happens on the game
 // thread in DispatchMsgs.
-long __stdcall CDPClient::HandleClientMsg(void* UserContext, unsigned long MessageId, void* MsgData)
+HRESULT __stdcall CDPClient::HandleClientMsg(void* UserContext, DWORD MessageId, void* MsgData)
 {
     CDPClient* Self = (CDPClient*)UserContext;
-    long Result = 0;
+    HRESULT Result = 0;
 
     switch (MessageId)
     {

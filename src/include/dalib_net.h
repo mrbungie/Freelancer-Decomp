@@ -199,7 +199,7 @@ public:
 protected:
     bool ConnectToServer(const wchar_t* Host, const wchar_t* Port);
 
-    static long __stdcall HandleClientMsg(void* UserContext, unsigned long MessageId, void* MsgData);
+    static HRESULT __stdcall HandleClientMsg(void* UserContext, DWORD MessageId, void* MsgData);
 
     static unsigned long m_dwLastMsgReceivedTime; // .data:065ca120
     static unsigned long m_dwPingSendTime;        // .data:065ca1ac
@@ -299,7 +299,7 @@ public:
     static void CrashCleanup();
 
 protected:
-    static long __stdcall HandleDPServerMsg(void* UserContext, unsigned long MessageId, void* MsgData);
+    static HRESULT __stdcall HandleDPServerMsg(void* UserContext, DWORD MessageId, void* MsgData);
 
     void GetHostAddresses();
     void ReleaseHostAddresses();

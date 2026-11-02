@@ -3464,7 +3464,9 @@ namespace AlchemyImpl
 
 #pragma optimize("", off)
 #pragma float_control(except, on, push)
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 #pragma intrinsic(sqrt)
+#endif
     GENRESULT DACOM_API FLDustAppearance::DrawOrEnqueue()
     {
         const float kFadeNear = FloatFromBits(0x42c80000u);    // 100
@@ -3761,7 +3763,9 @@ namespace AlchemyImpl
         std::memcpy(&LastCameraStep_, &StepLen, sizeof(StepLen));
         return GR_OK;
     }
+#if defined(_MSC_VER) && !defined(FREELANCER_PORTABLE)
 #pragma function(sqrt)
+#endif
 #pragma float_control(pop)
 #pragma optimize("", on)
 
