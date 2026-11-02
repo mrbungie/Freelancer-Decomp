@@ -3153,7 +3153,7 @@ void FClientShipGameobj::update(float Dt)
         // 0x005454f6..0x00545511: it leaves the effect list (FUN_004fcef0) once the ship stops
         // colliding, leaves the atmosphere or is landing (+0x18c bit 3).
         if (!bCollides || Atmosphere == nullptr || (Field_0x18c & 0x8u) != 0)
-            CliEffectListRemove(reinterpret_cast<unsigned char*>(this) + 0x28, Field_0xf4);
+            CliEffectListRemove(&EffectList, Field_0xf4);
     }
     else if (bCollides && Atmosphere != nullptr && (Field_0x18c & 0x8u) == 0)
     {
