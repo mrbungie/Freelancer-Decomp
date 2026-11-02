@@ -11,9 +11,12 @@
 #include <type_traits>
 #include "fl/handles.h"
 
-template <class T, class U>
-inline T FlReinterpretCast(U u)
+// U&&: a reference cast (reinterpret_cast<T&>(x)) must alias x, never a by-value copy of it.
+template <class T, class UR>
+inline T FlReinterpretCast(UR&& ur)
 {
+    using U = typename std::remove_cv<typename std::remove_reference<UR>::type>::type;
+    auto&& u = ur;
 #pragma push_macro("reinterpret_cast")
 #undef reinterpret_cast
     if constexpr (fl::IsSlot32<U>::value)
