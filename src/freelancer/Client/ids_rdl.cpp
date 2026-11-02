@@ -6,6 +6,7 @@
 
 // FUN_0057da40 / FUN_0057db50 -- IDS resource and plain UTF-16 text into a RenderDisplayList.
 
+#include <string>
 #include "ids_rdl.h"
 #include "ids_strings.h"
 
@@ -259,7 +260,7 @@ namespace
         if (OutCount != 0 && *reinterpret_cast<const unsigned short*>(Cursor) == 0xfeff)
         {
             OutCount -= 1;
-            Cursor += 1;
+            Cursor = reinterpret_cast<const wchar_t*>(reinterpret_cast<const unsigned short*>(Cursor) + 1);   // 16-bit units
         }
         return Cursor;
     }
@@ -308,9 +309,28 @@ bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl)
     // FUN_0057da40 @ LAB_0057db16: XMLReader::read_buffer(Rdl, text, count*2); on failure
     // FUN_0057db50 (AppendTextAsRdl). Ordinary IDS strings are not XML and take the split
     // path in retail too; RDLX / HTML infocard resources succeed on the XML branch.
+    if (getenv("FL_TRACE_FONT"))
+    {
+        const unsigned char* B = reinterpret_cast<const unsigned char*>(Text);
+        {
+            const unsigned short* U = reinterpret_cast<const unsigned short*>(Text);
+            std::string A;
+            for (unsigned i = 0; i < Count && i < 400; ++i) A.push_back(U[i] < 128 && U[i] >= 32 ? (char)U[i] : '.');
+            fprintf(stderr, "[ids-text] %s\n", A.c_str());
+        }
+        fprintf(stderr, "[ids] id=%08x count=%u bytes=%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", Ids, Count, B[0], B[1], B[2], B[3], B[4], B[5], B[6], B[7], B[8], B[9], B[10], B[11]);
+    }
     XMLReader Reader;
     if (!Reader.read_buffer(Rdl, reinterpret_cast<const char*>(Text), Count * 2u))
-        AppendTextAsRdl(Text, Count, Rdl, true);
+    {
+        // PORT: the resource holds 16-bit units; the RDL text nodes use the host wchar_t.
+        std::wstring Wide;
+        Wide.reserve(Count);
+        const unsigned short* const Units = reinterpret_cast<const unsigned short*>(Text);
+        for (unsigned int Index = 0; Index < Count; ++Index)
+            Wide.push_back(static_cast<wchar_t>(Units[Index]));
+        AppendTextAsRdl(Wide.c_str(), Count, Rdl, true);
+    }
     return true;
 }
 

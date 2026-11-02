@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #pragma once
+#include "fl/text.h"
 
 // Retail BaseRichTextWin / RichTextWin (E:\FL\Scratch\Source\Client\...\RichDisplay.cpp,
 // RTTI .?AVBaseRichTextWin@@ : WinControl, .?AVRichTextWin@@ : BaseRichTextWin).
@@ -76,12 +77,10 @@ struct FLImeInputBox;
 // RTTI .?AVDebugWindow@@, vftable 0x005e465c -- never constructed (see +0x32c above).
 struct DebugWindow;
 
-// BaseRichTextWin +0x3d4 -- the memory DC, its bitmap and the object it replaced.
+// BaseRichTextWin +0x3d4 -- the software surface the rich text is drawn into (retail: a GDI memory DC).
 struct FRichTextSurface
 {
-    HDC Dc;                  // +0x00
-    HBITMAP Bitmap;          // +0x04
-    HGDIOBJ PreviousObject;  // +0x08
+    fl::text::Surface* Gfx;  // PORT: replaces the memory DC + bitmap + previous object (+0x00..+0x08)
     int Width;               // +0x0c
     int Height;              // +0x10
 };

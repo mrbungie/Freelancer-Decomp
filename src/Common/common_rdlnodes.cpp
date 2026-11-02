@@ -7,6 +7,9 @@
 // RDLNode and its twelve node classes (NullNode .. RDLRefNode) -- split out of common_text.cpp
 // (retail RichDisplayList.cpp) in CMN-SPLIT phase B.
 
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "common_text.h"
 #include "common_text_internal.h"
 #include "dacom.h"
@@ -285,6 +288,17 @@ TextNode::TextNode(const wchar_t* InText, int Len) : RDLNode()
     if (Len < 0)
     {
         Len = (int)wcslen(InText);
+    }
+    if (getenv("FL_TRACE_FONT") && InText[0] > 0xFFFF)
+    {
+        static int Shown = 0;
+        if (Shown++ < 3)
+        {
+            fprintf(stderr, "[trc] TextNode got 16-bit packed text %08x len=%d\n", (unsigned)InText[0], Len);
+            void* Frames[12];
+            int N = backtrace(Frames, 12);
+            backtrace_symbols_fd(Frames, N, 2);
+        }
     }
     Text.assign(InText, (std::wstring::size_type)Len);
 }

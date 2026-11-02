@@ -307,18 +307,18 @@ DeviceTRC::DeviceTRC()
 {
     // .text:06327b40: the TextRenderContext constructor inlined, then +0x3C = 0 and the four
     // ClipRect dwords = 0.
-    MHdc = nullptr;
+    MSurface = nullptr;
     ClipRect.left = 0;
     ClipRect.top = 0;
     ClipRect.right = 0;
     ClipRect.bottom = 0;
 }
 
-DeviceTRC::DeviceTRC(HDC InDC)
+DeviceTRC::DeviceTRC(fl::text::Surface* InDC)
 {
     // .text:06327bf0: the TextRenderContext constructor inlined, then +0x3C = InDC. Retail
     // leaves ClipRect unwritten; the port zeroes it.
-    MHdc = InDC;
+    MSurface = InDC;
     ClipRect.left = 0;
     ClipRect.top = 0;
     ClipRect.right = 0;
@@ -331,7 +331,7 @@ DeviceTRC::DeviceTRC(const DeviceTRC& Other)
     // .text:063250f0: the TextRenderContext copy (both lists copied node by node through
     // FUN_0632c3a0 / FUN_0632c420, then +0x1c/+0x24/+0x2c..+0x38) is inlined, then +0x3c and
     // the four ClipRect dwords at +0x40.
-    MHdc = Other.MHdc;
+    MSurface = Other.MSurface;
     ClipRect = Other.ClipRect;
 }
 
@@ -345,7 +345,7 @@ DeviceTRC& DeviceTRC::operator=(const DeviceTRC& Other)
     // .text:06325200: TextRenderContext::operator= inlined (list assignments skipped when the
     // lists are the same object, then the plain fields), then +0x3c and +0x40..+0x4c.
     TextRenderContext::operator=(Other);
-    MHdc = Other.MHdc;
+    MSurface = Other.MSurface;
     ClipRect = Other.ClipRect;
     return *this;
 }
@@ -356,7 +356,6 @@ DeviceTRC& DeviceTRC::operator=(const DeviceTRC& Other)
 // is (Style << 3) | Combination, one byte of TextRenderAttributes::Packed.
 static const int GMaxFontIndices = 32;
 static const int GSubEntriesPerFont = 8;
-static_assert(sizeof(DeviceTRC::WinFont) == 0x7C, "retail WinFont stride is 0x7C");
 DeviceTRC::WinFont DeviceTRC::mFont[256];
 
 // The 32 standard styles — retail DAT_06409588, 0x8C per style. SetStandardFont writes
@@ -434,18 +433,20 @@ static bool GRichTextOsAboveNt4 = false;
 // (LogFont) and [this+0x40] = 0 (FontHandle). +0x3C and the TEXTMETRICA are not touched.
 DeviceTRC::WinFont::WinFont()
 {
-    memset(&LogFont, 0, sizeof(LogFont));
-    FontHandle = nullptr;
+    memset(FaceName, 0, sizeof(FaceName));
+    Weight = 400;
+    bItalic = bUnderline = 0;
+    LogHeight = 0;
+    UnscaledSize = 0;
+    Font = nullptr;
+    memset(&Metrics, 0, sizeof(Metrics));
 }
 
 // FUN_063277d0 -- mFont's element destructor: DeleteObject(FontHandle) if set, then null it.
 DeviceTRC::WinFont::~WinFont()
 {
-    if (FontHandle != nullptr)
-    {
-        DeleteObject(FontHandle);
-        FontHandle = nullptr;
-    }
+    delete Font;
+    Font = nullptr;
 }
 
 // FUN_063277f0 (thiscall on the WinFont, RET 4) -- FontDesc to LOGFONTA:
@@ -458,37 +459,21 @@ DeviceTRC::WinFont::~WinFont()
 static void BuildRichTextLogFont(DeviceTRC::WinFont& Entry, TextRenderContext::FontDesc const& Desc)
 {
     Entry.UnscaledSize = (int)Desc.Size;
-    memset(&Entry.LogFont, 0, sizeof(Entry.LogFont));
-    Entry.LogFont.lfHeight = Entry.UnscaledSize;
-    Entry.LogFont.lfWidth = 0;
-    Entry.LogFont.lfEscapement = 0;
-    Entry.LogFont.lfOrientation = 0;
-    Entry.LogFont.lfCharSet = 1;
-    Entry.LogFont.lfOutPrecision = 4;
-    Entry.LogFont.lfClipPrecision = 0;
-    Entry.LogFont.lfQuality = 4;
-    Entry.LogFont.lfPitchAndFamily = 0;
-    Entry.LogFont.lfWeight = Desc.bBold != 0 ? 700 : 400;
-    strncpy(Entry.LogFont.lfFaceName, Desc.Name, 0x1f);
-    Entry.LogFont.lfFaceName[0x1f] = '\0';
-    Entry.LogFont.lfItalic = Desc.bItalic != 0 ? 1 : 0;
-    Entry.LogFont.lfStrikeOut = 0;
-    Entry.LogFont.lfUnderline = Desc.bUnderline != 0 ? 1 : 0;
+    Entry.LogHeight = Entry.UnscaledSize;
+    Entry.Weight = Desc.bBold != 0 ? 700 : 400;
+    memset(Entry.FaceName, 0, sizeof(Entry.FaceName));
+    strncpy(Entry.FaceName, Desc.Name, 0x1f);
+    Entry.bItalic = Desc.bItalic != 0 ? 1 : 0;
+    Entry.bUnderline = Desc.bUnderline != 0 ? 1 : 0;
 }
 
-// The delete sweep InitializeRichText and ShutdownRichText both inline (06326360 / 063265d0):
-// from DAT_064019a8 (mFont[0].FontHandle) in steps of 0x7C until DAT_064095a8 -- every one of
-// the 256 entries -- DeleteObject the HFONT if set and null it.
 static void ReleaseAllRichTextFonts(DeviceTRC::WinFont* Fonts)
 {
     for (int Index = 0; Index < GMaxFontIndices * GSubEntriesPerFont; ++Index)
     {
         DeviceTRC::WinFont& Entry = Fonts[Index];
-        if (Entry.FontHandle != nullptr)
-        {
-            DeleteObject(Entry.FontHandle);
-            Entry.FontHandle = nullptr;
-        }
+        delete Entry.Font;
+        Entry.Font = nullptr;
     }
 }
 
@@ -516,25 +501,29 @@ static void RebuildRichTextStyleFonts(DeviceTRC::WinFont* StyleFonts,
         DeviceTRC::WinFont& Entry = StyleFonts[Sub];
         BuildRichTextLogFont(Entry, Desc);
 
-        if (Entry.FontHandle != nullptr)
-        {
-            DeleteObject(Entry.FontHandle);
-            Entry.FontHandle = nullptr;
-        }
+        delete Entry.Font;
+        Entry.Font = nullptr;
 
         // FILD dword [entry+0x3C] (signed); FMUL float Scale; ftol (truncation).
-        Entry.LogFont.lfHeight = (LONG)((double)Entry.UnscaledSize * (double)Scale);
+        Entry.LogHeight = (int)((double)Entry.UnscaledSize * (double)Scale);
 
-        Entry.FontHandle = CreateFontIndirectA(&Entry.LogFont);
-        if (Entry.FontHandle != nullptr)
+        // PORT: the platform rasterizer replaces CreateFontIndirectA + GetTextMetricsA.
+        if (fl::text::IRasterizer* const Rasterizer = fl::text::GetRasterizer())
+            Entry.Font = Rasterizer->CreateFont(Entry.FaceName, Entry.LogHeight, Entry.Weight >= 700,
+                                                Entry.bItalic != 0, Entry.bUnderline != 0);
+        if (Entry.Font != nullptr)
         {
-            HDC TempDC = CreateCompatibleDC(nullptr);
-            HGDIOBJ OldObj = SelectObject(TempDC, Entry.FontHandle);
-            GetTextMetricsA(TempDC, &Entry.Metrics);
-            SelectObject(TempDC, OldObj);
-            DeleteDC(TempDC);
+            fl::text::FontMetrics const M = Entry.Font->Metrics();
+            memset(&Entry.Metrics, 0, sizeof(Entry.Metrics));
+            Entry.Metrics.tmHeight = M.height;
+            Entry.Metrics.tmAscent = M.ascent;
+            Entry.Metrics.tmDescent = M.descent;
+            Entry.Metrics.tmInternalLeading = M.internalLeading;
+            Entry.Metrics.tmExternalLeading = M.externalLeading;
+            Entry.Metrics.tmAveCharWidth = M.aveCharWidth;
+            Entry.Metrics.tmMaxCharWidth = M.maxCharWidth;
         }
-        if (Entry.FontHandle == nullptr)
+        if (Entry.Font == nullptr)
         {
             FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
                   "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x48e,
@@ -610,11 +599,8 @@ void __cdecl ReinitializeRichTextFonts()
         DeviceTRC::WinFont* const StyleFonts = &DeviceTRC::mFont[StyleIndex * GSubEntriesPerFont];
         for (int Sub = 0; Sub < GSubEntriesPerFont; ++Sub)
         {
-            if (StyleFonts[Sub].FontHandle != nullptr)
-            {
-                DeleteObject(StyleFonts[Sub].FontHandle);
-                StyleFonts[Sub].FontHandle = nullptr;
-            }
+            delete StyleFonts[Sub].Font;
+            StyleFonts[Sub].Font = nullptr;
         }
 
         FStandardFontStyle const& Style = GStandardFonts[StyleIndex];
@@ -671,11 +657,8 @@ void __cdecl DeviceTRC::release_font(int Index)
     for (int Sub = 0; Sub < GSubEntriesPerFont; Sub++)
     {
         WinFont* Entry = &mFont[Index * GSubEntriesPerFont + Sub];
-        if (Entry->FontHandle != nullptr)
-        {
-            DeleteObject(Entry->FontHandle);
-            Entry->FontHandle = nullptr;
-        }
+        delete Entry->Font;
+        Entry->Font = nullptr;
     }
 }
 
@@ -726,14 +709,12 @@ void DeviceTRC::get_text_visual_size(const wchar_t* Text, VisualSize& Size, int 
         Len = (int)wcslen(Text);
     }
 
-    HDC const Dc = MHdc;
     const WinFont& Entry = mFont[(unsigned char)(CurrentAttrs.Packed & 0xFF)];
-    HGDIOBJ const OldFont = SelectObject(Dc, Entry.FontHandle);
-    SIZE TextSize;
-    if (GetTextExtentPoint32W(MHdc, Text, Len, &TextSize))
+    int ExtentW = 0, ExtentH = 0;
+    if (Entry.Font != nullptr && Entry.Font->Extent(Text, Len, &ExtentW, &ExtentH))
     {
-        Size.Height = TextSize.cy;
-        Size.Width = TextSize.cx;
+        Size.Height = ExtentH;
+        Size.Width = ExtentW;
     }
     else
     {
@@ -742,7 +723,6 @@ void DeviceTRC::get_text_visual_size(const wchar_t* Text, VisualSize& Size, int 
     }
     Size.Ascent = Entry.Metrics.tmAscent;
     Size.Descent = Entry.Metrics.tmDescent;
-    SelectObject(Dc, OldFont);
 }
 
 void DeviceTRC::get_font_metrics(int& Ascent, int& Descent) const
@@ -775,49 +755,24 @@ void DeviceTRC::get_text_fit(const wchar_t* Text, int MaxWidth, int& FitCount,
 
     // 06328140: the current font (low byte of CurrentAttrs indexes mFont) into the DC; then
     // Len == -1 means wcslen.
-    HDC const Dc = MHdc;
-    HGDIOBJ const OldFont = SelectObject(Dc, mFont[(unsigned char)(CurrentAttrs.Packed & 0xFF)].FontHandle);
+    fl::text::IFont const* const Font = mFont[(unsigned char)(CurrentAttrs.Packed & 0xFF)].Font;
     if (Len == -1)
     {
         Len = (int)wcslen(Text);
     }
 
-    if (GRichTextOsAboveNt4)
+    // GetTextExtentExPointW / GetCharWidthW fallback: count the characters whose running width stays
+    // below MaxWidth (the retail fallback loop's rule).
+    FitCount = 0;
+    int TotalWidth = 0;
+    for (int Index = 0; Index < Len && Font != nullptr; ++Index)
     {
-        // 0632817b: GetTextExtentExPointW(DC, Text, Len, MaxWidth, &FitCount, NULL, &scratch);
-        // failure -> FitCount = 0.
-        SIZE Extent;
-        if (GetTextExtentExPointW(MHdc, Text, Len, MaxWidth, &FitCount, nullptr, &Extent) == 0)
-        {
-            FitCount = 0;
-        }
+        int const NewTotal = TotalWidth + Font->CharWidth(Text[Index]);
+        if (NewTotal >= MaxWidth)
+            break;
+        ++FitCount;
+        TotalWidth = NewTotal;
     }
-    else
-    {
-        // 063281b8: FitCount = 0, running total 0; per character (Len counted down to 0)
-        // GetCharWidthW into a zeroed int; total + width >= MaxWidth (signed JGE) stops,
-        // otherwise ++FitCount and the total advances.
-        FitCount = 0;
-        int TotalWidth = 0;
-        int Remaining = Len;
-        const wchar_t* Cur = Text;
-        while (Remaining != 0)
-        {
-            int CharWidth = 0;
-            GetCharWidthW(MHdc, *Cur, *Cur, &CharWidth);
-            const int NewTotal = TotalWidth + CharWidth;
-            if (NewTotal >= MaxWidth)
-            {
-                break;
-            }
-            ++FitCount;
-            ++Cur;
-            --Remaining;
-            TotalWidth = NewTotal;
-        }
-    }
-
-    SelectObject(Dc, OldFont);
 }
 
 void DeviceTRC::execute_text(const wchar_t* Text, bool bHighlight, int Len)
@@ -833,31 +788,25 @@ void DeviceTRC::execute_text(const wchar_t* Text, bool bHighlight, int Len)
         return;
     }
 
-    HDC const Dc = MHdc;
-    HGDIOBJ const OldFont = SelectObject(Dc, mFont[(unsigned char)(CurrentAttrs.Packed & 0xFF)].FontHandle);
+    fl::text::IFont const* const Font = mFont[(unsigned char)(CurrentAttrs.Packed & 0xFF)].Font;
     if (Len == -1)
     {
         Len = (int)wcslen(Text);
     }
-    if (bHighlight)
+    if (getenv("FL_TRACE_FONT"))
+        fprintf(stderr, "[trc] execute_text hl=%d surf=%p font=%p len=%d first=%c\n", (int)bHighlight, (void*)MSurface, (const void*)Font, Len, Len > 0 ? (char)Text[0] : '?');
+    // COLORREF (0x00BBGGRR) -> 0x00RRGGBB for the surface.
+    auto ToRgb = [](unsigned Colorref) { return ((Colorref & 0xFF) << 16) | (Colorref & 0xFF00) | ((Colorref >> 16) & 0xFF); };
+    if (bHighlight && MSurface != nullptr && Font != nullptr)
     {
-        SetTextAlign(MHdc, 0);
-        SetBkColor(MHdc, 0);
-        SetBkMode(MHdc, TRANSPARENT);
-        SetTextColor(MHdc, 0x0A0A0A);
-        ExtTextOutW(MHdc, PosH + OriginH + mDropShadowX, PosV + OriginV + mDropShadowY,
-                    ETO_CLIPPED, nullptr, Text, Len, nullptr);
-        SetTextColor(MHdc, (CurrentAttrs.Packed >> 8) & 0xFFFFFF);
-        ExtTextOutW(MHdc, PosH + OriginH, PosV + OriginV, ETO_CLIPPED, nullptr, Text, Len, nullptr);
+        MSurface->DrawText(Font, Text, Len, PosH + OriginH + mDropShadowX, PosV + OriginV + mDropShadowY, ToRgb(0x0A0A0A));
+        MSurface->DrawText(Font, Text, Len, PosH + OriginH, PosV + OriginV, ToRgb((CurrentAttrs.Packed >> 8) & 0xFFFFFF));
     }
 
-    // Retail's SIZE is uninitialised stack and is added even when the call fails; the port
-    // zeroes it (a failed measure advances by 0).
-    SIZE TextSize = {};
-    GetTextExtentPoint32W(MHdc, Text, Len, &TextSize);
-    PosH += TextSize.cx;
-
-    SelectObject(Dc, OldFont);
+    int TextW = 0, TextH = 0;
+    if (Font != nullptr)
+        Font->Extent(Text, Len, &TextW, &TextH);
+    PosH += TextW;
 }
 
 
@@ -868,27 +817,17 @@ class DeviceTRC::BMPImage : public TextRenderContext::Image
 {
 public:
     // Width (+0x04) / Height (+0x08) live in the Image base (ImageNode reads them there).
-    HDC HdcSrc;       // +0x0C
-    HBITMAP HBitmap;  // +0x10
-    HGDIOBJ HOldBmp;  // +0x14
+    fl::text::Bitmap* Pixels;   // PORT: retail kept a GDI DC + DIB section
 
-    // FUN_06327880 (.text:06327880-06327a95), called only from create_image (.text:063285c7).
+    // .text:06327880 -- loads the .bmp: a UNC or drive-qualified name as given, anything else under the image root.
     explicit BMPImage(const char* Filename)
     {
-        // A null name: zero the five fields and stop (.text:063278c1 -> 06327a6d).
+        Height = 0.0f;
+        Width = 0.0f;
+        Pixels = nullptr;
         if (Filename == nullptr)
-        {
-            Height = 0.0f;
-            Width = 0.0f;
-            HdcSrc = nullptr;
-            HBitmap = nullptr;
-            HOldBmp = nullptr;
             return;
-        }
 
-        // .text:063278db-0632798b. A UNC name ("\\...") or a drive-qualified one ("X:...") is
-        // used as given; anything else is the image root (set_image_root keeps its trailing
-        // '\\') with the name appended verbatim -- no separator is inserted here.
         std::string Path;
         const char* LoadPath = Filename;
         const bool bUnc = Filename[0] == '\\' && Filename[1] == '\\';
@@ -899,57 +838,23 @@ public:
             LoadPath = Path.c_str();
         }
 
-        // .text:06327991-063279af: the four other fields are zeroed before the load, then
-        // LoadImageA(NULL, path, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION).
-        Height = 0.0f;
-        Width = 0.0f;
-        HdcSrc = nullptr;
-        HOldBmp = nullptr;
-        HBitmap = (HBITMAP)LoadImageA(nullptr, LoadPath, IMAGE_BITMAP, 0, 0,
-                                      LR_LOADFROMFILE | LR_CREATEDIBSECTION);
-        if (HBitmap == nullptr)
+        Pixels = fl::text::Bitmap::LoadBmp(LoadPath);
+        if (Pixels == nullptr)
         {
-            // .text:06327a12-06327a43: retail's own notice, formatted through FUN_06306fe0
-            // (_vsnprintf into a 0x2000-byte stack buffer).
             char Buffer[0x2000];
             _snprintf(Buffer, 0x2000, "Failed to load image from \"%s\"\n", LoadPath);
             FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
                   "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x43e, Buffer);
             return;
         }
-
-        // .text:063279b4-06327a0a. The screen DC is released last, whether or not the memory
-        // DC was created. GetObjectA's result is not checked: the 0x54-byte DIBSECTION is
-        // zeroed first, so a failure leaves Width / Height at 0 (FILD bmWidth / bmHeight).
-        HDC ScreenDC = GetDC(nullptr);
-        HdcSrc = CreateCompatibleDC(ScreenDC);
-        if (HdcSrc != nullptr)
-        {
-            DIBSECTION Dib;
-            memset(&Dib, 0, sizeof(Dib));
-            GetObjectA(HBitmap, sizeof(Dib), &Dib);
-            Width = (float)Dib.dsBm.bmWidth;
-            Height = (float)Dib.dsBm.bmHeight;
-            HOldBmp = SelectObject(HdcSrc, HBitmap);
-        }
-        ReleaseDC(nullptr, ScreenDC);
+        Width = (float)Pixels->w;
+        Height = (float)Pixels->h;
     }
 
-    // FUN_06327af0 (.text:06327af0-06327b3f).
     virtual ~BMPImage() override
     {
-        if (HdcSrc != nullptr)
-        {
-            SelectObject(HdcSrc, HOldBmp);
-            DeleteDC(HdcSrc);
-            HdcSrc = nullptr;
-            HOldBmp = nullptr;
-        }
-        if (HBitmap != nullptr)
-        {
-            DeleteObject(HBitmap);
-            HBitmap = nullptr;
-        }
+        delete Pixels;
+        Pixels = nullptr;
     }
 };
 
@@ -962,13 +867,12 @@ void DeviceTRC::execute_image(const Image* Img, bool bDraw)
     // No null checks on the image, its DC or this DC (retail has none).
     // Every image this context draws came from its own create_image.
     const BMPImage* const DevImg = (const BMPImage*)Img;
-    if (bDraw)
+    if (bDraw && MSurface != nullptr && DevImg->Pixels != nullptr)
     {
-        StretchBlt(MHdc, OriginH + PosH, OriginV + PosV,
-                   (int)((double)GRichTextScaleY * DevImg->Width),
-                   (int)((double)GRichTextScaleY * DevImg->Height),
-                   DevImg->HdcSrc, 0, 0,
-                   (int)DevImg->Width, (int)DevImg->Height, SRCCOPY);
+        MSurface->StretchBlt(*DevImg->Pixels, OriginH + PosH, OriginV + PosV,
+                             (int)((double)GRichTextScaleY * DevImg->Width),
+                             (int)((double)GRichTextScaleY * DevImg->Height),
+                             0, 0, (int)DevImg->Width, (int)DevImg->Height);
     }
     // FLD ScaleY; FMUL width; FIADD PosH; ftol.
     PosH = (int)((double)GRichTextScaleY * DevImg->Width + PosH);
@@ -976,65 +880,41 @@ void DeviceTRC::execute_image(const Image* Img, bool bDraw)
 
 void DeviceTRC::set_clip_rect(const RECT& NewClip)
 {
-    // .text:063283f0-063284c0. With a DC: an empty rectangle (bottom == top or left == right)
-    // clears the clip region; otherwise a copy offset by the origin (OffsetRect(OriginH,
-    // OriginV)) becomes a region that is selected (a failed select is reported) and freed.
-    // A null region skips the select. Then the rectangle is cached, DC or not.
-    if (MHdc != nullptr)
+    // .text:063283f0: an empty rectangle clears the clip region; otherwise the rectangle offset by the origin
+    // becomes the clip.
+    if (MSurface != nullptr)
     {
         if (NewClip.bottom == NewClip.top || NewClip.left == NewClip.right)
-        {
-            SelectClipRgn(MHdc, nullptr);
-        }
+            MSurface->ClearClip();
         else
-        {
-            RECT OffsetRc = NewClip;
-            OffsetRect(&OffsetRc, OriginH, OriginV);
-            HRGN const Hrgn = CreateRectRgnIndirect(&OffsetRc);
-            if (Hrgn != nullptr)
-            {
-                if (SelectClipRgn(MHdc, Hrgn) == 0)
-                {
-                    FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
-                          "E:\\FL\\Scratch\\Source\\Common\\RichDisplayList.cpp", 0x592,
-                          "Failed to select clipping region into DC\n");
-                }
-                DeleteObject(Hrgn);
-            }
-        }
+            MSurface->SetClip(NewClip.left + OriginH, NewClip.top + OriginV, NewClip.right + OriginH, NewClip.bottom + OriginV);
     }
     ClipRect = NewClip;
 }
 
 void DeviceTRC::get_clip_rect(RECT& OutRect)
 {
-    // .text:063284d0-06328582. With a DC: a scratch 10x10 region receives the clip region;
-    // none (0) zeroes the cache, an error (-1) leaves it, otherwise its bounding box offset back
-    // by -OriginH / -OriginV is cached; the region is freed. The cache is returned either way.
-    if (MHdc != nullptr)
+    // .text:063284d0: refreshes the cached rectangle from the surface's clip (zero when it has none).
+    if (MSurface != nullptr)
     {
-        HRGN const Hrgn = CreateRectRgn(0, 0, 10, 10);
-        const int Result = GetClipRgn(MHdc, Hrgn);
-        if (Result == 0)
+        int L, T, R, B;
+        if (MSurface->GetClip(&L, &T, &R, &B))
+        {
+            ClipRect.left = L - OriginH;
+            ClipRect.top = T - OriginV;
+            ClipRect.right = R - OriginH;
+            ClipRect.bottom = B - OriginV;
+        }
+        else
         {
             ClipRect.left = 0;
             ClipRect.top = 0;
             ClipRect.right = 0;
             ClipRect.bottom = 0;
         }
-        else if (Result != -1)
-        {
-            RECT RgnBox;
-            GetRgnBox(Hrgn, &RgnBox);
-            OffsetRect(&RgnBox, -OriginH, -OriginV);
-            ClipRect = RgnBox;
-        }
-        DeleteObject(Hrgn);
     }
     OutRect = ClipRect;
 }
-
-
 
 TextRenderContext::Image* DeviceTRC::create_image(const char* const Filename)
 {
@@ -1053,8 +933,7 @@ void DeviceTRC::destroy_image(Image* Img)
     }
 }
 
-void DeviceTRC::bind_to_dc(HDC InDC)
+void DeviceTRC::bind_to_surface(fl::text::Surface* InSurface)
 {
-    // Common.dll.c 0x466b0: *(this+0x3c) = InDC.
-    MHdc = InDC;
+    MSurface = InSurface;
 }

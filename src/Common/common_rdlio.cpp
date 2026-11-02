@@ -1169,6 +1169,8 @@ namespace
     };
 }
 
+namespace { HRESULT RunSimpleSax(std::wstring const& Doc, ISAXContentHandlerRdlx& Sink); }   // defined below
+
 // Common.dll.c/.txt 0xcbf80 (Common.dll.txt:364321-364417). Ported 2026-09-09 (D109). Retail
 // flow, traced instruction-by-instruction:
 //   1. CoCreateInstance(CLSID_SAXXMLReader, NULL, 0x7 [CLSCTX_INPROC_SERVER|
@@ -1186,44 +1188,35 @@ namespace
 //      (parseURL result == 0), matching the SETZ-on-EAX==0 at 364388.
 bool XMLReader::read_file(RenderDisplayList& Rdl, const char* Filename)
 {
-    // CORRECTED 2026-09-17: the sink is constructed FIRST and the reader interface is created
-    // straight into the sink's own +0x04 field, which is what retail does (see the field and
-    // destructor comments on RDLXParser). The sink's destructor is the only thing
-    // that releases it -- retail has no separate local holding the reference, and its two
-    // explicit Release sites are that destructor inlined.
+    // .text:0632bf80. PORT: read the file (UTF-16 with BOM, UTF-8 or ASCII) and run the SAX driver.
     RDLXParser Handler(Rdl);
-    HRESULT Hr = CoCreateInstance(CLSID_SAXXMLReader_Rdlx, nullptr,
-                                  CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER,
-                                  IID_ISAXXMLReader_Rdlx, (void**)&Handler.Ctx.Reader);
-    // `CMP EAX,EBX; JL` (.text:0632bfdc) -- only a negative HRESULT fails; the reader is then
-    // used without a null check.
-    if (Hr < 0)
-    {
+    if (Handler.Ctx.bSkipParse != 0 || Filename == nullptr)
         return false;
-    }
-
-    // putContentHandler (vtbl+0x28): `CMP EAX,EBX; SETZ` -- anything but exactly S_OK fails.
-    if (Handler.Ctx.Reader->putContentHandler(&Handler) != S_OK)
-    {
+    std::string Path(Filename);
+    for (char& C : Path)
+        if (C == '\\') C = '/';
+    FILE* File = fopen(Path.c_str(), "rb");
+    if (File == nullptr)
         return false;
-    }
-
-    // .text:0632bff8-0632c002: the sink's +0x08 byte (zeroed at .text:0632bfb5, never written
-    // again) set -> result false without parsing.
-    if (Handler.Ctx.bSkipParse != 0)
+    std::vector<unsigned char> Data;
+    unsigned char Chunk[4096];
+    size_t Got;
+    while ((Got = fread(Chunk, 1, sizeof(Chunk), File)) != 0)
+        Data.insert(Data.end(), Chunk, Chunk + Got);
+    fclose(File);
+    std::wstring Doc;
+    if (Data.size() >= 2 && Data[0] == 0xFF && Data[1] == 0xFE)
     {
-        return false;
+        for (size_t Index = 2; Index + 1 < Data.size(); Index += 2)
+            Doc.push_back(static_cast<wchar_t>(Data[Index] | (Data[Index + 1] << 8)));
     }
-
-    // .text:0632c004-0632c016: mbstowcs into a 1000-wchar stack buffer with a 999 cap. Retail
-    // does not terminate a name that fills the cap (UB in retail); the port terminates the last
-    // slot to stay deterministic.
-    wchar_t WideFilename[1000];
-    mbstowcs(WideFilename, Filename, 0x3e7);
-    WideFilename[999] = L'\0';
-
-    // parseURL (vtbl+0x50); `CMP EAX,EBX; SETZ` -- the result is exactly S_OK.
-    return Handler.Ctx.Reader->parseURL(WideFilename) == S_OK;
+    else
+    {
+        size_t Index = (Data.size() >= 3 && Data[0] == 0xEF && Data[1] == 0xBB && Data[2] == 0xBF) ? 3 : 0;
+        for (; Index < Data.size(); ++Index)
+            Doc.push_back(static_cast<wchar_t>(Data[Index]));   // ASCII / Latin-1 subset
+    }
+    return RunSimpleSax(Doc, Handler) == S_OK;
 }
 
 // Common.dll.txt 0xcc0a0 / item 73130: retail default is `XOR AL,AL; RET 0x14` — always false.
@@ -1235,65 +1228,186 @@ bool XMLReader::extract_text_from_buffer(wchar_t* /*Dest*/, unsigned int /*MaxSi
     return false;
 }
 
+
+// ----------------------------------------------------------------------------------------------
+// PORT: minimal SAX driver. Retail fed the RDLX sink through MSXML's SAX2 reader (CoCreateInstance);
+// there is no MSXML here, so this tokenizer plays the reader's part and calls the same sink
+// (startElement / endElement / characters) with the same arguments. The RDL markup is plain
+// element / attribute / text content (see the resources: <RDL><PUSH/><TEXT>..</TEXT><PARA/><POP/></RDL>).
+// ----------------------------------------------------------------------------------------------
+namespace
+{
+    class SaxAttributes : public ISAXAttributesRdlx
+    {
+    public:
+        std::vector<std::wstring> Names;
+        std::vector<std::wstring> Values;
+
+        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void**) override { return E_NOINTERFACE; }
+        ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+        ULONG STDMETHODCALLTYPE Release() override { return 1; }
+        HRESULT STDMETHODCALLTYPE getLength(int* N) override { *N = (int)Names.size(); return S_OK; }
+        HRESULT STDMETHODCALLTYPE getURI(int, const wchar_t** P, int* C) override { *P = L""; *C = 0; return S_OK; }
+        HRESULT STDMETHODCALLTYPE getLocalName(int I, const wchar_t** P, int* C) override
+        {
+            if (I < 0 || I >= (int)Names.size()) return E_INVALIDARG;
+            *P = Names[I].c_str(); *C = (int)Names[I].size(); return S_OK;
+        }
+        HRESULT STDMETHODCALLTYPE getQName(int I, const wchar_t** P, int* C) override { return getLocalName(I, P, C); }
+        HRESULT STDMETHODCALLTYPE getName(int, const wchar_t**, int*, const wchar_t**, int*, const wchar_t**, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getIndexFromName(const wchar_t*, int, const wchar_t*, int, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getIndexFromQName(const wchar_t*, int, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getType(int, const wchar_t** P, int* C) override { *P = L"CDATA"; *C = 5; return S_OK; }
+        HRESULT STDMETHODCALLTYPE getTypeFromName(const wchar_t*, int, const wchar_t*, int, const wchar_t**, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getTypeFromQName(const wchar_t*, int, const wchar_t**, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getValue(int I, const wchar_t** P, int* C) override
+        {
+            if (I < 0 || I >= (int)Values.size()) return E_INVALIDARG;
+            *P = Values[I].c_str(); *C = (int)Values[I].size(); return S_OK;
+        }
+        HRESULT STDMETHODCALLTYPE getValueFromName(const wchar_t*, int, const wchar_t*, int, const wchar_t**, int*) override { return E_NOTIMPL; }
+        HRESULT STDMETHODCALLTYPE getValueFromQName(const wchar_t*, int, const wchar_t**, int*) override { return E_NOTIMPL; }
+    };
+
+    std::wstring SaxDecode(const std::wstring& In)
+    {
+        std::wstring Out;
+        Out.reserve(In.size());
+        for (size_t I = 0; I < In.size(); ++I)
+        {
+            if (In[I] != L'&') { Out.push_back(In[I]); continue; }
+            size_t End = In.find(L';', I);
+            if (End == std::wstring::npos || End - I > 10) { Out.push_back(In[I]); continue; }
+            std::wstring Ent = In.substr(I + 1, End - I - 1);
+            if (Ent == L"lt") Out.push_back(L'<');
+            else if (Ent == L"gt") Out.push_back(L'>');
+            else if (Ent == L"amp") Out.push_back(L'&');
+            else if (Ent == L"quot") Out.push_back(L'"');
+            else if (Ent == L"apos") Out.push_back(L'\'');
+            else if (Ent.size() > 1 && Ent[0] == L'#')
+            {
+                long V = Ent[1] == L'x' ? wcstol(Ent.c_str() + 2, nullptr, 16) : wcstol(Ent.c_str() + 1, nullptr, 10);
+                Out.push_back((wchar_t)V);
+            }
+            else { Out.push_back(In[I]); continue; }
+            I = End;
+        }
+        return Out;
+    }
+
+    // Returns S_OK when the whole document was tokenised.
+    HRESULT RunSimpleSax(std::wstring const& Doc, ISAXContentHandlerRdlx& Sink)
+    {
+        size_t I = 0;
+        size_t const N = Doc.size();
+        if (I < N && Doc[I] == 0xFEFF) ++I;
+        Sink.startDocument();
+        while (I < N)
+        {
+            if (Doc[I] != L'<')
+            {
+                size_t End = Doc.find(L'<', I);
+                if (End == std::wstring::npos) End = N;
+                std::wstring Text = SaxDecode(Doc.substr(I, End - I));
+                if (!Text.empty()) Sink.characters(Text.c_str(), (int)Text.size());
+                I = End;
+                continue;
+            }
+            if (Doc.compare(I, 2, L"<?") == 0)
+            {
+                size_t End = Doc.find(L"?>", I);
+                if (End == std::wstring::npos) return E_FAIL;
+                I = End + 2;
+            }
+            else if (Doc.compare(I, 4, L"<!--") == 0)
+            {
+                size_t End = Doc.find(L"-->", I);
+                if (End == std::wstring::npos) return E_FAIL;
+                I = End + 3;
+            }
+            else if (Doc.compare(I, 9, L"<![CDATA[") == 0)
+            {
+                size_t End = Doc.find(L"]]>", I);
+                if (End == std::wstring::npos) return E_FAIL;
+                std::wstring Text = Doc.substr(I + 9, End - I - 9);
+                if (!Text.empty()) Sink.characters(Text.c_str(), (int)Text.size());
+                I = End + 3;
+            }
+            else if (Doc.compare(I, 2, L"<!") == 0)
+            {
+                size_t End = Doc.find(L'>', I);
+                if (End == std::wstring::npos) return E_FAIL;
+                I = End + 1;
+            }
+            else if (Doc.compare(I, 2, L"</") == 0)
+            {
+                size_t End = Doc.find(L'>', I);
+                if (End == std::wstring::npos) return E_FAIL;
+                std::wstring Name = Doc.substr(I + 2, End - I - 2);
+                while (!Name.empty() && iswspace((wint_t)Name.back())) Name.pop_back();
+                Sink.endElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size());
+                I = End + 1;
+            }
+            else
+            {
+                ++I;
+                size_t NameEnd = I;
+                while (NameEnd < N && !iswspace((wint_t)Doc[NameEnd]) && Doc[NameEnd] != L'/' && Doc[NameEnd] != L'>') ++NameEnd;
+                std::wstring Name = Doc.substr(I, NameEnd - I);
+                I = NameEnd;
+                SaxAttributes Attrs;
+                bool SelfClose = false;
+                for (;;)
+                {
+                    while (I < N && iswspace((wint_t)Doc[I])) ++I;
+                    if (I >= N) return E_FAIL;
+                    if (Doc[I] == L'>') { ++I; break; }
+                    if (Doc[I] == L'/') { SelfClose = true; ++I; continue; }
+                    size_t AEnd = I;
+                    while (AEnd < N && Doc[AEnd] != L'=' && !iswspace((wint_t)Doc[AEnd]) && Doc[AEnd] != L'>' && Doc[AEnd] != L'/') ++AEnd;
+                    std::wstring AName = Doc.substr(I, AEnd - I);
+                    I = AEnd;
+                    while (I < N && iswspace((wint_t)Doc[I])) ++I;
+                    std::wstring AValue;
+                    if (I < N && Doc[I] == L'=')
+                    {
+                        ++I;
+                        while (I < N && iswspace((wint_t)Doc[I])) ++I;
+                        if (I < N && (Doc[I] == L'"' || Doc[I] == L'\''))
+                        {
+                            wchar_t Q = Doc[I++];
+                            size_t VEnd = Doc.find(Q, I);
+                            if (VEnd == std::wstring::npos) return E_FAIL;
+                            AValue = SaxDecode(Doc.substr(I, VEnd - I));
+                            I = VEnd + 1;
+                        }
+                    }
+                    if (AName.empty()) return E_FAIL;
+                    Attrs.Names.push_back(AName);
+                    Attrs.Values.push_back(AValue);
+                }
+                Sink.startElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size(), &Attrs);
+                if (SelfClose)
+                    Sink.endElement(L"", 0, Name.c_str(), (int)Name.size(), Name.c_str(), (int)Name.size());
+            }
+        }
+        Sink.endDocument();
+        return S_OK;
+    }
+}
+
 bool XMLReader::read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned int Size)
 {
-    // .text:0632ac30-0632ae10. Same sink / reader ownership as read_file: the sink is zeroed
-    // on the stack (.text:0632ac5a-0632ac6a), the reader is created into its +0x04 and the
-    // sink's destructor releases it (.text:0632adb7 / 0632ade8).
+    // .text:0632ac30. PORT: the buffer is UTF-16 (Size bytes); the SAX driver above replaces MSXML.
     RDLXParser Handler(Rdl);
-    HRESULT Hr = CoCreateInstance(CLSID_SAXXMLReader_Rdlx, nullptr,
-                                  CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER,
-                                  IID_ISAXXMLReader_Rdlx, (void**)&Handler.Ctx.Reader);
-    // `TEST EAX,EAX; JL` -- only a negative HRESULT fails; no null check on the reader.
-    if (Hr < 0)
-    {
-        return false;
-    }
-
-    // putContentHandler (vtbl+0x28): `TEST EAX,EAX; SETZ` -- anything but exactly S_OK fails.
-    if (Handler.Ctx.Reader->putContentHandler(&Handler) != S_OK)
-    {
-        return false;
-    }
-
-    // .text:0632acae-0632acbb: the sink's +0x08 byte (zeroed at .text:0632ac66, never written
-    // again) set -> result false without parsing.
     if (Handler.Ctx.bSkipParse != 0)
-    {
         return false;
-    }
-
-    // .text:0632acc0-0632ad0e: `_bstr_t Raw(SysAllocStringByteLen(Buffer, Size), false)` --
-    // operator new(0xc) + FUN_0632ae70 (_bstr_t::Data_t(BSTR, false)); _com_issue_error
-    // (FUN_06392140) with E_OUTOFMEMORY when the holder is not allocated.
-    _bstr_t Raw(SysAllocStringByteLen(Buffer, Size), false);
-
-    // .text:0632ad0e-0632ad45: VC6's inline _variant_t(const _bstr_t&): vt = VT_BSTR, bstrVal = a
-    // byte-for-byte copy of Raw's BSTR, _com_issue_error(E_OUTOFMEMORY) if the copy is null.
-    // Retail writes only vt and bstrVal; the reserved words are zeroed here rather than left as
-    // stack contents.
-    VARIANT Input;
-    memset(&Input, 0, sizeof(Input));
-    Input.vt = VT_BSTR;
-    wchar_t* RawChars = (wchar_t*)Raw;
-    Input.bstrVal = SysAllocStringByteLen((const char*)RawChars, SysStringByteLen(RawChars));
-    if (Input.bstrVal == nullptr)
-    {
-        _com_issue_error(E_OUTOFMEMORY);
-    }
-
-    // parse (vtbl+0x4c) takes the VARIANT by value (.text:0632ad53-0632ad75).
-    HRESULT ParseHr = Handler.Ctx.Reader->parse(Input);
-
-    // VC6's ~_variant_t: VariantClear, _com_issue_error on a negative result (.text:0632ad7a-0632ad8f).
-    HRESULT ClearHr = VariantClear(&Input);
-    if (ClearHr < 0)
-    {
-        _com_issue_error(ClearHr);
-    }
-
-    // `TEST EDI,EDI; SETZ` -- exactly S_OK. Raw is released next (FUN_0632aed0), then the sink.
-    return ParseHr == S_OK;
+    const unsigned short* const Units = reinterpret_cast<const unsigned short*>(Buffer);
+    std::wstring Doc;
+    Doc.reserve(Size / 2);
+    for (unsigned int Index = 0; Index < Size / 2; ++Index)
+        Doc.push_back(static_cast<wchar_t>(Units[Index]));
+    return RunSimpleSax(Doc, Handler) == S_OK;
 }
 
 // Common.dll.c 0xc5ec0

@@ -955,8 +955,11 @@ namespace
             const double w = (double)r - l, h = (double)t - b, d = (double)f - n;
             projV_[0] = (float)(2.0 / w); projV_[5] = (float)(2.0 / h); projV_[10] = (float)(2.0 / d);
             projV_[12] = (float)(-((double)r + l) / w); projV_[13] = (float)(-((double)b + t) / h); projV_[14] = (float)(-(double)n / d); projV_[15] = 1.0f;
+            StoreProjForGet();
             return GR_OK;
         }
+        // RP8 GetProjection hands back the transpose of the stored projection (Transforms_.Projection.LoadTransposed).
+        void StoreProjForGet() { for (int r = 0; r < 4; ++r) for (int c = 0; c < 4; ++c) proj_[r * 4 + c] = projV_[c * 4 + r]; }
         GENRESULT DACOM_API SetPerspective(float fov, float aspect, float n, float f) override
         {
             if (TraceCam()) fprintf(stderr, "[cam] perspective fov=%g aspect=%g near=%g far=%g\n", fov, aspect, n, f);
@@ -965,6 +968,7 @@ namespace
             const float inv = 1.0f / (f - n);
             memset(projV_, 0, sizeof(projV_));
             projV_[0] = cot / aspect; projV_[5] = cot; projV_[10] = f * inv; projV_[11] = 1.0f; projV_[14] = -f * n * inv;
+            StoreProjForGet();
             return GR_OK;
         }
 

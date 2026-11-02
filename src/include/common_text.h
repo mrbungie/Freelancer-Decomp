@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #pragma once
+#include "fl/text.h"
 
 #include "common_exports.h"
 
@@ -483,7 +484,7 @@ class COMMON_API DeviceTRC : public TextRenderContext
 {
 public:
     DeviceTRC();
-    DeviceTRC(HDC InDC);
+    DeviceTRC(fl::text::Surface* InSurface);   // PORT: retail took a GDI HDC
     DeviceTRC(const DeviceTRC& Other);
     virtual ~DeviceTRC();
 
@@ -503,10 +504,15 @@ public:
         WinFont();
         ~WinFont();
 
-        LOGFONTA LogFont;           // +0x00
-        int UnscaledSize;           // +0x3C  FUN_063277f0 stashes the unscaled size here; FILD (signed)
-        HFONT FontHandle;           // +0x40
-        TEXTMETRICA Metrics;        // +0x44
+        // PORT: retail kept a LOGFONTA + HFONT here; the face request and the platform font replace them.
+        char FaceName[32];
+        int Weight;                 // 400 / 700
+        unsigned char bItalic;
+        unsigned char bUnderline;
+        int LogHeight;              // scaled cell height in pixels (lfHeight)
+        int UnscaledSize;           // FUN_063277f0 stashes the unscaled size here; FILD (signed)
+        fl::text::IFont* Font;      // null when the platform has no text backend / the face failed
+        TEXTMETRICA Metrics;
     };
 
     // Static methods
@@ -533,7 +539,7 @@ public:
     virtual Image* create_image(const char* const Filename) override;
     virtual void destroy_image(Image* Img) override;
 
-    void bind_to_dc(HDC InDC);
+    void bind_to_surface(fl::text::Surface* InSurface);
 
 private:
     // The RichText entry points write the shadow offsets and free / rebuild mFont.
@@ -552,7 +558,7 @@ private:
     static int mDropShadowY;
     static WinFont mFont[256];
 
-    HDC MHdc;                   // +0x3C
+    fl::text::Surface* MSurface;   // +0x3C (retail: HDC)
     // +0x40..+0x4C, formerly Field40..Field4C: the cached clip rectangle in context
     // coordinates. set_clip_rect (.text:063284a1) stores its argument here, get_clip_rect
     // (.text:063284d0) refreshes it from the DC's clip region (zeroed when the DC has none) and

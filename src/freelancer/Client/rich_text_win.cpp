@@ -55,19 +55,10 @@ namespace
     // (0x0057a320..0x0057a36b) inline the same body.
     void ReleaseRichTextSurface(FRichTextSurface* Surface)
     {
-        if (Surface->Dc != nullptr)
-        {
-            if (Surface->PreviousObject != nullptr)
-                SelectObject(Surface->Dc, Surface->PreviousObject);
-            if (Surface->Bitmap != nullptr)
-                DeleteObject(Surface->Bitmap);
-            DeleteDC(Surface->Dc);
-        }
+        delete Surface->Gfx;
         Surface->Height = -1;
         Surface->Width = -1;
-        Surface->PreviousObject = nullptr;
-        Surface->Bitmap = nullptr;
-        Surface->Dc = nullptr;
+        Surface->Gfx = nullptr;
     }
 
     // 0x0057a274..0x0057a2f8, spelled out twice (width, then height): a negative size becomes 1,
@@ -106,9 +97,7 @@ BaseRichTextWin::BaseRichTextWin()
     // and the DeviceTRC (import 0x005c6c20) are the members' own constructors.
     Surface.Height = -1;
     Surface.Width = -1;
-    Surface.Dc = nullptr;
-    Surface.Bitmap = nullptr;
-    Surface.PreviousObject = nullptr;
+    Surface.Gfx = nullptr;
     Image = nullptr;
 
     // The hover record: caption buffer empty and the Font::String (FUN_004144b0) -- the member's
@@ -293,23 +282,30 @@ void BaseRichTextWin::UpdateInactive()
 void BaseRichTextWin::Draw()
 {
     // FUN_0057ab10.
+    if (getenv("FL_TRACE_FONT"))
+    {
+        static int N0 = 0;
+        if (N0++ < 20)
+            fprintf(stderr, "[rtw] Draw0 this=%p flags=%x\n", (void*)this, (unsigned)Flags);
+    }
     if ((Flags & 2) == 0)
         return;
 
     EnsureSurface();
+    if (getenv("FL_TRACE_FONT"))
+    {
+        static int N = 0;
+        if (N++ < 30)
+            fprintf(stderr, "[rtw] Draw this=%p flags=%x pix=%dx%d surf=%p %dx%d sdirty=%d ldirty=%d\n", (void*)this, (unsigned)Flags, PixelWidth, PixelHeight, (void*)Surface.Gfx, Surface.Width, Surface.Height, (int)bSurfaceDirty, (int)bLayoutDirty);
+    }
 
     if ((bSurfaceDirty != 0 || bLayoutDirty != 0) && PixelWidth > 0 && PixelHeight > 0)
     {
-        SelectClipRgn(Surface.Dc, nullptr);
-        RECT Fill;
-        Fill.left = 0;
-        Fill.top = 0;
-        Fill.right = Surface.Width;
-        Fill.bottom = Surface.Height;
-        HBRUSH const Brush = CreateSolidBrush(0);
-        FillRect(Surface.Dc, &Fill, Brush);
-        if (Brush != nullptr)
-            DeleteObject(Brush);
+        if (Surface.Gfx != nullptr)
+        {
+            Surface.Gfx->ClearClip();
+            Surface.Gfx->Fill(0);
+        }
 
         if (ScrollBarV != nullptr)
         {
@@ -342,27 +338,12 @@ void BaseRichTextWin::Draw()
         Trc.set_pos_h(0);
         LayoutList.execute(Trc, true);
 
-        // Read the 16-bit DIB back out of the bitmap: deselect it, GetDIBits, reselect it.
+        // Pack the surface into the 16-bit buffer the BigImage upload takes.
         unsigned int const BufferBytes = static_cast<unsigned int>(Pitch * Surface.Height);
         unsigned char* const Buffer = static_cast<unsigned char*>(operator new(BufferBytes));
-        struct FDibInfo
-        {
-            BITMAPINFOHEADER Header;
-            RGBQUAD Colors[1];
-        };
-        FDibInfo Info;
-        memset(&Info, 0, sizeof(Info));
-        Info.Header.biSize = 0x28;
-        Info.Header.biWidth = Surface.Width;
-        Info.Header.biHeight = -Surface.Height;
-        Info.Header.biPlanes = 1;
-        Info.Header.biBitCount = 0x10;
-        Info.Header.biSizeImage = BufferBytes;
-        SelectObject(Surface.Dc, Surface.PreviousObject);
-        int const Lines = GetDIBits(Surface.Dc, Surface.Bitmap, 0,
-                                    static_cast<UINT>(Surface.Height), Buffer,
-                                    reinterpret_cast<BITMAPINFO*>(&Info), 0);
-        SelectObject(Surface.Dc, Surface.Bitmap);
+        int const Lines = Surface.Gfx != nullptr ? Surface.Height : 0;
+        if (Surface.Gfx != nullptr)
+            Surface.Gfx->ReadX1R5G5B5(Buffer, Pitch);
 
         // Every drawn (non-black) pixel gets the A1 bit.
         if (Lines != 0)
@@ -756,6 +737,8 @@ void BaseRichTextWin::EnsureSurface()
         Sum += M[Row * 4 + 3];
         Clip0[Row] = static_cast<float>(Sum);
     }
+    if (getenv("FL_TRACE_FONT"))
+        fprintf(stderr, "[rtw] rect view=%d,%d %dx%d clip0=(%g %g %g %g) M=[%g %g %g %g|%g %g %g %g|%g %g %g %g|%g %g %g %g] w0=(%g %g %g)\n", ViewX, ViewY, ViewW, ViewH, Clip0[0], Clip0[1], Clip0[2], Clip0[3], M[0],M[1],M[2],M[3],M[4],M[5],M[6],M[7],M[8],M[9],M[10],M[11],M[12],M[13],M[14],M[15], World0.X, World0.Y, World0.Z);
     if (Clip0[3] == 0.0f)
         return;
     double const InvW0 = 1.0 / Clip0[3];
@@ -829,15 +812,7 @@ void BaseRichTextWin::EnsureSurface()
             ReleaseRichTextSurface(&Surface);
             Surface.Width = SurfaceW;
             Surface.Height = SurfaceH;
-            HDC const ScreenDc = GetDC(nullptr);
-            Surface.Dc = CreateCompatibleDC(ScreenDc);
-            if (Surface.Dc != nullptr)
-            {
-                Surface.Bitmap = CreateCompatibleBitmap(ScreenDc, Surface.Width, Surface.Height);
-                if (Surface.Bitmap != nullptr)
-                    Surface.PreviousObject = SelectObject(Surface.Dc, Surface.Bitmap);
-            }
-            ReleaseDC(nullptr, ScreenDc);
+            Surface.Gfx = new fl::text::Surface(Surface.Width, Surface.Height);
         }
 
         Pitch = Surface.Width * 2;
@@ -899,7 +874,7 @@ void BaseRichTextWin::EnsureSurface()
         bLayoutDirty = 1;
         bSurfaceDirty = 1;
     }
-    Trc.bind_to_dc(Surface.Dc);
+    Trc.bind_to_surface(Surface.Gfx);
 }
 
 DeviceTRC* BaseRichTextWin::GetDeviceTRC()
@@ -923,7 +898,7 @@ void BaseRichTextWin::MarkDirty(bool bSurface, bool bLayout)
 void BaseRichTextWin::RebuildLayoutIfDirty()
 {
     // FUN_0057a680.
-    if (Surface.Dc == nullptr || bLayoutDirty == 0)
+    if (Surface.Gfx == nullptr || bLayoutDirty == 0)
         return;
 
     Trc.reset_to_default();
