@@ -477,6 +477,27 @@ namespace
         GENRESULT Submit(uint32_t prim, unsigned fvf, const unsigned char* verts, unsigned nverts, const uint16_t* idx, unsigned nidx)
         {
             if (!sgReady_ || !verts || nverts == 0) return GR_GENERIC;
+            {   // debug bisect: FL_SKIP_LO/HI skip draws [lo,hi) of the frame; FL_LIST_DRAWS prints them
+                static const char* lo = getenv("FL_SKIP_LO"); static const char* hi = getenv("FL_SKIP_HI");
+                static const bool list = getenv("FL_LIST_DRAWS") != nullptr;
+                if (list && drawCalls_ < 400) fprintf(stderr, "[drawlist] #%u fvf=0x%x n=%u prim=%u blend=%d src=%d dst=%d zen=%d tex0=%p\n", drawCalls_, fvf, nverts, prim, renderState_[27], renderState_[19], renderState_[20], renderState_[7], stageTex_[0]);
+                static const char* dumpIdx = getenv("FL_DUMP_DRAW");
+                if (dumpIdx && fvf == 0x142 && nverts == (unsigned)atoi(dumpIdx))
+                {
+                    const fldraw::FvfLayout DL = fldraw::MakeLayout(fvf);
+                    fprintf(stderr, "[dumpdraw] #%u fvf=0x%x n=%u stride=%u nidx=%u tex0=%p\n", drawCalls_, fvf, nverts, DL.stride, nidx, stageTex_[0]);
+                    for (unsigned i = 0; i < nverts && i < 24; ++i)
+                    {
+                        const float* f = (const float*)(verts + (size_t)i * DL.stride);
+                        const uint32_t* u = (const uint32_t*)f;
+                        fprintf(stderr, "[dumpdraw]  v%u pos=(%g %g %g) col=%08x uv=(%g %g)\n", i, f[0], f[1], f[2], u[3], f[4], f[5]);
+                    }
+                    fprintf(stderr, "[dumpdraw] stage0: cop=%d a1=%d a2=%d aop=%d aa1=%d aa2=%d addr=%d,%d  tfactor=%08x\n", stageState_[0][1], stageState_[0][2], stageState_[0][3], stageState_[0][4], stageState_[0][5], stageState_[0][6], stageState_[0][13], stageState_[0][14], renderState_[60]);
+                }
+                static const char* only = getenv("FL_ONLY");
+                if (only && drawCalls_ < 9 && drawCalls_ != (unsigned)atoi(only)) { ++drawCalls_; return GR_OK; }
+                if (lo && hi && drawCalls_ >= (unsigned)atoi(lo) && drawCalls_ < (unsigned)atoi(hi)) { ++drawCalls_; return GR_OK; }
+            }
             const fldraw::FvfLayout L = fldraw::MakeLayout(fvf);
             if (!L.pos || L.stride == 0) return GR_GENERIC;
             if (TraceCam()) fprintf(stderr, "[cam] draw fvf=0x%x n=%u tex0=%p world.t=(%g %g %g) view.t=(%g %g %g) viewRaw=[%g %g %g | %g %g %g | %g %g %g]\n", fvf, nverts, stageTex_[0], worldV_[12], worldV_[13], worldV_[14], viewV_[12], viewV_[13], viewV_[14], viewRaw_[0], viewRaw_[1], viewRaw_[2], viewRaw_[3], viewRaw_[4], viewRaw_[5], viewRaw_[9], viewRaw_[10], viewRaw_[11]);
@@ -652,6 +673,13 @@ namespace
         static void ConvertVertices(unsigned char* dst, unsigned fvf, const FRpVertexSrcDesc* src, unsigned start, unsigned count)
         {
             const fldraw::FvfLayout L = fldraw::MakeLayout(fvf);
+            if (src->SrcFvf == fvf && (src->Flags & 6u) == 2u && src->Position.Base)
+            {
+                // RP8 FDirectX8::CopyVertexData case 3: interleaved source with the same FVF is a plain
+                // byte copy; the per-stream offsets in the descriptor are not consulted.
+                memcpy(dst + (size_t)start * L.stride, src->Position.Base + (size_t)start * src->Position.Stride, (size_t)L.stride * count);
+                return;
+            }
             auto at = [&](const FRpVertexStream& s, unsigned v) -> const unsigned char*
             {
                 if (!s.Base) return nullptr;
@@ -718,6 +746,19 @@ namespace
         // ------------------------------------------------------------ vertex / index copies
         GENRESULT DACOM_API CopyVertexData(void* dest, unsigned fvf, const FRpVertexSrcDesc* src, unsigned start, unsigned count) override
         {
+            static int dumped = 0; if (getenv("FL_DUMP_COPY") && fvf == 0x142 && dumped++ < 4)
+            {
+                fprintf(stderr, "[copy] dstFvf=0x%x srcFvf=0x%x flags=%u start=%u count=%u\n", fvf, src->SrcFvf, src->Flags, start, count);
+                const FRpVertexStream* ss[5] = {&src->Position, &src->Normal, &src->Diffuse, &src->Tex[0], &src->Tex[1]};
+                const char* nm[5] = {"pos", "nrm", "dif", "tex0", "tex1"};
+                for (int i = 0; i < 5; ++i)
+                {
+                    const FRpVertexStream& s = *ss[i];
+                    fprintf(stderr, "[copy]  %s base=%p bytes=%u stride=%u idx=%p cnt=%u", nm[i], (const void*)s.Base, s.ByteSize, s.Stride, (const void*)s.IndexArray, s.Count);
+                    if (s.Base) { const float* f = (const float*)s.Base; fprintf(stderr, " first=%g %g %g %g", f[0], f[1], f[2], f[3]); }
+                    fprintf(stderr, "\n");
+                }
+            }
             ConvertVertices((unsigned char*)dest, fvf, src, start, count);
             return GR_OK;
         }
@@ -734,6 +775,19 @@ namespace
                 selVb_ = pool;
             }
             else { b = (FBuffer*)h; if (!vbs_.count(b)) return (GENRESULT)0xFFFFFFFF; }
+            if (getenv("FL_DUMP_COPY") && src->SrcFvf == 0x142)
+            {
+                const FRpVertexStream* ss[5] = {&src->Position, &src->Normal, &src->Diffuse, &src->Tex[0], &src->Tex[1]};
+                const char* nm[5] = {"pos", "nrm", "dif", "tex0", "tex1"};
+                for (int i = 0; i < 5; ++i)
+                {
+                    const FRpVertexStream& st = *ss[i];
+                    fprintf(stderr, "[copyraw]  %s base=%p bytes=%u stride=%u idx=%p cnt=%u", nm[i], (const void*)st.Base, st.ByteSize, st.Stride, (const void*)st.IndexArray, st.Count);
+                    if (st.Base) { const uint32_t* w = (const uint32_t*)st.Base; fprintf(stderr, " w=%08x %08x %08x %08x %08x %08x", w[0], w[1], w[2], w[3], w[4], w[5]); }
+                    fprintf(stderr, "\n");
+                }
+            }
+            if (getenv("FL_DUMP_COPY")) fprintf(stderr, "[copyverts] vbfvf=0x%x srcFvf=0x%x flags=%u start=%u count=%u\n", b->fvf, src->SrcFvf, src->Flags, start, count);
             const unsigned stride = fldraw::MakeLayout(b->fvf).stride;
             if ((size_t)(offset + count) * stride > b->bytes.size()) b->bytes.resize((size_t)(offset + count) * stride + 4096);
             // ConvertVertices addresses vertices [start, start+count) relative to dst; shift so they land at `offset`.
