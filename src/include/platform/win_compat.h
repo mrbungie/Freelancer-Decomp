@@ -515,16 +515,19 @@ inline int _swprintf(wchar_t* buffer, const wchar_t* format, ...) {
     return res;
 }
 
+// MSVCRT _itoa: any radix 2..36, lowercase digits, '-' only for negative values in radix 10.
 inline char* _itoa(int value, char* str, int radix) {
-    if (radix == 10) {
-        std::sprintf(str, "%d", value);
-    } else if (radix == 16) {
-        std::sprintf(str, "%x", value);
-    } else if (radix == 8) {
-        std::sprintf(str, "%o", value);
-    } else {
-        std::sprintf(str, "%d", value);
-    }
+    char tmp[40];
+    int n = 0;
+    bool neg = (radix == 10 && value < 0);
+    unsigned long long u = neg ? static_cast<unsigned long long>(-static_cast<long long>(value))
+                               : static_cast<unsigned int>(value);
+    if (radix < 2 || radix > 36) { str[0] = 0; return str; }
+    do { unsigned d = static_cast<unsigned>(u % radix); tmp[n++] = static_cast<char>(d < 10 ? '0' + d : 'a' + d - 10); u /= radix; } while (u);
+    char* o = str;
+    if (neg) *o++ = '-';
+    while (n) *o++ = tmp[--n];
+    *o = 0;
     return str;
 }
 
