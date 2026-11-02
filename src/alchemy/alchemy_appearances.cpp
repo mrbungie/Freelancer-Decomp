@@ -1304,9 +1304,11 @@ namespace AlchemyImpl
         G_RenderPipeline->SetRenderState(D3DRS_DESTBLEND, static_cast<int>(Descriptor_->BlendInfo[1]));
 
         // node+0xbc: the first dword of the frame block FUN_06244f30 fills (Texture_.Frame[0]).
-        void* FrameTexture = nullptr;
-        std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
-        G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
+        {
+            uint32_t FrameHandle = 0;
+            std::memcpy(&FrameHandle, &Texture_.Frame[0], sizeof(FrameHandle));   // Frame[0] holds the texture handle's bits
+            G_RenderPipeline->SetTextureStageTexture(0, fl::HandleToPtr(FrameHandle));
+        }
 
         const float IdentityXform12[12] = {
             1.0f, 0.0f, 0.0f,
@@ -2486,9 +2488,11 @@ namespace AlchemyImpl
         G_RenderPipeline->SetRenderState(D3DRS_SRCBLEND, static_cast<int>(Descriptor_->BlendInfo[0]));
         G_RenderPipeline->SetRenderState(D3DRS_DESTBLEND, static_cast<int>(Descriptor_->BlendInfo[1]));
 
-        void* FrameTexture = nullptr;
-        std::memcpy(&FrameTexture, &Texture_.Frame[0], sizeof(FrameTexture));
-        G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
+        {
+            uint32_t FrameHandle = 0;
+            std::memcpy(&FrameHandle, &Texture_.Frame[0], sizeof(FrameHandle));   // Frame[0] holds the texture handle's bits
+            G_RenderPipeline->SetTextureStageTexture(0, fl::HandleToPtr(FrameHandle));
+        }
 
         ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         const float* const View = Camera->GetViewTransform();
@@ -3258,9 +3262,11 @@ namespace AlchemyImpl
         ++G_DrawCounters[1];
         G_RenderPipeline->SetRenderState(D3DRS_SRCBLEND, static_cast<int>(Descriptor_->BlendInfo[0]));
         G_RenderPipeline->SetRenderState(D3DRS_DESTBLEND, static_cast<int>(Descriptor_->BlendInfo[1]));
-        void* FrameTexture;
-        std::memcpy(&FrameTexture, Texture_.Frame, sizeof(FrameTexture));
-        G_RenderPipeline->SetTextureStageTexture(0, FrameTexture);
+        {
+            uint32_t FrameHandle = 0;
+            std::memcpy(&FrameHandle, &Texture_.Frame[0], sizeof(FrameHandle));   // Frame[0] holds the texture handle's bits
+            G_RenderPipeline->SetTextureStageTexture(0, fl::HandleToPtr(FrameHandle));
+        }
         ICamera* const Camera = static_cast<ICamera*>(fl::HandleToPtr(G_DrawCookie));
         float ViewWorld[12];
         ComposeTransform(ViewWorld, Camera->GetViewTransform(), NodeWorldXform_);
@@ -4219,7 +4225,7 @@ namespace AlchemyImpl
             std::memcpy(&Texture, &Texture_.Frame[0], sizeof(Texture));
             FillMode = 3;
         }
-        G_RenderPipeline->SetTextureStageTexture(0, reinterpret_cast<void*>(Texture));
+        G_RenderPipeline->SetTextureStageTexture(0, fl::HandleToPtr(static_cast<uint32_t>(Texture)));
 
         // Retail arms the unwind only after both GetRenderState and SetRenderState.
         struct FBeamFillModeState
