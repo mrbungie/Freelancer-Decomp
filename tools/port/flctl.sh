@@ -9,7 +9,7 @@
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; FIFO=/tmp/fl.cmd; LOG=/tmp/fl_game.log
 case "$1" in
   run) pkill -9 -x freelancer 2>/dev/null; rm -f $FIFO
-       (cd "$ROOT/bin" && env FL_CONTROL=$FIFO $FL_EXTRA_ENV nohup ./freelancer >/dev/null 2>$LOG &); sleep 5; sleep 1; echo started;;
+       (cd "$ROOT/${FL_BIN:-bin}" && env FL_CONTROL=$FIFO $FL_EXTRA_ENV nohup ./freelancer >/dev/null 2>$LOG &); sleep 5; sleep 1; echo started;;
   click|move) timeout 3 bash -c "echo '$1 $2 $3' > $FIFO"; sleep 1;;
   shot) id=$(swift /tmp/winid.swift 2>/dev/null | awk '$2<2000 && $2>=800 && $3>=600{print $1; exit}')
         screencapture -x -o -l"$id" "${2:-/tmp/fl_shot.png}"; echo "${2:-/tmp/fl_shot.png}";;

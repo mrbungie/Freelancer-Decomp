@@ -2451,15 +2451,14 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
                 if (MatAnim_ == nullptr)
                 {
                     const char* Name = InstanceName_;
-                    uint32_t CrcStruct[2];
-                    CrcStruct[0] = (uint32_t)fl::PtrToHandle((Name));
-                    CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
+                    struct FAnimationNameQuery { const char* Name; uint32_t Crc; };   // host layout, as FMaterialAnimation reads it
+                    FAnimationNameQuery CrcStruct = {Name, DACOM_CRC::GetCRC32(Name)};
                     if (MatAnim_ != nullptr)
                     {
                         MatAnim_->Release();
                         MatAnim_ = nullptr;
                     }
-                    ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
+                    ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, &CrcStruct, &MatAnim_);
                 }
             }
             else if (MatAnim_ != nullptr)
