@@ -779,18 +779,20 @@ struct IObjAffect
 // offset the CompleteObjectLocator at .rdata:063a8b9c fixes. Spelled as a cast here because
 // every caller still holds the object as a void*; once they hold a real IObjRW*, a plain
 // `static_cast<IObjAffect*>` does the same adjustment and this helper can go.
-inline IObjAffect* ObjAffectOf(void* ObjRw)
-{
-    if (ObjRw == nullptr)
-        return nullptr;
-    return reinterpret_cast<IObjAffect*>(static_cast<char*>(ObjRw) + 4);
-}
 
 struct IObjRW : IObjInspect, IObjAffect, Watchable
 {
 };
 
 static_assert(sizeof(IObjRW) == 0x0C, "IObjRW is two vtable pointers plus Watchable");
+
+// IObjAffect is IObjRW's second base (retail: the sub-object at +4); upcast for the real offset.
+inline IObjAffect* ObjAffectOf(void* ObjRw)
+{
+    if (ObjRw == nullptr)
+        return nullptr;
+    return static_cast<IObjRW*>(ObjRw);
+}
 
 // `Watchable` is IObjRW's third base and sits at +8, so the `- 8` the AI state machines
 // do on a watcher target is a downcast to the whole object. The AI TUs (common_aisteer.cpp,
