@@ -6,6 +6,7 @@
 #   flctl.sh shot [file]    window-only screenshot (default /tmp/fl_shot.png)
 #   flctl.sh log [N]        last N lines of the game log (default 15)
 #   flctl.sh try 'click X Y' 'wait 2' 'shot' 'log 8'   one-shot scenario, always quits
+#   'until N' waits (max N s) for a crash/capture/exit instead of a fixed sleep
 #   flctl.sh quit           stop the game
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; FIFO=/tmp/fl.cmd; LOG=/tmp/fl_game.log
 case "$1" in
@@ -17,6 +18,6 @@ case "$1" in
   log) tail -n "${2:-15}" $LOG | cut -c1-200;;
   quit) timeout 3 bash -c "echo quit > $FIFO" ; sleep 1; pkill -9 -x freelancer 2>/dev/null; echo stopped;;
   try) shift; "$0" run >/dev/null; for st in "$@"; do case "$st" in
-         click*|move*) set -- $st; "$0" $1 $2 $3;; wait*) sleep ${st#wait };; shot*) "$0" shot ${st#shot };; log*) "$0" log ${st#log };; esac; done; "$0" quit >/dev/null;;
+         click*|move*) set -- $st; "$0" $1 $2 $3;; wait*) sleep ${st#wait };; until*) n=${st#until }; for _ in $(seq $((n*5))); do grep -qE 'fatal signal|captured|ERROR: Address' $LOG 2>/dev/null && break; pgrep -x freelancer >/dev/null || break; sleep 0.2; done;; shot*) "$0" shot ${st#shot };; log*) "$0" log ${st#log };; esac; done; "$0" quit >/dev/null;;
   *) sed -n 2,8p "$0";;
 esac
