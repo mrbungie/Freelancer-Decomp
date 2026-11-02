@@ -17,6 +17,7 @@
 #include "common_goods.h"   // BaseWatcher
 #include "common_iface.h"   // IObjInspect, IObjRW, ObjRwFromWatchable
 #include "common_aisteer.h" // GetInterceptClearanceOfIface
+#include "common_pathfind.h"
 
 #include <cstring>
 
@@ -46,7 +47,24 @@ namespace CmnIdea
     // dereferences both levels unguarded (e.g. 062d584e/062d5865), and so does this.
     inline unsigned char* SlotArrayOf(void* Context)
     {
-        return *reinterpret_cast<unsigned char**>(static_cast<unsigned char*>(Context) + 0x0c);
+        return reinterpret_cast<unsigned char*>(static_cast<IBehaviorManager*>(Context)->Pathfind);
+    }
+
+    // Byte address of the PathfindManager field the retail offset names (the raw +0x64 / +0x200 /
+    // +0x214.. device above, mapped to this build's layout).
+    inline unsigned char* PfAt(void* Context, unsigned RetailOffset)
+    {
+        unsigned char* const Pf = SlotArrayOf(Context);
+        switch (RetailOffset)
+        {
+        case 0x064: return Pf + offsetof(PathfindManager, Field_064);
+        case 0x200: return Pf + offsetof(PathfindManager, CachedTargetPosition);
+        case 0x214: return Pf + offsetof(PathfindManager, Field_214);
+        case 0x22c: return Pf + offsetof(PathfindManager, Field_22C);
+        case 0x23c: return Pf + offsetof(PathfindManager, Field_23C);
+        case 0x240: return Pf + offsetof(PathfindManager, Field_240);
+        }
+        return Pf + RetailOffset;
     }
 
     // BaseIdea::Handle is the owning SystemManager: retail reaches its SelfTarget as

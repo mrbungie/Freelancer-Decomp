@@ -85,7 +85,7 @@ bool SplineMoveIdea::SetContext(void* InObject, void* InHandle, void* InContext)
     // through Context -- the SAME `*(Context+0xc) + 0x64` idiom MoveIdea::
     // Commit() and this class's own Commit() below use (common_idea.h). Context is
     // dereferenced unguarded, as retail does.
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
+    *reinterpret_cast<int*>(PfAt(Context, 0x64)) = 0;
 
     PersistedT = 0.0f; // 062d9cda
     return true;       // 062d9c9b sets AL=1 and 062d9ce0 reloads it
@@ -97,7 +97,7 @@ void SplineMoveIdea::Commit()
 {
     // 062da316-062da31c: `*(*(Context+0xc)) + 0x64 = 0` -- same publish idiom
     // as SetContext above.
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
+    *reinterpret_cast<int*>(PfAt(Context, 0x64)) = 0;
 
     // 062da329 / 062da338: both embedded members' OWN vtable slot 4 (0x10),
     // zero arguments -- i.e. Commit() on each, confirming the slot-4 identity

@@ -230,7 +230,7 @@ int MoveIdea::Update(float DeltaTime)
     // ---- LAB_062d50df: the steering body. `PUSH EBX` here is what shifts every
     // ---- later stack displacement by four. ----
     // 062d50df-062d50e6: EDI = [Context+0xc] + 0x214, never tested.
-    unsigned char* const SlotBlock = SlotArrayOf(Context) + 0x214;
+    unsigned char* const SlotBlock = PfAt(Context, 0x214);
 
     // 062d5104-062d510b: bit 1 of the dword at SlotBlock+0x00, kept in BL.
     bool const bSlotOverride = ((*reinterpret_cast<unsigned int const*>(SlotBlock) >> 1) & 1u) != 0;
@@ -238,7 +238,7 @@ int MoveIdea::Update(float DeltaTime)
     Vector Goal{ 0.0f, 0.0f, 0.0f };   // 062d50ec-062d50fc, zeroed first
     if (bSlotOverride)
     {
-        Goal = *reinterpret_cast<Vector const*>(SlotBlock + 0x18); // 062d510d-062d5120
+        Goal = *reinterpret_cast<Vector const*>(PfAt(Context, 0x22c)); // 062d510d-062d5120
     }
     else if (TargetKind48 == 1)
     {
@@ -315,11 +315,11 @@ int MoveIdea::Update(float DeltaTime)
     int ModeEff = Mode;
     if (bSlotOverride)
     {
-        if (*reinterpret_cast<int const*>(SlotBlock + 0x2c) == 1)
+        if (*reinterpret_cast<int const*>(PfAt(Context, 0x240)) == 1)
         {
             ModeEff = 0;
         }
-        else if (*reinterpret_cast<float const*>(SlotBlock + 0x28) < 1.0f)
+        else if (*reinterpret_cast<float const*>(PfAt(Context, 0x23c)) < 1.0f)
         {
             // DAT_0639a1d0 == 1.0f. `TEST AH,5; JP` skips on >=, so the
             // ModeEff = 0 fall-through is strictly less-than.
@@ -449,7 +449,7 @@ int MoveIdea::Update(float DeltaTime)
     float Speed2 = Throttle;
     if (*reinterpret_cast<int const*>(SlotBlock) != 0)
     {
-        float const SlotValue = *reinterpret_cast<float const*>(SlotBlock + 0x28);
+        float const SlotValue = *reinterpret_cast<float const*>(PfAt(Context, 0x23c));
         if (SlotValue < Speed2)
         {
             Speed2 = SlotValue;   // 062d5625
@@ -509,8 +509,8 @@ void MoveIdea::Commit()
 
     // LAB_062d570e-062d5750: the unconditional tail. Zeroes the PathfindManager's
     // +0x64 dword and its +0x200..+0x208 Vector, re-reading Context->+0xc each time.
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;
-    float* const Dest = reinterpret_cast<float*>(SlotArrayOf(Context) + 0x200);
+    *reinterpret_cast<int*>(PfAt(Context, 0x64)) = 0;
+    float* const Dest = reinterpret_cast<float*>(PfAt(Context, 0x200));
     Dest[0] = 0.0f;
     Dest[1] = 0.0f;
     Dest[2] = 0.0f;
@@ -533,7 +533,7 @@ void MoveIdea::SetPosition(Vector const& Pos)
     // slot array at +0x200/+0x204/+0x208. Retail re-reads it out of Position
     // (EAX still points at this+0x1c), not out of Pos.
     unsigned char* const Slots = SlotArrayOf(Context);
-    float* const Dest = reinterpret_cast<float*>(Slots + 0x200);
+    float* const Dest = reinterpret_cast<float*>(PfAt(Context, 0x200));
     Dest[0] = Position.x;
     Dest[1] = Position.y;
     Dest[2] = Position.z;
@@ -587,8 +587,8 @@ void MoveIdea::SetWatchObject(void const* Object2)
         // internally), then zero both mirrored fields.
         TargetKind48 = 0;
         Watcher.set(nullptr);
-        *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = 0;  // 062d57f3-062d57f9
-        float* const Dest = reinterpret_cast<float*>(Slots + 0x200); // 062d5800 (EBP)
+        *reinterpret_cast<int*>(PfAt(Context, 0x64)) = 0;  // 062d57f3-062d57f9
+        float* const Dest = reinterpret_cast<float*>(PfAt(Context, 0x200)); // 062d5800 (EBP)
         Dest[0] = 0.0f;
         Dest[1] = 0.0f;
         Dest[2] = 0.0f;
@@ -607,10 +607,10 @@ void MoveIdea::SetWatchObject(void const* Object2)
     // without a test (the watcher was just set to a non-null pointer). The id
     // goes through a fresh Context->+0xc, the position through the captured one.
     IObjRW* const Outer = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
-    *reinterpret_cast<int*>(SlotArrayOf(Context) + 0x64) = static_cast<int>(Outer->get_id()); // 062d57a0-062d57a9
+    *reinterpret_cast<int*>(PfAt(Context, 0x64)) = static_cast<int>(Outer->get_id()); // 062d57a0-062d57a9
     IObjRW* const OuterAgain = ObjRwFromWatchable(const_cast<Watchable*>(Watcher.target()));
     Vector const& Pos = OuterAgain->get_position();                 // 062d57bb
-    float* const PosDest = reinterpret_cast<float*>(Slots + 0x200);  // 062d57bf (EBP)
+    float* const PosDest = reinterpret_cast<float*>(PfAt(Context, 0x200));  // 062d57bf (EBP)
     PosDest[0] = Pos.x;
     PosDest[1] = Pos.y;
     PosDest[2] = Pos.z;
